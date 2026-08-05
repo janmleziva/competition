@@ -12,3 +12,4 @@ publish/
 appsettings.Secrets.json
 deployment/logs/
 deployment/ftp-creds.json
+deployment/rollback-cache/
