@@ -6,7 +6,19 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddRazorPages();
 builder.Services.AddDbContext<CompetitionDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("CompetitionDb") ?? "Data Source=competition.db"));
+{
+    var connectionString = builder.Configuration.GetConnectionString("CompetitionDb") ?? "Data Source=competition.db";
+    var provider = builder.Configuration.GetValue<string>("DatabaseProvider") ?? "Sqlite";
+
+    if (provider.Equals("SqlServer", StringComparison.OrdinalIgnoreCase))
+    {
+        options.UseSqlServer(connectionString);
+    }
+    else
+    {
+        options.UseSqlite(connectionString);
+    }
+});
 builder.Services.AddScoped<StandingsService>();
 
 var app = builder.Build();
