@@ -1,0 +1,14 @@
+bin/
+obj/
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.log
+publish/
+*.pubxml.user
+*.pubxml
+appsettings.Secrets.json
+deployment/logs/
+deployment/ftp-creds.json
