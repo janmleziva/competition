@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"] - Competition Tracker</title>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    <header class="app-header">
+        <a class="brand" asp-page="/Index">Competition Tracker</a>
+        <nav>
+            <a asp-page="/Standings/Index">Standings</a>
+            <a asp-page="/Competitors/Index">Competitors</a>
+            <a asp-page="/Disciplines/Index">Disciplines</a>
+            <a asp-page="/Matches/Index">Matches</a>
+            <a asp-page="/Results/Index">Results</a>
+        </nav>
+    </header>
+    <main class="container">
+        @RenderBody()
+    </main>
+</body>
+</html>

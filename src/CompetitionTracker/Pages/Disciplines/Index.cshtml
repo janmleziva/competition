@@ -1,0 +1,17 @@
+@page
+@model CompetitionTracker.Pages.Disciplines.IndexModel
+@{
+    ViewData["Title"] = "Disciplines";
+}
+<h1>Disciplines</h1>
+<form method="post" class="card form-card">
+    <label>Name <input asp-for="Input.Name" /></label>
+    <label>Scoring notes <textarea asp-for="Input.ScoringNotes"></textarea></label>
+    <button class="button primary" type="submit">Add discipline</button>
+</form>
+<div class="stack">
+@foreach (var discipline in Model.Disciplines)
+{
+    <article class="card"><h2>@discipline.Name</h2><p>@discipline.ScoringNotes</p></article>
+}
+</div>

@@ -1,0 +1,24 @@
+@page
+@model CompetitionTracker.Pages.Results.IndexModel
+@{
+    ViewData["Title"] = "Results";
+}
+<h1>Results</h1>
+<form method="post" class="card form-card">
+    <label>Match <select asp-for="Input.MatchId" asp-items="Model.MatchOptions"></select></label>
+    <label>Competitor <select asp-for="Input.CompetitorId" asp-items="Model.CompetitorOptions"></select></label>
+    <label>Rank <input asp-for="Input.Rank" type="number" min="1" /></label>
+    <label>Raw score <input asp-for="Input.RawScore" /></label>
+    <label>Points <input asp-for="Input.Points" type="number" min="0" step="0.01" /></label>
+    <button class="button primary" type="submit">Save result</button>
+</form>
+<div class="stack">
+@foreach (var result in Model.Results)
+{
+    <article class="card">
+        <h2>@result.Competitor?.Name</h2>
+        <p>@result.Match?.Discipline?.Name · @result.Match?.RoundName</p>
+        <p>Rank @result.Rank · @result.Points pts · @result.RawScore</p>
+    </article>
+}
+</div>

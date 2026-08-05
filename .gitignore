@@ -1,0 +1,8 @@
+bin/
+obj/
+*.user
+*.suo
+.vs/
+competition.db
+*.db-shm
+*.db-wal

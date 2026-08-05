@@ -1,0 +1,19 @@
+@page
+@model CompetitionTracker.Pages.IndexModel
+@{
+    ViewData["Title"] = "Home";
+}
+<section class="hero card">
+    <p class="eyebrow">Mobile-first .NET platform</p>
+    <h1>Track competitors, disciplines, matches, and points in one lightweight app.</h1>
+    <p>Use the quick links below while entering data from a phone at an event.</p>
+    <div class="actions">
+        <a class="button primary" asp-page="/Standings/Index">View standings</a>
+        <a class="button" asp-page="/Matches/Index">Record matches</a>
+    </div>
+</section>
+<section class="grid">
+    <article class="card"><h2>Competitors</h2><p>Maintain participants and optional team/club labels.</p></article>
+    <article class="card"><h2>Disciplines</h2><p>Define scoring areas and notes per discipline.</p></article>
+    <article class="card"><h2>Results</h2><p>Capture rank, raw score, and points for each match.</p></article>
+</section>
