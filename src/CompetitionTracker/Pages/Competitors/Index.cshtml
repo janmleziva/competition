@@ -1,0 +1,17 @@
+@page
+@model CompetitionTracker.Pages.Competitors.IndexModel
+@{
+    ViewData["Title"] = "Competitors";
+}
+<h1>Competitors</h1>
+<form method="post" class="card form-card">
+    <label>Name <input asp-for="Input.Name" /></label>
+    <label>Club or team <input asp-for="Input.ClubOrTeam" /></label>
+    <button class="button primary" type="submit">Add competitor</button>
+</form>
+<div class="stack">
+@foreach (var competitor in Model.Competitors)
+{
+    <article class="card"><h2>@competitor.Name</h2><p>@competitor.ClubOrTeam</p></article>
+}
+</div>

@@ -1,0 +1,24 @@
+@page
+@model CompetitionTracker.Pages.Standings.IndexModel
+@{
+    ViewData["Title"] = "Standings";
+}
+<h1>Standings</h1>
+<div class="stack">
+@foreach (var row in Model.Rows)
+{
+    <article class="card standing-card">
+        <div>
+            <h2>@row.CompetitorName</h2>
+            @if (!string.IsNullOrWhiteSpace(row.ClubOrTeam)) { <p>@row.ClubOrTeam</p> }
+        </div>
+        <strong>@row.TotalPoints pts</strong>
+        <dl>
+        @foreach (var score in row.DisciplinePoints)
+        {
+            <div><dt>@score.Key</dt><dd>@score.Value</dd></div>
+        }
+        </dl>
+    </article>
+}
+</div>
