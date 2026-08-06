@@ -58,6 +58,9 @@ public sealed class CompetitionDbContext(DbContextOptions<CompetitionDbContext> 
             entity.HasIndex(x => new { x.CompetitionEditionId, x.Seed }).IsUnique();
             entity.ToTable("CompetitionEntries", table =>
                 table.HasCheckConstraint("CK_CompetitionEntries_Seed", "Seed > 0"));
+            entity.HasOne(x => x.CompetitionEdition)
+                .WithMany(x => x.Entries)
+                .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Competitor)
                 .WithMany(x => x.CompetitionEntries)
                 .OnDelete(DeleteBehavior.Restrict);
@@ -79,6 +82,9 @@ public sealed class CompetitionDbContext(DbContextOptions<CompetitionDbContext> 
                 table.HasCheckConstraint("CK_CompetitionDisciplines_Order", "\"Order\" > 0");
                 table.HasCheckConstraint("CK_CompetitionDisciplines_TeamSize", "TeamSize > 0");
             });
+            entity.HasOne(x => x.CompetitionEdition)
+                .WithMany(x => x.Disciplines)
+                .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Discipline)
                 .WithMany(x => x.CompetitionDisciplines)
                 .OnDelete(DeleteBehavior.Restrict);
@@ -90,6 +96,9 @@ public sealed class CompetitionDbContext(DbContextOptions<CompetitionDbContext> 
             entity.HasAlternateKey(x => new { x.CompetitionDisciplineId, x.Id });
             entity.ToTable("DisciplineTeams", table =>
                 table.HasCheckConstraint("CK_DisciplineTeams_Seed", "Seed > 0"));
+            entity.HasOne(x => x.CompetitionDiscipline)
+                .WithMany(x => x.Teams)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<DisciplineTeamMember>(entity =>
@@ -101,7 +110,8 @@ public sealed class CompetitionDbContext(DbContextOptions<CompetitionDbContext> 
             entity.HasOne(x => x.DisciplineTeam)
                 .WithMany(x => x.Members)
                 .HasForeignKey(x => new { x.CompetitionDisciplineId, x.DisciplineTeamId })
-                .HasPrincipalKey(x => new { x.CompetitionDisciplineId, x.Id });
+                .HasPrincipalKey(x => new { x.CompetitionDisciplineId, x.Id })
+                .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.CompetitionEntry)
                 .WithMany(x => x.TeamMemberships)
                 .OnDelete(DeleteBehavior.Restrict);
@@ -117,6 +127,9 @@ public sealed class CompetitionDbContext(DbContextOptions<CompetitionDbContext> 
                 table.HasCheckConstraint("CK_DisciplinePhases_Order", "\"Order\" > 0");
                 table.HasCheckConstraint("CK_DisciplinePhases_Points", "PointsForWin >= 0 AND PointsForDraw >= 0 AND PointsForLoss >= 0");
             });
+            entity.HasOne(x => x.CompetitionDiscipline)
+                .WithMany(x => x.Phases)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<PhaseGroup>(entity =>
@@ -127,6 +140,9 @@ public sealed class CompetitionDbContext(DbContextOptions<CompetitionDbContext> 
             entity.HasAlternateKey(x => new { x.DisciplinePhaseId, x.Id });
             entity.ToTable("PhaseGroups", table =>
                 table.HasCheckConstraint("CK_PhaseGroups_Order", "\"Order\" > 0"));
+            entity.HasOne(x => x.DisciplinePhase)
+                .WithMany(x => x.Groups)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<PhaseGroupTeam>(entity =>
@@ -138,7 +154,8 @@ public sealed class CompetitionDbContext(DbContextOptions<CompetitionDbContext> 
             entity.HasOne(x => x.PhaseGroup)
                 .WithMany(x => x.Teams)
                 .HasForeignKey(x => new { x.DisciplinePhaseId, x.PhaseGroupId })
-                .HasPrincipalKey(x => new { x.DisciplinePhaseId, x.Id });
+                .HasPrincipalKey(x => new { x.DisciplinePhaseId, x.Id })
+                .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.DisciplineTeam)
                 .WithMany(x => x.GroupAssignments)
                 .OnDelete(DeleteBehavior.Restrict);
@@ -158,6 +175,9 @@ public sealed class CompetitionDbContext(DbContextOptions<CompetitionDbContext> 
                 table.HasCheckConstraint("CK_Matches_Score", "(HomeScore IS NULL AND AwayScore IS NULL) OR (HomeScore >= 0 AND AwayScore >= 0)");
                 table.HasCheckConstraint("CK_Matches_CompletedHasScore", "Status <> 'Completed' OR (HomeScore IS NOT NULL AND AwayScore IS NOT NULL)");
             });
+            entity.HasOne(x => x.DisciplinePhase)
+                .WithMany(x => x.Matches)
+                .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.PhaseGroup)
                 .WithMany(x => x.Matches)
                 .HasForeignKey(x => new { x.DisciplinePhaseId, x.PhaseGroupId })
@@ -179,6 +199,9 @@ public sealed class CompetitionDbContext(DbContextOptions<CompetitionDbContext> 
                 table.HasCheckConstraint("CK_MatchSetScores_SetNumber", "SetNumber > 0");
                 table.HasCheckConstraint("CK_MatchSetScores_Score", "HomeScore >= 0 AND AwayScore >= 0");
             });
+            entity.HasOne(x => x.Match)
+                .WithMany(x => x.SetScores)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<RankingPointRule>(entity =>
@@ -189,6 +212,9 @@ public sealed class CompetitionDbContext(DbContextOptions<CompetitionDbContext> 
                 table.HasCheckConstraint("CK_RankingPointRules_Rank", "Rank > 0");
                 table.HasCheckConstraint("CK_RankingPointRules_Points", "Points >= 0");
             });
+            entity.HasOne(x => x.CompetitionDiscipline)
+                .WithMany(x => x.RankingPointRules)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<DisciplineStanding>(entity =>
@@ -200,9 +226,12 @@ public sealed class CompetitionDbContext(DbContextOptions<CompetitionDbContext> 
                 table.HasCheckConstraint("CK_DisciplineStandings_Rank", "Rank > 0");
                 table.HasCheckConstraint("CK_DisciplineStandings_Points", "PointsAwarded >= 0");
             });
+            entity.HasOne(x => x.CompetitionDiscipline)
+                .WithMany(x => x.FinalStandings)
+                .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.DisciplineTeam)
                 .WithMany(x => x.FinalStandingEntries)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 

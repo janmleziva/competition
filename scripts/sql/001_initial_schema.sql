@@ -216,11 +216,71 @@ BEGIN
     ADD CONSTRAINT AK_PhaseGroups_DisciplinePhaseId_Id UNIQUE (DisciplinePhaseId, Id);
 END;
 
+IF EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_CompetitionEntries_CompetitionEditions_CompetitionEditionId' AND delete_referential_action_desc = N'CASCADE')
+BEGIN
+    ALTER TABLE dbo.CompetitionEntries DROP CONSTRAINT FK_CompetitionEntries_CompetitionEditions_CompetitionEditionId;
+END;
+
+IF EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_CompetitionDisciplines_CompetitionEditions_CompetitionEditionId' AND delete_referential_action_desc = N'CASCADE')
+BEGIN
+    ALTER TABLE dbo.CompetitionDisciplines DROP CONSTRAINT FK_CompetitionDisciplines_CompetitionEditions_CompetitionEditionId;
+END;
+
+IF EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_DisciplinePhases_CompetitionDisciplines_CompetitionDisciplineId' AND delete_referential_action_desc = N'CASCADE')
+BEGIN
+    ALTER TABLE dbo.DisciplinePhases DROP CONSTRAINT FK_DisciplinePhases_CompetitionDisciplines_CompetitionDisciplineId;
+END;
+
+IF EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_DisciplineTeams_CompetitionDisciplines_CompetitionDisciplineId' AND delete_referential_action_desc = N'CASCADE')
+BEGIN
+    ALTER TABLE dbo.DisciplineTeams DROP CONSTRAINT FK_DisciplineTeams_CompetitionDisciplines_CompetitionDisciplineId;
+END;
+
+IF EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_RankingPointRules_CompetitionDisciplines_CompetitionDisciplineId' AND delete_referential_action_desc = N'CASCADE')
+BEGIN
+    ALTER TABLE dbo.RankingPointRules DROP CONSTRAINT FK_RankingPointRules_CompetitionDisciplines_CompetitionDisciplineId;
+END;
+
+IF EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_PhaseGroups_DisciplinePhases_DisciplinePhaseId' AND delete_referential_action_desc = N'CASCADE')
+BEGIN
+    ALTER TABLE dbo.PhaseGroups DROP CONSTRAINT FK_PhaseGroups_DisciplinePhases_DisciplinePhaseId;
+END;
+
+IF EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_DisciplineStandings_CompetitionDisciplines_CompetitionDisciplineId' AND delete_referential_action_desc = N'CASCADE')
+BEGIN
+    ALTER TABLE dbo.DisciplineStandings DROP CONSTRAINT FK_DisciplineStandings_CompetitionDisciplines_CompetitionDisciplineId;
+END;
+
+IF EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_DisciplineStandings_DisciplineTeams_DisciplineTeamId' AND delete_referential_action_desc = N'CASCADE')
+BEGIN
+    ALTER TABLE dbo.DisciplineStandings DROP CONSTRAINT FK_DisciplineStandings_DisciplineTeams_DisciplineTeamId;
+END;
+
+IF EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_DisciplineTeamMembers_DisciplineTeams_CompetitionDisciplineId_DisciplineTeamId' AND delete_referential_action_desc = N'CASCADE')
+BEGIN
+    ALTER TABLE dbo.DisciplineTeamMembers DROP CONSTRAINT FK_DisciplineTeamMembers_DisciplineTeams_CompetitionDisciplineId_DisciplineTeamId;
+END;
+
+IF EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_Matches_DisciplinePhases_DisciplinePhaseId' AND delete_referential_action_desc = N'CASCADE')
+BEGIN
+    ALTER TABLE dbo.Matches DROP CONSTRAINT FK_Matches_DisciplinePhases_DisciplinePhaseId;
+END;
+
+IF EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_PhaseGroupTeams_PhaseGroups_DisciplinePhaseId_PhaseGroupId' AND delete_referential_action_desc = N'CASCADE')
+BEGIN
+    ALTER TABLE dbo.PhaseGroupTeams DROP CONSTRAINT FK_PhaseGroupTeams_PhaseGroups_DisciplinePhaseId_PhaseGroupId;
+END;
+
+IF EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_MatchSetScores_Matches_MatchId' AND delete_referential_action_desc = N'CASCADE')
+BEGIN
+    ALTER TABLE dbo.MatchSetScores DROP CONSTRAINT FK_MatchSetScores_Matches_MatchId;
+END;
+
 IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_CompetitionEntries_CompetitionEditions_CompetitionEditionId')
 BEGIN
     ALTER TABLE dbo.CompetitionEntries
     ADD CONSTRAINT FK_CompetitionEntries_CompetitionEditions_CompetitionEditionId
-        FOREIGN KEY (CompetitionEditionId) REFERENCES dbo.CompetitionEditions (Id) ON DELETE CASCADE;
+        FOREIGN KEY (CompetitionEditionId) REFERENCES dbo.CompetitionEditions (Id);
 END;
 
 IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_CompetitionEntries_Competitors_CompetitorId')
@@ -234,7 +294,7 @@ IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_CompetitionDisci
 BEGIN
     ALTER TABLE dbo.CompetitionDisciplines
     ADD CONSTRAINT FK_CompetitionDisciplines_CompetitionEditions_CompetitionEditionId
-        FOREIGN KEY (CompetitionEditionId) REFERENCES dbo.CompetitionEditions (Id) ON DELETE CASCADE;
+        FOREIGN KEY (CompetitionEditionId) REFERENCES dbo.CompetitionEditions (Id);
 END;
 
 IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_CompetitionDisciplines_Disciplines_DisciplineId')
@@ -248,42 +308,42 @@ IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_DisciplinePhases
 BEGIN
     ALTER TABLE dbo.DisciplinePhases
     ADD CONSTRAINT FK_DisciplinePhases_CompetitionDisciplines_CompetitionDisciplineId
-        FOREIGN KEY (CompetitionDisciplineId) REFERENCES dbo.CompetitionDisciplines (Id) ON DELETE CASCADE;
+        FOREIGN KEY (CompetitionDisciplineId) REFERENCES dbo.CompetitionDisciplines (Id);
 END;
 
 IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_DisciplineTeams_CompetitionDisciplines_CompetitionDisciplineId')
 BEGIN
     ALTER TABLE dbo.DisciplineTeams
     ADD CONSTRAINT FK_DisciplineTeams_CompetitionDisciplines_CompetitionDisciplineId
-        FOREIGN KEY (CompetitionDisciplineId) REFERENCES dbo.CompetitionDisciplines (Id) ON DELETE CASCADE;
+        FOREIGN KEY (CompetitionDisciplineId) REFERENCES dbo.CompetitionDisciplines (Id);
 END;
 
 IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_RankingPointRules_CompetitionDisciplines_CompetitionDisciplineId')
 BEGIN
     ALTER TABLE dbo.RankingPointRules
     ADD CONSTRAINT FK_RankingPointRules_CompetitionDisciplines_CompetitionDisciplineId
-        FOREIGN KEY (CompetitionDisciplineId) REFERENCES dbo.CompetitionDisciplines (Id) ON DELETE CASCADE;
+        FOREIGN KEY (CompetitionDisciplineId) REFERENCES dbo.CompetitionDisciplines (Id);
 END;
 
 IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_PhaseGroups_DisciplinePhases_DisciplinePhaseId')
 BEGIN
     ALTER TABLE dbo.PhaseGroups
     ADD CONSTRAINT FK_PhaseGroups_DisciplinePhases_DisciplinePhaseId
-        FOREIGN KEY (DisciplinePhaseId) REFERENCES dbo.DisciplinePhases (Id) ON DELETE CASCADE;
+        FOREIGN KEY (DisciplinePhaseId) REFERENCES dbo.DisciplinePhases (Id);
 END;
 
 IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_DisciplineStandings_CompetitionDisciplines_CompetitionDisciplineId')
 BEGIN
     ALTER TABLE dbo.DisciplineStandings
     ADD CONSTRAINT FK_DisciplineStandings_CompetitionDisciplines_CompetitionDisciplineId
-        FOREIGN KEY (CompetitionDisciplineId) REFERENCES dbo.CompetitionDisciplines (Id) ON DELETE CASCADE;
+        FOREIGN KEY (CompetitionDisciplineId) REFERENCES dbo.CompetitionDisciplines (Id);
 END;
 
 IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_DisciplineStandings_DisciplineTeams_DisciplineTeamId')
 BEGIN
     ALTER TABLE dbo.DisciplineStandings
     ADD CONSTRAINT FK_DisciplineStandings_DisciplineTeams_DisciplineTeamId
-        FOREIGN KEY (DisciplineTeamId) REFERENCES dbo.DisciplineTeams (Id) ON DELETE CASCADE;
+        FOREIGN KEY (DisciplineTeamId) REFERENCES dbo.DisciplineTeams (Id);
 END;
 
 IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_DisciplineTeamMembers_CompetitionEntries_CompetitionEntryId')
@@ -298,14 +358,14 @@ BEGIN
     ALTER TABLE dbo.DisciplineTeamMembers
     ADD CONSTRAINT FK_DisciplineTeamMembers_DisciplineTeams_CompetitionDisciplineId_DisciplineTeamId
         FOREIGN KEY (CompetitionDisciplineId, DisciplineTeamId)
-        REFERENCES dbo.DisciplineTeams (CompetitionDisciplineId, Id) ON DELETE CASCADE;
+        REFERENCES dbo.DisciplineTeams (CompetitionDisciplineId, Id);
 END;
 
 IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_Matches_DisciplinePhases_DisciplinePhaseId')
 BEGIN
     ALTER TABLE dbo.Matches
     ADD CONSTRAINT FK_Matches_DisciplinePhases_DisciplinePhaseId
-        FOREIGN KEY (DisciplinePhaseId) REFERENCES dbo.DisciplinePhases (Id) ON DELETE CASCADE;
+        FOREIGN KEY (DisciplinePhaseId) REFERENCES dbo.DisciplinePhases (Id);
 END;
 
 IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_Matches_DisciplineTeams_AwayTeamId')
@@ -342,14 +402,14 @@ BEGIN
     ALTER TABLE dbo.PhaseGroupTeams
     ADD CONSTRAINT FK_PhaseGroupTeams_PhaseGroups_DisciplinePhaseId_PhaseGroupId
         FOREIGN KEY (DisciplinePhaseId, PhaseGroupId)
-        REFERENCES dbo.PhaseGroups (DisciplinePhaseId, Id) ON DELETE CASCADE;
+        REFERENCES dbo.PhaseGroups (DisciplinePhaseId, Id);
 END;
 
 IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_MatchSetScores_Matches_MatchId')
 BEGIN
     ALTER TABLE dbo.MatchSetScores
     ADD CONSTRAINT FK_MatchSetScores_Matches_MatchId
-        FOREIGN KEY (MatchId) REFERENCES dbo.Matches (Id) ON DELETE CASCADE;
+        FOREIGN KEY (MatchId) REFERENCES dbo.Matches (Id);
 END;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_CompetitionDisciplines_CompetitionEditionId_DisciplineId' AND object_id = OBJECT_ID(N'dbo.CompetitionDisciplines'))

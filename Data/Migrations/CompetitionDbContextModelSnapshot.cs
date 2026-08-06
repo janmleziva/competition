@@ -535,7 +535,7 @@ namespace Competition.Data.Migrations
                     b.HasOne("Competition.Domain.CompetitionEdition", "CompetitionEdition")
                         .WithMany("Disciplines")
                         .HasForeignKey("CompetitionEditionId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("Competition.Domain.Discipline", "Discipline")
@@ -554,7 +554,7 @@ namespace Competition.Data.Migrations
                     b.HasOne("Competition.Domain.CompetitionEdition", "CompetitionEdition")
                         .WithMany("Entries")
                         .HasForeignKey("CompetitionEditionId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("Competition.Domain.Competitor", "Competitor")
@@ -573,7 +573,7 @@ namespace Competition.Data.Migrations
                     b.HasOne("Competition.Domain.CompetitionDiscipline", "CompetitionDiscipline")
                         .WithMany("Phases")
                         .HasForeignKey("CompetitionDisciplineId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("CompetitionDiscipline");
@@ -584,13 +584,13 @@ namespace Competition.Data.Migrations
                     b.HasOne("Competition.Domain.CompetitionDiscipline", "CompetitionDiscipline")
                         .WithMany("FinalStandings")
                         .HasForeignKey("CompetitionDisciplineId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("Competition.Domain.DisciplineTeam", "DisciplineTeam")
                         .WithMany("FinalStandingEntries")
                         .HasForeignKey("DisciplineTeamId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("CompetitionDiscipline");
@@ -603,7 +603,7 @@ namespace Competition.Data.Migrations
                     b.HasOne("Competition.Domain.CompetitionDiscipline", "CompetitionDiscipline")
                         .WithMany("Teams")
                         .HasForeignKey("CompetitionDisciplineId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("CompetitionDiscipline");
@@ -621,7 +621,7 @@ namespace Competition.Data.Migrations
                         .WithMany("Members")
                         .HasForeignKey("CompetitionDisciplineId", "DisciplineTeamId")
                         .HasPrincipalKey("CompetitionDisciplineId", "Id")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("CompetitionEntry");
@@ -639,7 +639,7 @@ namespace Competition.Data.Migrations
                     b.HasOne("Competition.Domain.DisciplinePhase", "DisciplinePhase")
                         .WithMany("Matches")
                         .HasForeignKey("DisciplinePhaseId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("Competition.Domain.DisciplineTeam", "HomeTeam")
@@ -667,7 +667,7 @@ namespace Competition.Data.Migrations
                     b.HasOne("Competition.Domain.Match", "Match")
                         .WithMany("SetScores")
                         .HasForeignKey("MatchId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Match");
@@ -678,7 +678,7 @@ namespace Competition.Data.Migrations
                     b.HasOne("Competition.Domain.DisciplinePhase", "DisciplinePhase")
                         .WithMany("Groups")
                         .HasForeignKey("DisciplinePhaseId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("DisciplinePhase");
@@ -696,7 +696,7 @@ namespace Competition.Data.Migrations
                         .WithMany("Teams")
                         .HasForeignKey("DisciplinePhaseId", "PhaseGroupId")
                         .HasPrincipalKey("DisciplinePhaseId", "Id")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("DisciplineTeam");
@@ -709,7 +709,7 @@ namespace Competition.Data.Migrations
                     b.HasOne("Competition.Domain.CompetitionDiscipline", "CompetitionDiscipline")
                         .WithMany("RankingPointRules")
                         .HasForeignKey("CompetitionDisciplineId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("CompetitionDiscipline");

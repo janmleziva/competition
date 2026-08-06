@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -75,7 +75,7 @@ namespace Competition.Data.Migrations
                         column: x => x.CompetitionEditionId,
                         principalTable: "CompetitionEditions",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_CompetitionEntries_Competitors_CompetitorId",
                         column: x => x.CompetitorId,
@@ -106,7 +106,7 @@ namespace Competition.Data.Migrations
                         column: x => x.CompetitionEditionId,
                         principalTable: "CompetitionEditions",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_CompetitionDisciplines_Disciplines_DisciplineId",
                         column: x => x.DisciplineId,
@@ -139,7 +139,7 @@ namespace Competition.Data.Migrations
                         column: x => x.CompetitionDisciplineId,
                         principalTable: "CompetitionDisciplines",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -161,7 +161,7 @@ namespace Competition.Data.Migrations
                         column: x => x.CompetitionDisciplineId,
                         principalTable: "CompetitionDisciplines",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -184,7 +184,7 @@ namespace Competition.Data.Migrations
                         column: x => x.CompetitionDisciplineId,
                         principalTable: "CompetitionDisciplines",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -207,7 +207,7 @@ namespace Competition.Data.Migrations
                         column: x => x.DisciplinePhaseId,
                         principalTable: "DisciplinePhases",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -231,13 +231,13 @@ namespace Competition.Data.Migrations
                         column: x => x.CompetitionDisciplineId,
                         principalTable: "CompetitionDisciplines",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_DisciplineStandings_DisciplineTeams_DisciplineTeamId",
                         column: x => x.DisciplineTeamId,
                         principalTable: "DisciplineTeams",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -266,7 +266,7 @@ namespace Competition.Data.Migrations
                         columns: x => new { x.CompetitionDisciplineId, x.DisciplineTeamId },
                         principalTable: "DisciplineTeams",
                         principalColumns: new[] { "CompetitionDisciplineId", "Id" },
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -299,7 +299,7 @@ namespace Competition.Data.Migrations
                         column: x => x.DisciplinePhaseId,
                         principalTable: "DisciplinePhases",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_Matches_DisciplineTeams_AwayTeamId",
                         column: x => x.AwayTeamId,
@@ -346,7 +346,7 @@ namespace Competition.Data.Migrations
                         columns: x => new { x.DisciplinePhaseId, x.PhaseGroupId },
                         principalTable: "PhaseGroups",
                         principalColumns: new[] { "DisciplinePhaseId", "Id" },
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -370,7 +370,7 @@ namespace Competition.Data.Migrations
                         column: x => x.MatchId,
                         principalTable: "Matches",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateIndex(
