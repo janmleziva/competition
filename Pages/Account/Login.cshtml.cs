@@ -35,7 +35,7 @@ public sealed class LoginModel(AdminCredentialValidator credentialValidator) : P
 
         if (!credentialValidator.IsValid(Credentials.Username, Credentials.Password))
         {
-            ModelState.AddModelError(string.Empty, "Invalid username or password.");
+            ModelState.AddModelError(string.Empty, "Neplatné uživatelské jméno nebo heslo.");
             return Page();
         }
 
@@ -54,15 +54,17 @@ public sealed class LoginModel(AdminCredentialValidator credentialValidator) : P
     }
 
     private string GetSafeReturnUrl() =>
-        Url.IsLocalUrl(ReturnUrl) ? ReturnUrl! : Url.Page("/Admin/CreateComp")!;
+        Url.IsLocalUrl(ReturnUrl) ? ReturnUrl! : Url.Page("/Editions/Index")!;
 
     public sealed class CredentialsInput
     {
-        [Required]
+        [Required(ErrorMessage = "Zadejte uživatelské jméno.")]
+        [Display(Name = "Uživatelské jméno")]
         public string Username { get; set; } = string.Empty;
 
-        [Required]
+        [Required(ErrorMessage = "Zadejte heslo.")]
         [DataType(DataType.Password)]
+        [Display(Name = "Heslo")]
         public string Password { get; set; } = string.Empty;
     }
 }

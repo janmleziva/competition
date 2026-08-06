@@ -44,7 +44,7 @@ Database checks cover valid date ranges, positive ordering/seeding/ranks, nonneg
 
 Acceptance: a clean checkout can run `dotnet build`; a host operator can apply `scripts/sql/001_initial_schema.sql` through the Forpsi MSSQL web interface; and the app can start once `ConnectionStrings:CompetitionDb` points at that prepared database.
 
-### Step 2 - Edition administration
+### Step 2 - Edition administration (completed)
 
 - Replace the placeholder CreateComp page with create/edit forms for name, city, start date, and end date.
 - Add edition list/detail pages and choose the active edition explicitly rather than assuming the current year.

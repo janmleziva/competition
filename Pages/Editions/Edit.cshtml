@@ -1,0 +1,41 @@
+@page "{id:long}"
+@model Competition.Pages.Editions.EditModel
+@{
+    ViewData["Title"] = "Úprava soutěže";
+}
+
+<main class="shell">
+    <section class="panel admin">
+        <h1>Úprava soutěže</h1>
+
+        <form method="post" class="edition-form">
+            <div asp-validation-summary="ModelOnly" class="error"></div>
+
+            <label asp-for="Input.Name"></label>
+            <input asp-for="Input.Name" autofocus />
+            <span asp-validation-for="Input.Name" class="field-error"></span>
+
+            <label asp-for="Input.City"></label>
+            <input asp-for="Input.City" />
+            <span asp-validation-for="Input.City" class="field-error"></span>
+
+            <div class="form-grid">
+                <div>
+                    <label asp-for="Input.StartDate"></label>
+                    <input asp-for="Input.StartDate" asp-format="{0:dd/MM/yyyy}" type="text" inputmode="numeric" placeholder="dd/mm/rrrr" />
+                    <span asp-validation-for="Input.StartDate" class="field-error"></span>
+                </div>
+                <div>
+                    <label asp-for="Input.EndDate"></label>
+                    <input asp-for="Input.EndDate" asp-format="{0:dd/MM/yyyy}" type="text" inputmode="numeric" placeholder="dd/mm/rrrr" />
+                    <span asp-validation-for="Input.EndDate" class="field-error"></span>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button class="button" type="submit">Uložit změny</button>
+                <a class="button button-ghost" asp-page="/Editions/Details" asp-route-id="@Model.EditionId">Zrušit</a>
+            </div>
+        </form>
+    </section>
+</main>
