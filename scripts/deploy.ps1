@@ -268,11 +268,24 @@ try {
         $_.Name -ne 'appsettings.Development.json' -and $_.Name -ne 'ftp-creds.json'
     }
     Write-Log ("Uploading {0} file(s)." -f $files.Count)
+    $ensuredRemoteDirectories = [System.Collections.Generic.HashSet[string]]::new(
+        [System.StringComparer]::OrdinalIgnoreCase
+    )
 
     foreach ($file in $files) {
         $relativePath = $file.FullName.Substring($resolvedPublishDir.Length).TrimStart('\')
         $remoteFileUri = ($remoteBaseUri + ($relativePath -replace '\\', '/'))
         $localBackupPath = Join-Path $resolvedRollbackCacheDir ($relativePath -replace '[\\/:*?"<>|]', '_')
+        $relativeDirectory = [System.IO.Path]::GetDirectoryName($relativePath)
+
+        if (-not [string]::IsNullOrWhiteSpace($relativeDirectory)) {
+            $remoteDirectoryUri = $remoteBaseUri + (($relativeDirectory -replace '\\', '/').Trim('/')) + '/'
+
+            if ($ensuredRemoteDirectories.Add($remoteDirectoryUri)) {
+                Write-Log "Ensuring remote folder: $remoteDirectoryUri"
+                Ensure-RemoteDirectory -RemoteUri $remoteDirectoryUri -Credential $script:Credential
+            }
+        }
 
         try {
             Download-RemoteFile -RemoteUri $remoteFileUri -LocalPath $localBackupPath -Credential $script:Credential
