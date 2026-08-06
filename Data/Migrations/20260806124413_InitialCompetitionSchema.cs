@@ -15,12 +15,12 @@ namespace Competition.Data.Migrations
                 name: "CompetitionEditions",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    Name = table.Column<string>(type: "TEXT", maxLength: 200, nullable: false),
-                    City = table.Column<string>(type: "TEXT", maxLength: 120, nullable: false),
-                    StartDate = table.Column<DateOnly>(type: "TEXT", nullable: false),
-                    EndDate = table.Column<DateOnly>(type: "TEXT", nullable: false)
+                    Id = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Name = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
+                    City = table.Column<string>(type: "nvarchar(120)", maxLength: 120, nullable: false),
+                    StartDate = table.Column<DateOnly>(type: "date", nullable: false),
+                    EndDate = table.Column<DateOnly>(type: "date", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -32,11 +32,11 @@ namespace Competition.Data.Migrations
                 name: "Competitors",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    FirstName = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
-                    LastName = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
-                    DateOfBirth = table.Column<DateOnly>(type: "TEXT", nullable: true)
+                    Id = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    FirstName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    LastName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    DateOfBirth = table.Column<DateOnly>(type: "date", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -47,9 +47,9 @@ namespace Competition.Data.Migrations
                 name: "Disciplines",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    Name = table.Column<string>(type: "TEXT", maxLength: 120, nullable: false)
+                    Id = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Name = table.Column<string>(type: "nvarchar(120)", maxLength: 120, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -60,11 +60,11 @@ namespace Competition.Data.Migrations
                 name: "CompetitionEntries",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    CompetitionEditionId = table.Column<long>(type: "INTEGER", nullable: false),
-                    CompetitorId = table.Column<long>(type: "INTEGER", nullable: false),
-                    Seed = table.Column<int>(type: "INTEGER", nullable: false)
+                    Id = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    CompetitionEditionId = table.Column<long>(type: "bigint", nullable: false),
+                    CompetitorId = table.Column<long>(type: "bigint", nullable: false),
+                    Seed = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -88,13 +88,13 @@ namespace Competition.Data.Migrations
                 name: "CompetitionDisciplines",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    CompetitionEditionId = table.Column<long>(type: "INTEGER", nullable: false),
-                    DisciplineId = table.Column<long>(type: "INTEGER", nullable: false),
-                    PlayingSystem = table.Column<string>(type: "TEXT", maxLength: 40, nullable: false),
-                    TeamSize = table.Column<int>(type: "INTEGER", nullable: false),
-                    Order = table.Column<int>(type: "INTEGER", nullable: false)
+                    Id = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    CompetitionEditionId = table.Column<long>(type: "bigint", nullable: false),
+                    DisciplineId = table.Column<long>(type: "bigint", nullable: false),
+                    PlayingSystem = table.Column<string>(type: "nvarchar(40)", maxLength: 40, nullable: false),
+                    TeamSize = table.Column<int>(type: "int", nullable: false),
+                    Order = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -119,15 +119,15 @@ namespace Competition.Data.Migrations
                 name: "DisciplinePhases",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    CompetitionDisciplineId = table.Column<long>(type: "INTEGER", nullable: false),
-                    Name = table.Column<string>(type: "TEXT", maxLength: 120, nullable: false),
-                    Type = table.Column<string>(type: "TEXT", maxLength: 30, nullable: false),
-                    Order = table.Column<int>(type: "INTEGER", nullable: false),
-                    PointsForWin = table.Column<int>(type: "INTEGER", nullable: false),
-                    PointsForDraw = table.Column<int>(type: "INTEGER", nullable: false),
-                    PointsForLoss = table.Column<int>(type: "INTEGER", nullable: false)
+                    Id = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    CompetitionDisciplineId = table.Column<long>(type: "bigint", nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(120)", maxLength: 120, nullable: false),
+                    Type = table.Column<string>(type: "nvarchar(30)", maxLength: 30, nullable: false),
+                    Order = table.Column<int>(type: "int", nullable: false),
+                    PointsForWin = table.Column<int>(type: "int", nullable: false),
+                    PointsForDraw = table.Column<int>(type: "int", nullable: false),
+                    PointsForLoss = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -146,10 +146,10 @@ namespace Competition.Data.Migrations
                 name: "DisciplineTeams",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    CompetitionDisciplineId = table.Column<long>(type: "INTEGER", nullable: false),
-                    Seed = table.Column<int>(type: "INTEGER", nullable: false)
+                    Id = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    CompetitionDisciplineId = table.Column<long>(type: "bigint", nullable: false),
+                    Seed = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -168,11 +168,11 @@ namespace Competition.Data.Migrations
                 name: "RankingPointRules",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    CompetitionDisciplineId = table.Column<long>(type: "INTEGER", nullable: false),
-                    Rank = table.Column<int>(type: "INTEGER", nullable: false),
-                    Points = table.Column<int>(type: "INTEGER", nullable: false)
+                    Id = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    CompetitionDisciplineId = table.Column<long>(type: "bigint", nullable: false),
+                    Rank = table.Column<int>(type: "int", nullable: false),
+                    Points = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -191,11 +191,11 @@ namespace Competition.Data.Migrations
                 name: "PhaseGroups",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    DisciplinePhaseId = table.Column<long>(type: "INTEGER", nullable: false),
-                    Name = table.Column<string>(type: "TEXT", maxLength: 80, nullable: false),
-                    Order = table.Column<int>(type: "INTEGER", nullable: false)
+                    Id = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    DisciplinePhaseId = table.Column<long>(type: "bigint", nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(80)", maxLength: 80, nullable: false),
+                    Order = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -214,12 +214,12 @@ namespace Competition.Data.Migrations
                 name: "DisciplineStandings",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    CompetitionDisciplineId = table.Column<long>(type: "INTEGER", nullable: false),
-                    DisciplineTeamId = table.Column<long>(type: "INTEGER", nullable: false),
-                    Rank = table.Column<int>(type: "INTEGER", nullable: false),
-                    PointsAwarded = table.Column<int>(type: "INTEGER", nullable: false)
+                    Id = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    CompetitionDisciplineId = table.Column<long>(type: "bigint", nullable: false),
+                    DisciplineTeamId = table.Column<long>(type: "bigint", nullable: false),
+                    Rank = table.Column<int>(type: "int", nullable: false),
+                    PointsAwarded = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -244,12 +244,12 @@ namespace Competition.Data.Migrations
                 name: "DisciplineTeamMembers",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    CompetitionDisciplineId = table.Column<long>(type: "INTEGER", nullable: false),
-                    DisciplineTeamId = table.Column<long>(type: "INTEGER", nullable: false),
-                    CompetitionEntryId = table.Column<long>(type: "INTEGER", nullable: false),
-                    Order = table.Column<int>(type: "INTEGER", nullable: false)
+                    Id = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    CompetitionDisciplineId = table.Column<long>(type: "bigint", nullable: false),
+                    DisciplineTeamId = table.Column<long>(type: "bigint", nullable: false),
+                    CompetitionEntryId = table.Column<long>(type: "bigint", nullable: false),
+                    Order = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -273,19 +273,19 @@ namespace Competition.Data.Migrations
                 name: "Matches",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    DisciplinePhaseId = table.Column<long>(type: "INTEGER", nullable: false),
-                    PhaseGroupId = table.Column<long>(type: "INTEGER", nullable: true),
-                    HomeTeamId = table.Column<long>(type: "INTEGER", nullable: true),
-                    AwayTeamId = table.Column<long>(type: "INTEGER", nullable: true),
-                    Name = table.Column<string>(type: "TEXT", maxLength: 120, nullable: false),
-                    Order = table.Column<int>(type: "INTEGER", nullable: false),
-                    Status = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false),
-                    HomeScore = table.Column<int>(type: "INTEGER", nullable: true),
-                    AwayScore = table.Column<int>(type: "INTEGER", nullable: true),
-                    UpdatedAtUtc = table.Column<DateTime>(type: "TEXT", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP"),
-                    Version = table.Column<int>(type: "INTEGER", nullable: false)
+                    Id = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    DisciplinePhaseId = table.Column<long>(type: "bigint", nullable: false),
+                    PhaseGroupId = table.Column<long>(type: "bigint", nullable: true),
+                    HomeTeamId = table.Column<long>(type: "bigint", nullable: true),
+                    AwayTeamId = table.Column<long>(type: "bigint", nullable: true),
+                    Name = table.Column<string>(type: "nvarchar(120)", maxLength: 120, nullable: false),
+                    Order = table.Column<int>(type: "int", nullable: false),
+                    Status = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
+                    HomeScore = table.Column<int>(type: "int", nullable: true),
+                    AwayScore = table.Column<int>(type: "int", nullable: true),
+                    UpdatedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "CURRENT_TIMESTAMP"),
+                    Version = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -324,12 +324,12 @@ namespace Competition.Data.Migrations
                 name: "PhaseGroupTeams",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    DisciplinePhaseId = table.Column<long>(type: "INTEGER", nullable: false),
-                    PhaseGroupId = table.Column<long>(type: "INTEGER", nullable: false),
-                    DisciplineTeamId = table.Column<long>(type: "INTEGER", nullable: false),
-                    Seed = table.Column<int>(type: "INTEGER", nullable: false)
+                    Id = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    DisciplinePhaseId = table.Column<long>(type: "bigint", nullable: false),
+                    PhaseGroupId = table.Column<long>(type: "bigint", nullable: false),
+                    DisciplineTeamId = table.Column<long>(type: "bigint", nullable: false),
+                    Seed = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -353,12 +353,12 @@ namespace Competition.Data.Migrations
                 name: "MatchSetScores",
                 columns: table => new
                 {
-                    Id = table.Column<long>(type: "INTEGER", nullable: false)
-                        .Annotation("Sqlite:Autoincrement", true),
-                    MatchId = table.Column<long>(type: "INTEGER", nullable: false),
-                    SetNumber = table.Column<int>(type: "INTEGER", nullable: false),
-                    HomeScore = table.Column<int>(type: "INTEGER", nullable: false),
-                    AwayScore = table.Column<int>(type: "INTEGER", nullable: false)
+                    Id = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    MatchId = table.Column<long>(type: "bigint", nullable: false),
+                    SetNumber = table.Column<int>(type: "int", nullable: false),
+                    HomeScore = table.Column<int>(type: "int", nullable: false),
+                    AwayScore = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -419,6 +419,12 @@ namespace Competition.Data.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_Disciplines_Name",
+                table: "Disciplines",
+                column: "Name",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_DisciplineStandings_CompetitionDisciplineId_DisciplineTeamId",
                 table: "DisciplineStandings",
                 columns: new[] { "CompetitionDisciplineId", "DisciplineTeamId" },
@@ -463,18 +469,6 @@ namespace Competition.Data.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_Disciplines_Name",
-                table: "Disciplines",
-                column: "Name",
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_MatchSetScores_MatchId_SetNumber",
-                table: "MatchSetScores",
-                columns: new[] { "MatchId", "SetNumber" },
-                unique: true);
-
-            migrationBuilder.CreateIndex(
                 name: "IX_Matches_AwayTeamId",
                 table: "Matches",
                 column: "AwayTeamId");
@@ -496,6 +490,24 @@ namespace Competition.Data.Migrations
                 column: "HomeTeamId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_MatchSetScores_MatchId_SetNumber",
+                table: "MatchSetScores",
+                columns: new[] { "MatchId", "SetNumber" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_PhaseGroups_DisciplinePhaseId_Name",
+                table: "PhaseGroups",
+                columns: new[] { "DisciplinePhaseId", "Name" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_PhaseGroups_DisciplinePhaseId_Order",
+                table: "PhaseGroups",
+                columns: new[] { "DisciplinePhaseId", "Order" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_PhaseGroupTeams_DisciplinePhaseId_DisciplineTeamId",
                 table: "PhaseGroupTeams",
                 columns: new[] { "DisciplinePhaseId", "DisciplineTeamId" },
@@ -515,18 +527,6 @@ namespace Competition.Data.Migrations
                 name: "IX_PhaseGroupTeams_PhaseGroupId_Seed",
                 table: "PhaseGroupTeams",
                 columns: new[] { "PhaseGroupId", "Seed" },
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_PhaseGroups_DisciplinePhaseId_Name",
-                table: "PhaseGroups",
-                columns: new[] { "DisciplinePhaseId", "Name" },
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_PhaseGroups_DisciplinePhaseId_Order",
-                table: "PhaseGroups",
-                columns: new[] { "DisciplinePhaseId", "Order" },
                 unique: true);
 
             migrationBuilder.CreateIndex(

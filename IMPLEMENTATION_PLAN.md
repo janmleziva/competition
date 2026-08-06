@@ -36,13 +36,13 @@ Database checks cover valid date ranges, positive ordering/seeding/ranks, nonneg
 
 ### Step 1 - Persistence foundation (completed)
 
-- Add EF Core SQLite runtime and design-time tooling.
+- Add EF Core SQL Server runtime and design-time tooling.
 - Define the domain entities, relationships, indexes, constraints, and enum conversions.
-- Generate `InitialCompetitionSchema` and create the local database under `App_Data`.
+- Generate `InitialCompetitionSchema` for SQL Server.
 - Apply pending migrations automatically during single-instance application startup.
-- Verify a clean build, migration application, and database table list.
+- Verify a clean build, migration consistency, and connection-string based startup configuration.
 
-Acceptance: a clean checkout can run `dotnet tool restore`, `dotnet build`, and `dotnet ef database update`; starting the app creates or upgrades `App_Data/competition.db`.
+Acceptance: a clean checkout can run `dotnet tool restore`, `dotnet build`, and `dotnet ef database update` after configuring `ConnectionStrings:CompetitionDb`; starting the app creates or upgrades the target SQL Server database.
 
 ### Step 2 - Edition administration
 
@@ -130,9 +130,9 @@ Acceptance: every competitor's edition total reconciles exactly with the sum of 
 ### Step 10 - Operational hardening and deployment
 
 - Add realistic seed data for local development only.
-- Add database backup/restore instructions and make `App_Data` persistent across FTP deployments.
-- Verify SQLite write permissions and single-instance hosting; move to a server database before horizontal scaling or sustained concurrent writes.
-- Add migration checks to CI, integration tests against a temporary SQLite database, health checks, and production-safe error handling.
+- Add database backup/restore instructions for the SQL Server host.
+- Verify SQL Server connectivity, migration permissions, and production connection-string management.
+- Add migration checks to CI, integration tests against a temporary SQL Server instance, health checks, and production-safe error handling.
 - Move the temporary plaintext admin credential to environment/host secrets before production use.
 
 Acceptance: deployment preserves data, migrations are repeatable, backups are tested, and secrets are absent from committed production configuration.

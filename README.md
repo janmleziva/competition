@@ -4,9 +4,15 @@ Small ASP.NET Core countdown app for the competition landing page.
 
 ## Database
 
-The app uses Entity Framework Core with SQLite. On startup it applies committed migrations
-and stores the local database at `App_Data/competition.db`; that directory is intentionally
-ignored by Git and must be persisted and backed up by the production host.
+The app uses Entity Framework Core with SQL Server. On startup it applies committed migrations
+to the configured `ConnectionStrings:CompetitionDb` database.
+
+For local development, keep the real connection string in user secrets instead of git-tracked
+files:
+
+```powershell
+dotnet user-secrets set "ConnectionStrings:CompetitionDb" "Server=YOUR_SERVER;Database=Competition;User Id=YOUR_USER;Password=YOUR_PASSWORD;TrustServerCertificate=True;"
+```
 
 Restore the repository-local EF tool and apply migrations manually with:
 
@@ -32,9 +38,10 @@ Access and appearance are configured in `appsettings.json`:
 - `Competition` contains the countdown title and target date.
 
 Configuration values can also be supplied as environment variables, for example
-`AdminAccess__Password`, so production credentials do not need to be committed. Settings
-changes do not require recompilation; configuration-file changes are reloaded while the app
-is running, except cookie lifetime changes, which apply after an app restart.
+`AdminAccess__Password` or `ConnectionStrings__CompetitionDb`, so production credentials do
+not need to be committed. Settings changes do not require recompilation; configuration-file
+changes are reloaded while the app is running, except cookie lifetime changes, which apply
+after an app restart.
 
 ## Azure publish
 

@@ -13,11 +13,14 @@ builder.Services.Configure<CompetitionSettings>(builder.Configuration.GetSection
 builder.Services.Configure<AdminAccessSettings>(builder.Configuration.GetSection(AdminAccessSettings.SectionName));
 builder.Services.Configure<ThemeSettings>(builder.Configuration.GetSection(ThemeSettings.SectionName));
 
-var dataDirectory = Path.Combine(builder.Environment.ContentRootPath, "App_Data");
-Directory.CreateDirectory(dataDirectory);
-var databasePath = Path.Combine(dataDirectory, "competition.db");
+var connectionString = builder.Configuration.GetConnectionString("CompetitionDb")
+    ?? throw new InvalidOperationException(
+        "Connection string 'CompetitionDb' is missing. Configure it in user secrets or environment variables.");
+
 builder.Services.AddDbContext<CompetitionDbContext>(options =>
-    options.UseSqlite($"Data Source={databasePath}"));
+    options.UseSqlServer(
+        connectionString,
+        sqlServerOptions => sqlServerOptions.EnableRetryOnFailure()));
 
 var adminAccess = builder.Configuration
     .GetSection(AdminAccessSettings.SectionName)
