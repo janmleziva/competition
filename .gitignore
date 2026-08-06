@@ -13,3 +13,5 @@ appsettings.Secrets.json
 deployment/logs/
 deployment/ftp-creds.json
 deployment/rollback-cache/
+.config/dotnet-tools.json.user
+App_Data/
