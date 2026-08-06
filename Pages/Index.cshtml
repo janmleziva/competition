@@ -1,0 +1,28 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = Model.Settings.Title;
+}
+
+<main class="shell">
+    <section class="panel hero">
+        <p class="eyebrow">Anonymous access</p>
+        <h1>Competition starts soon</h1>
+        <p class="lead">Live countdown to the beginning of the competition.</p>
+
+        <section class="countdown" aria-label="Countdown" data-countdown-target="@Model.Settings.TargetDate.ToString("O")">
+            <div class="unit"><span class="value" data-unit="days">--</span><span class="label">Days</span></div>
+            <div class="unit"><span class="value" data-unit="hours">--</span><span class="label">Hours</span></div>
+            <div class="unit"><span class="value" data-unit="minutes">--</span><span class="label">Minutes</span></div>
+            <div class="unit"><span class="value" data-unit="seconds">--</span><span class="label">Seconds</span></div>
+        </section>
+
+        <div class="meta">Target start: @Model.TargetDisplay (Europe/Prague)</div>
+        <a class="button button-ghost" asp-page="/Admin/CreateComp">Log in</a>
+        <div class="env">Environment: @Model.EnvironmentName</div>
+    </section>
+</main>
+
+@section Scripts {
+    <script src="~/js/countdown.js" asp-append-version="true"></script>
+}

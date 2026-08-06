@@ -1,0 +1,32 @@
+@using Competition.Configuration
+@using Microsoft.Extensions.Options
+@inject IOptionsMonitor<ThemeSettings> ThemeOptions
+@{
+    var theme = ThemeOptions.CurrentValue;
+}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewData["Title"] - Competition</title>
+    <style>
+        :root {
+            --bg: @theme.Background;
+            --bg-soft: @theme.BackgroundSoft;
+            --panel: @theme.Panel;
+            --text: @theme.Text;
+            --muted: @theme.Muted;
+            --accent: @theme.Accent;
+            --accent-strong: @theme.AccentStrong;
+            --font-family: @theme.FontFamily;
+            --radius: @theme.BorderRadius;
+        }
+    </style>
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    @RenderBody()
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

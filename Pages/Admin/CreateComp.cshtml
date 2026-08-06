@@ -1,0 +1,28 @@
+@page
+@model Competition.Pages.Admin.CreateCompModel
+@{
+    ViewData["Title"] = "CreateComp";
+}
+
+<main class="shell">
+    <section class="panel admin">
+        <p class="eyebrow">Admin access</p>
+        <h1>CreateComp</h1>
+        <p class="lead">Signed in as @User.Identity?.Name.</p>
+
+        <div class="admin-grid">
+            <div class="admin-card">
+                <span class="admin-label">Target start</span>
+                <strong>@Model.TargetDisplay</strong>
+            </div>
+            <div class="admin-card">
+                <span class="admin-label">Environment</span>
+                <strong>@Model.EnvironmentName</strong>
+            </div>
+        </div>
+
+        <form method="post" asp-page="/Account/Logout">
+            <button class="button" type="submit">Log out</button>
+        </form>
+    </section>
+</main>
