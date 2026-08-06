@@ -68,10 +68,68 @@ function Get-FtpBaseUri {
     return "ftp://$FtpHost/$trimmedPath/"
 }
 
-function Ensure-RemoteDirectory {
+function Get-FtpErrorResponse {
+    param([Parameter(Mandatory = $true)][System.Exception]$Exception)
+
+    $currentException = $Exception
+    while ($null -ne $currentException) {
+        if ($currentException.Response -is [System.Net.FtpWebResponse]) {
+            return $currentException.Response
+        }
+
+        $currentException = $currentException.InnerException
+    }
+
+    return $null
+}
+
+function Test-RemoteDirectory {
     param(
         [Parameter(Mandatory = $true)][string]$RemoteUri,
         [Parameter(Mandatory = $true)][System.Net.NetworkCredential]$Credential
+    )
+
+    $request = [System.Net.FtpWebRequest]::Create($RemoteUri)
+    $request.Method = [System.Net.WebRequestMethods+Ftp]::ListDirectory
+    $request.Credentials = $Credential
+    $request.UsePassive = $true
+    $request.KeepAlive = $false
+
+    try {
+        $response = $request.GetResponse()
+        try {
+            $responseStream = $response.GetResponseStream()
+            if ($null -ne $responseStream) {
+                try {
+                    $responseStream.CopyTo([System.IO.Stream]::Null)
+                }
+                finally {
+                    $responseStream.Dispose()
+                }
+            }
+        }
+        finally {
+            $response.Dispose()
+        }
+
+        return $true
+    }
+    catch {
+        $ftpResponse = Get-FtpErrorResponse -Exception $_.Exception
+        if ($null -ne $ftpResponse -and
+            $ftpResponse.StatusCode -eq [System.Net.FtpStatusCode]::ActionNotTakenFileUnavailable) {
+            return $false
+        }
+
+        throw
+    }
+}
+
+function Ensure-RemoteDirectory {
+    param(
+        [Parameter(Mandatory = $true)][string]$RemoteUri,
+        [Parameter(Mandatory = $true)][System.Net.NetworkCredential]$Credential,
+        [System.Collections.Generic.HashSet[string]]$KnownDirectories
     )
 
     $base = [Uri]$RemoteUri
@@ -82,7 +140,18 @@ function Ensure-RemoteDirectory {
         $currentPath = if ([string]::IsNullOrWhiteSpace($currentPath)) { $segment } else { "$currentPath/$segment" }
         $currentUri = "$($base.Scheme)://$($base.Authority)/$currentPath/"
 
-        $request = [System.Net.FtpWebRequest]::Create($currentUri)
+        if ($null -ne $KnownDirectories -and $KnownDirectories.Contains($currentUri)) {
+            continue
+        }
+
+        if (Test-RemoteDirectory -RemoteUri $currentUri -Credential $Credential) {
+            if ($null -ne $KnownDirectories) {
+                $null = $KnownDirectories.Add($currentUri)
+            }
+            continue
+        }
+
+        $request = [System.Net.FtpWebRequest]::Create($currentUri.TrimEnd('/'))
         $request.Method = [System.Net.WebRequestMethods+Ftp]::MakeDirectory
         $request.Credentials = $Credential
         $request.UseBinary = $true
@@ -93,9 +162,15 @@ function Ensure-RemoteDirectory {
             $response = $request.GetResponse()
             $response.Dispose()
             Write-Log "Created remote directory: $currentUri"
+            if ($null -ne $KnownDirectories) {
+                $null = $KnownDirectories.Add($currentUri)
+            }
         }
-        catch [System.Net.WebException] {
-            if ($_.Exception.Response -and $_.Exception.Response.StatusDescription -match '550') {
+        catch {
+            $ftpResponse = Get-FtpErrorResponse -Exception $_.Exception
+            if ($null -ne $ftpResponse -and
+                $ftpResponse.StatusCode -eq [System.Net.FtpStatusCode]::ActionNotTakenFileUnavailable -and
+                (Test-RemoteDirectory -RemoteUri $currentUri -Credential $Credential)) {
                 continue
             }
 
@@ -261,26 +336,40 @@ try {
     Publish-App -ResolvedProjectPath $resolvedProjectPath -OutputPath $resolvedPublishDir
 
     $remoteBaseUri = Get-FtpBaseUri -FtpHost $FtpHost -Path $RemoteDir
+    $ensuredRemoteDirectories = [System.Collections.Generic.HashSet[string]]::new(
+        [System.StringComparer]::OrdinalIgnoreCase
+    )
     Write-Log "Ensuring remote folder: $remoteBaseUri"
-    Ensure-RemoteDirectory -RemoteUri $remoteBaseUri -Credential $script:Credential
+    Ensure-RemoteDirectory -RemoteUri $remoteBaseUri -Credential $script:Credential -KnownDirectories $ensuredRemoteDirectories
 
     $files = Get-ChildItem -Path $resolvedPublishDir -File -Recurse | Where-Object {
         $_.Name -ne 'appsettings.Development.json' -and $_.Name -ne 'ftp-creds.json'
     }
     Write-Log ("Uploading {0} file(s)." -f $files.Count)
-
     foreach ($file in $files) {
         $relativePath = $file.FullName.Substring($resolvedPublishDir.Length).TrimStart('\')
         $remoteFileUri = ($remoteBaseUri + ($relativePath -replace '\\', '/'))
         $localBackupPath = Join-Path $resolvedRollbackCacheDir ($relativePath -replace '[\\/:*?"<>|]', '_')
+        $relativeDirectory = [System.IO.Path]::GetDirectoryName($relativePath)
+
+        if (-not [string]::IsNullOrWhiteSpace($relativeDirectory)) {
+            $remoteDirectoryUri = $remoteBaseUri + (($relativeDirectory -replace '\\', '/').Trim('/')) + '/'
+
+            if (-not $ensuredRemoteDirectories.Contains($remoteDirectoryUri)) {
+                Write-Log "Ensuring remote folder: $remoteDirectoryUri"
+                Ensure-RemoteDirectory -RemoteUri $remoteDirectoryUri -Credential $script:Credential -KnownDirectories $ensuredRemoteDirectories
+            }
+        }
 
         try {
             Download-RemoteFile -RemoteUri $remoteFileUri -LocalPath $localBackupPath -Credential $script:Credential
             New-LocalRollbackEntry -RemoteUri $remoteFileUri -BackupPath $localBackupPath
             Delete-RemoteFile -RemoteUri $remoteFileUri -Credential $script:Credential
         }
-        catch [System.Net.WebException] {
-            if ($_.Exception.Response -and $_.Exception.Response.StatusDescription -match '550') {
+        catch {
+            $ftpResponse = Get-FtpErrorResponse -Exception $_.Exception
+            if ($null -ne $ftpResponse -and
+                $ftpResponse.StatusCode -eq [System.Net.FtpStatusCode]::ActionNotTakenFileUnavailable) {
                 Write-Log "No existing remote file to back up: $remoteFileUri" -Level WARN
             }
             else {
