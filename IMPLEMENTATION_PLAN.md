@@ -38,11 +38,11 @@ Database checks cover valid date ranges, positive ordering/seeding/ranks, nonneg
 
 - Add EF Core SQL Server runtime and design-time tooling.
 - Define the domain entities, relationships, indexes, constraints, and enum conversions.
-- Generate `InitialCompetitionSchema` for SQL Server.
-- Apply pending migrations automatically during single-instance application startup.
-- Verify a clean build, migration consistency, and connection-string based startup configuration.
+- Produce a rerunnable MSSQL `001_initial_schema.sql` script for host-side execution.
+- Remove automatic startup migration so application startup no longer depends on direct SQL connectivity from the developer machine.
+- Verify a clean build, script/model alignment, and connection-string based startup configuration.
 
-Acceptance: a clean checkout can run `dotnet tool restore`, `dotnet build`, and `dotnet ef database update` after configuring `ConnectionStrings:CompetitionDb`; starting the app creates or upgrades the target SQL Server database.
+Acceptance: a clean checkout can run `dotnet build`; a host operator can apply `scripts/sql/001_initial_schema.sql` through the Forpsi MSSQL web interface; and the app can start once `ConnectionStrings:CompetitionDb` points at that prepared database.
 
 ### Step 2 - Edition administration
 

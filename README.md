@@ -4,8 +4,16 @@ Small ASP.NET Core countdown app for the competition landing page.
 
 ## Database
 
-The app uses Entity Framework Core with SQL Server. On startup it applies committed migrations
-to the configured `ConnectionStrings:CompetitionDb` database.
+The app uses Entity Framework Core with SQL Server for data access, but the initial schema is
+created from a rerunnable SQL script instead of EF migrations. This matches the Forpsi MSSQL
+hosting limitation where schema changes are applied through the web SQL interface.
+
+The initial schema script is:
+
+- `scripts/sql/001_initial_schema.sql`
+
+Run that script in the Forpsi MSSQL web interface. It is idempotent, so it can be rerun safely:
+existing tables, constraints, and indexes are skipped.
 
 For local development, keep the real connection string in user secrets instead of git-tracked
 files:
@@ -14,11 +22,10 @@ files:
 dotnet user-secrets set "ConnectionStrings:CompetitionDb" "Server=YOUR_SERVER;Database=Competition;User Id=YOUR_USER;Password=YOUR_PASSWORD;TrustServerCertificate=True;"
 ```
 
-Restore the repository-local EF tool and apply migrations manually with:
+Restore packages with:
 
 ```powershell
-dotnet tool restore
-dotnet ef database update
+dotnet restore
 ```
 
 The domain/schema decisions and the incremental feature roadmap are in
@@ -42,6 +49,9 @@ Configuration values can also be supplied as environment variables, for example
 not need to be committed. Settings changes do not require recompilation; configuration-file
 changes are reloaded while the app is running, except cookie lifetime changes, which apply
 after an app restart.
+
+The application no longer runs `Database.Migrate()` on startup. The SQL schema must already be
+present before the app starts using the database.
 
 ## Azure publish
 

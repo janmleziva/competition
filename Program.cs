@@ -45,12 +45,6 @@ var app = builder.Build();
 
 app.Logger.LogInformation("Starting Competition app in {Environment}", app.Environment.EnvironmentName);
 
-using (var scope = app.Services.CreateScope())
-{
-    var dbContext = scope.ServiceProvider.GetRequiredService<CompetitionDbContext>();
-    dbContext.Database.Migrate();
-}
-
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error");
