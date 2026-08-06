@@ -1,0 +1,39 @@
+@page
+@model Competition.Pages.Account.LoginModel
+@{
+    ViewData["Title"] = "Admin login";
+}
+
+<main class="shell">
+    <section class="panel hero">
+        <p class="eyebrow">Admin access</p>
+        <h1>Authentication required</h1>
+        <p class="lead">Log in to continue to the admin section.</p>
+        <a class="button button-ghost" asp-page="/Index">Back to countdown</a>
+    </section>
+</main>
+
+<div class="modal-backdrop" id="loginModal">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+        <h2 id="loginTitle">Log in</h2>
+        <p>Enter the admin credentials to continue.</p>
+
+        <form method="post" class="login-form">
+            <input asp-for="ReturnUrl" type="hidden" />
+            <div asp-validation-summary="ModelOnly" class="error"></div>
+
+            <label asp-for="Credentials.Username"></label>
+            <input asp-for="Credentials.Username" autocomplete="username" autofocus />
+            <span asp-validation-for="Credentials.Username" class="field-error"></span>
+
+            <label asp-for="Credentials.Password"></label>
+            <input asp-for="Credentials.Password" autocomplete="current-password" />
+            <span asp-validation-for="Credentials.Password" class="field-error"></span>
+
+            <div class="modal-actions">
+                <button class="button" type="submit">Continue</button>
+                <a class="button button-ghost" asp-page="/Index">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>

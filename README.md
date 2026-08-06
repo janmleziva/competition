@@ -2,6 +2,24 @@
 
 Small ASP.NET Core countdown app for the competition landing page.
 
+## Pages and access
+
+The UI uses Razor Pages. Add anonymous pages directly under `Pages` and admin pages under
+`Pages/Admin`; each page has its own `.cshtml` markup and optional `.cshtml.cs` page model.
+
+Access and appearance are configured in `appsettings.json`:
+
+- `AdminAccess.ProtectedPathPrefixes` controls which URL areas require authentication.
+- `AdminAccess.Username` and `AdminAccess.Password` define the temporary admin login.
+- `AdminAccess.CookieLifetimeHours` controls the login duration.
+- `Theme` contains the shared colors, font, and border radius.
+- `Competition` contains the countdown title and target date.
+
+Configuration values can also be supplied as environment variables, for example
+`AdminAccess__Password`, so production credentials do not need to be committed. Settings
+changes do not require recompilation; configuration-file changes are reloaded while the app
+is running, except cookie lifetime changes, which apply after an app restart.
+
 ## Azure publish
 
 1. Open `Competition.sln` in Visual Studio.
