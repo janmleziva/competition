@@ -2,6 +2,7 @@ using Competition.Configuration;
 using Competition.Data;
 using Competition.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -13,14 +14,34 @@ builder.Services.Configure<CompetitionSettings>(builder.Configuration.GetSection
 builder.Services.Configure<AdminAccessSettings>(builder.Configuration.GetSection(AdminAccessSettings.SectionName));
 builder.Services.Configure<ThemeSettings>(builder.Configuration.GetSection(ThemeSettings.SectionName));
 
-var connectionString = builder.Configuration.GetConnectionString("CompetitionDb")
+var configuredConnectionString = builder.Configuration.GetConnectionString("CompetitionDb")
     ?? throw new InvalidOperationException(
         "Connection string 'CompetitionDb' is missing. Configure it in user secrets or environment variables.");
 
+var databaseSettings = builder.Configuration
+    .GetSection(DatabaseSettings.SectionName)
+    .Get<DatabaseSettings>() ?? new DatabaseSettings();
+
+var connectionStringBuilder = new SqlConnectionStringBuilder(configuredConnectionString)
+{
+    ConnectTimeout = Math.Clamp(databaseSettings.ConnectTimeoutSeconds, 1, 60)
+};
+var effectiveConnectionString = connectionStringBuilder.ConnectionString;
+
+// Keep diagnostics aligned with the connection string actually passed to SqlClient.
+builder.Configuration["ConnectionStrings:CompetitionDb"] = effectiveConnectionString;
+
 builder.Services.AddDbContext<CompetitionDbContext>(options =>
     options.UseSqlServer(
-        connectionString,
-        sqlServerOptions => sqlServerOptions.EnableRetryOnFailure()));
+        effectiveConnectionString,
+        sqlServerOptions =>
+        {
+            sqlServerOptions.CommandTimeout(Math.Clamp(databaseSettings.CommandTimeoutSeconds, 1, 300));
+            sqlServerOptions.EnableRetryOnFailure(
+                Math.Clamp(databaseSettings.MaxRetryCount, 0, 10),
+                TimeSpan.FromSeconds(Math.Clamp(databaseSettings.MaxRetryDelaySeconds, 1, 60)),
+                errorNumbersToAdd: null);
+        }));
 
 var adminAccess = builder.Configuration
     .GetSection(AdminAccessSettings.SectionName)
@@ -40,6 +61,7 @@ builder.Services
 builder.Services.AddAuthorization();
 builder.Services.AddRazorPages();
 builder.Services.AddSingleton<AdminCredentialValidator>();
+builder.Services.AddScoped<IEditionAdministrationService, EditionAdministrationService>();
 
 var app = builder.Build();
 

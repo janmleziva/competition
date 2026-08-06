@@ -41,6 +41,10 @@ public sealed class CompetitionDbContext(DbContextOptions<CompetitionDbContext> 
         {
             entity.Property(x => x.Name).HasMaxLength(200);
             entity.Property(x => x.City).HasMaxLength(120);
+            entity.HasIndex(x => x.CreationToken).IsUnique();
+            entity.HasIndex(x => x.IsActive)
+                .IsUnique()
+                .HasFilter("[IsActive] = 1");
             entity.ToTable("CompetitionEditions", table =>
                 table.HasCheckConstraint("CK_CompetitionEditions_DateRange", "EndDate >= StartDate"));
         });

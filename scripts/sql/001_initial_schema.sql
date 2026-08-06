@@ -9,9 +9,23 @@ BEGIN
         City NVARCHAR(120) NOT NULL,
         StartDate DATE NOT NULL,
         EndDate DATE NOT NULL,
+        IsActive BIT NOT NULL CONSTRAINT DF_CompetitionEditions_IsActive DEFAULT 0,
+        CreationToken UNIQUEIDENTIFIER NOT NULL CONSTRAINT DF_CompetitionEditions_CreationToken DEFAULT NEWID(),
         CONSTRAINT PK_CompetitionEditions PRIMARY KEY (Id),
         CONSTRAINT CK_CompetitionEditions_DateRange CHECK (EndDate >= StartDate)
     );
+END;
+
+IF COL_LENGTH(N'dbo.CompetitionEditions', N'IsActive') IS NULL
+BEGIN
+    ALTER TABLE dbo.CompetitionEditions
+    ADD IsActive BIT NOT NULL CONSTRAINT DF_CompetitionEditions_IsActive DEFAULT 0 WITH VALUES;
+END;
+
+IF COL_LENGTH(N'dbo.CompetitionEditions', N'CreationToken') IS NULL
+BEGIN
+    ALTER TABLE dbo.CompetitionEditions
+    ADD CreationToken UNIQUEIDENTIFIER NOT NULL CONSTRAINT DF_CompetitionEditions_CreationToken DEFAULT NEWID() WITH VALUES;
 END;
 
 IF OBJECT_ID(N'dbo.Competitors', N'U') IS NULL
@@ -416,6 +430,19 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_CompetitionDiscipline
 BEGIN
     CREATE UNIQUE INDEX IX_CompetitionDisciplines_CompetitionEditionId_DisciplineId
         ON dbo.CompetitionDisciplines (CompetitionEditionId, DisciplineId);
+END;
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_CompetitionEditions_CreationToken' AND object_id = OBJECT_ID(N'dbo.CompetitionEditions'))
+BEGIN
+    CREATE UNIQUE INDEX IX_CompetitionEditions_CreationToken
+        ON dbo.CompetitionEditions (CreationToken);
+END;
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_CompetitionEditions_IsActive' AND object_id = OBJECT_ID(N'dbo.CompetitionEditions'))
+BEGIN
+    CREATE UNIQUE INDEX IX_CompetitionEditions_IsActive
+        ON dbo.CompetitionEditions (IsActive)
+        WHERE IsActive = 1;
 END;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_CompetitionDisciplines_CompetitionEditionId_Order' AND object_id = OBJECT_ID(N'dbo.CompetitionDisciplines'))

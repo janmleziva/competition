@@ -1,25 +1,41 @@
 @page
 @model IndexModel
 @{
-    ViewData["Title"] = Model.Settings.Title;
+    ViewData["Title"] = Model.Edition?.Name ?? Model.Settings.Title;
 }
 
 <main class="shell">
     <section class="panel hero">
-        <p class="eyebrow">Anonymous access</p>
-        <h1>Competition starts soon</h1>
-        <p class="lead">Live countdown to the beginning of the competition.</p>
+        <h1>@Model.Heading</h1>
+        @if (!string.IsNullOrWhiteSpace(Model.Lead))
+        {
+            <p class="lead">@Model.Lead</p>
+        }
 
-        <section class="countdown" aria-label="Countdown" data-countdown-target="@Model.Settings.TargetDate.ToString("O")">
-            <div class="unit"><span class="value" data-unit="days">--</span><span class="label">Days</span></div>
-            <div class="unit"><span class="value" data-unit="hours">--</span><span class="label">Hours</span></div>
-            <div class="unit"><span class="value" data-unit="minutes">--</span><span class="label">Minutes</span></div>
-            <div class="unit"><span class="value" data-unit="seconds">--</span><span class="label">Seconds</span></div>
-        </section>
+        @if (Model.Edition is not null)
+        {
+            <div class="home-edition">
+                <span class="admin-label">Soutěž</span>
+                <strong><a asp-page="/Editions/Details" asp-route-id="@Model.Edition.Id">@Model.Edition.Name</a></strong>
+                <span>@Model.Edition.City, @Model.EditionDateDisplay</span>
+            </div>
+        }
 
-        <div class="meta">Target start: @Model.TargetDisplay (Europe/Prague)</div>
-        <a class="button button-ghost" asp-page="/Admin/CreateComp">Log in</a>
-        <div class="env">Environment: @Model.EnvironmentName</div>
+        @if (!Model.IsCompetitionRunning)
+        {
+            <section class="countdown" aria-label="Odpočet" data-countdown-target="@Model.CountdownTarget.ToString("O")">
+                <div class="unit"><span class="value" data-unit="days">--</span><span class="label">Dny</span></div>
+                <div class="unit"><span class="value" data-unit="hours">--</span><span class="label">Hodiny</span></div>
+                <div class="unit"><span class="value" data-unit="minutes">--</span><span class="label">Minuty</span></div>
+                <div class="unit"><span class="value" data-unit="seconds">--</span><span class="label">Sekundy</span></div>
+            </section>
+        }
+
+        @if (Model.Edition is null)
+        {
+            <div class="meta">@Model.EditionDateDisplay</div>
+        }
+        <div class="env">Prostředí: @Model.EnvironmentName</div>
     </section>
 </main>
 

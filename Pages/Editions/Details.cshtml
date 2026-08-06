@@ -1,0 +1,43 @@
+@page "{id:long}"
+@model Competition.Pages.Editions.DetailsModel
+@{
+    ViewData["Title"] = Model.Edition.Name;
+}
+
+<main class="shell">
+    <section class="panel admin">
+        <div class="edition-title">
+            <h1>@Model.Edition.Name</h1>
+            @if (Model.Edition.IsActive)
+            {
+                <span class="badge">Aktivní</span>
+            }
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+        {
+            <div class="status-message" role="status">@Model.StatusMessage</div>
+        }
+
+        <dl class="details-grid">
+            <div><dt>Město</dt><dd>@Model.Edition.City</dd></div>
+            <div><dt>Začátek</dt><dd>@Model.FormatDate(Model.Edition.StartDate)</dd></div>
+            <div><dt>Konec</dt><dd>@Model.FormatDate(Model.Edition.EndDate)</dd></div>
+        </dl>
+
+        <div class="form-actions">
+            @if (User.Identity?.IsAuthenticated == true)
+            {
+                <a class="button" asp-page="/Editions/Create">Vytvořit soutěž</a>
+                <a class="button" asp-page="/Editions/Edit" asp-route-id="@Model.Edition.Id">Upravit</a>
+                @if (!Model.Edition.IsActive)
+                {
+                    <form method="post" asp-page-handler="SetActive">
+                        <button class="button" type="submit">Nastavit jako aktivní</button>
+                    </form>
+                }
+            }
+            <a class="button button-ghost" asp-page="/Editions/Index">Všechny soutěže</a>
+        </div>
+    </section>
+</main>

@@ -22,5 +22,8 @@
     <Compile Remove="deployment\**" />
     <Content Remove="appsettings.Development.json" />
     <None Remove="appsettings.Development.json" />
+    <Compile Remove="Competition.Tests\**" />
+    <Content Remove="Competition.Tests\**" />
+    <None Remove="Competition.Tests\**" />
   </ItemGroup>
 </Project>

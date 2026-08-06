@@ -1,0 +1,79 @@
+@page
+@model Competition.Pages.Editions.IndexModel
+@{
+    ViewData["Title"] = "Soutěže";
+}
+
+<main class="shell shell-wide">
+    <section class="panel admin">
+        <div class="page-heading">
+            <div>
+                <h1>Soutěže</h1>
+            </div>
+            @if (User.Identity?.IsAuthenticated == true)
+            {
+                <a class="button" asp-page="/Editions/Create">Vytvořit soutěž</a>
+            }
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+        {
+            <div class="status-message" role="status">@Model.StatusMessage</div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(Model.DatabaseError))
+        {
+            <section class="database-error" role="alert">
+                <h2>Připojení k databázi selhalo</h2>
+                <p>@Model.DatabaseError</p>
+                @if (Model.ShowFullConnectionString)
+                {
+                    <p><strong>Nastavený connection string (jen Development):</strong></p>
+                    <code>@(Model.ConnectionString ?? "ConnectionStrings:CompetitionDb není nakonfigurován.")</code>
+                    <p class="diagnostic-warning">Obsahuje přihlašovací údaje. Nesdílejte screenshot a po dokončení diagnostiky změňte heslo.</p>
+                }
+                else
+                {
+                    <p>Connection string je skrytý mimo výslovně povolenou diagnostiku v Development prostředí.</p>
+                }
+            </section>
+        }
+        else if (Model.Editions.Count == 0)
+        {
+            <div class="empty-state">Zatím nebyla vytvořena žádná soutěž.</div>
+        }
+        else
+        {
+            <div class="edition-list">
+                @foreach (var edition in Model.Editions)
+                {
+                    <article class="edition-row">
+                        <div>
+                            <div class="edition-title">
+                                <a asp-page="/Editions/Details" asp-route-id="@edition.Id">@edition.Name</a>
+                                @if (edition.IsActive)
+                                {
+                                    <span class="badge">Aktivní</span>
+                                }
+                            </div>
+                            <span class="meta-inline">@edition.City | @Model.FormatDateRange(edition.StartDate, edition.EndDate)</span>
+                        </div>
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            <div class="row-actions">
+                                <a class="button button-ghost button-small" asp-page="/Editions/Edit" asp-route-id="@edition.Id">Upravit</a>
+                                @if (!edition.IsActive)
+                                {
+                                    <form method="post" asp-page-handler="SetActive" asp-route-id="@edition.Id">
+                                        <button class="button button-small" type="submit">Nastavit jako aktivní</button>
+                                    </form>
+                                }
+                            </div>
+                        }
+                    </article>
+                }
+            </div>
+        }
+
+    </section>
+</main>

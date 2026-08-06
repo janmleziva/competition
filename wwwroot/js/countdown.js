@@ -21,8 +21,8 @@ if (countdown) {
         });
 
         if (remaining === 0) {
-            document.querySelector("h1").textContent = "Competition is on!";
-            document.querySelector(".lead").textContent = "The competition has started.";
+            document.querySelector("h1").textContent = "Soutěž právě probíhá";
+            document.querySelector(".lead").textContent = "Soutěž už začala.";
         }
     };
 

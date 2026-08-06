@@ -34,7 +34,7 @@ The domain/schema decisions and the incremental feature roadmap are in
 ## Pages and access
 
 The UI uses Razor Pages. Add anonymous pages directly under `Pages` and admin pages under
-`Pages/Admin`; each page has its own `.cshtml` markup and optional `.cshtml.cs` page model.
+`Pages`; each page has its own `.cshtml` markup and optional `.cshtml.cs` page model.
 
 Access and appearance are configured in `appsettings.json`:
 
@@ -111,3 +111,30 @@ Each deployment writes a timestamped log file to `deployment/logs/`. The folder 
 ## Local run
 
 Run the project from Visual Studio or with `dotnet run` from this folder.
+
+## Edition administration
+
+Competition editions are listed under `/Editions`. The list and detail pages are public, while create, edit, and active-edition actions require an authenticated administrator:
+
+- create an edition with a name, city, start date, and end date;
+- reopen an edition and edit those details;
+- select one edition as the explicit active edition.
+
+The first edition is made active automatically. Later active-edition changes are explicit, and
+the database permits at most one active edition. Creation forms use a unique submission token,
+so retrying the same form submission does not create a duplicate row.
+
+After updating an existing database from Step 1, rerun `scripts/sql/001_initial_schema.sql` in
+the Forpsi MSSQL web interface. It adds the Step 2 columns and indexes without recreating or
+deleting existing edition data.
+
+SQL connection behavior is configured under `Database` in `appsettings.json`. The defaults use
+a 5-second connection timeout, a 10-second command timeout, and one retry with at most a
+1-second delay. These values can be overridden with environment variables such as
+`Database__ConnectTimeoutSeconds`.
+
+Run the automated checks with:
+
+```powershell
+dotnet test Competition.sln -c Release
+```

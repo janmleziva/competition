@@ -1,0 +1,43 @@
+@page
+@model Competition.Pages.Editions.CreateModel
+@{
+    ViewData["Title"] = "Vytvořit soutěž";
+}
+
+<main class="shell">
+    <section class="panel admin">
+        <h1>Vytvořit soutěž</h1>
+        <p class="lead">Doplňte termín a místo konání nové soutěže.</p>
+
+        <form method="post" class="edition-form">
+            <input asp-for="CreationToken" type="hidden" />
+            <div asp-validation-summary="ModelOnly" class="error"></div>
+
+            <label asp-for="Input.Name"></label>
+            <input asp-for="Input.Name" autofocus />
+            <span asp-validation-for="Input.Name" class="field-error"></span>
+
+            <label asp-for="Input.City"></label>
+            <input asp-for="Input.City" />
+            <span asp-validation-for="Input.City" class="field-error"></span>
+
+            <div class="form-grid">
+                <div>
+                    <label asp-for="Input.StartDate"></label>
+                    <input asp-for="Input.StartDate" asp-format="{0:dd/MM/yyyy}" type="text" inputmode="numeric" placeholder="dd/mm/rrrr" />
+                    <span asp-validation-for="Input.StartDate" class="field-error"></span>
+                </div>
+                <div>
+                    <label asp-for="Input.EndDate"></label>
+                    <input asp-for="Input.EndDate" asp-format="{0:dd/MM/yyyy}" type="text" inputmode="numeric" placeholder="dd/mm/rrrr" />
+                    <span asp-validation-for="Input.EndDate" class="field-error"></span>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button class="button" type="submit">Vytvořit soutěž</button>
+                <a class="button button-ghost" asp-page="/Editions/Index">Zrušit</a>
+            </div>
+        </form>
+    </section>
+</main>
