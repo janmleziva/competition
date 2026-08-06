@@ -2,6 +2,22 @@
 
 Small ASP.NET Core countdown app for the competition landing page.
 
+## Database
+
+The app uses Entity Framework Core with SQLite. On startup it applies committed migrations
+and stores the local database at `App_Data/competition.db`; that directory is intentionally
+ignored by Git and must be persisted and backed up by the production host.
+
+Restore the repository-local EF tool and apply migrations manually with:
+
+```powershell
+dotnet tool restore
+dotnet ef database update
+```
+
+The domain/schema decisions and the incremental feature roadmap are in
+[`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md).
+
 ## Pages and access
 
 The UI uses Razor Pages. Add anonymous pages directly under `Pages` and admin pages under

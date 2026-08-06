@@ -1,6 +1,8 @@
 using Competition.Configuration;
+using Competition.Data;
 using Competition.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,6 +12,12 @@ builder.Logging.AddConsole();
 builder.Services.Configure<CompetitionSettings>(builder.Configuration.GetSection(CompetitionSettings.SectionName));
 builder.Services.Configure<AdminAccessSettings>(builder.Configuration.GetSection(AdminAccessSettings.SectionName));
 builder.Services.Configure<ThemeSettings>(builder.Configuration.GetSection(ThemeSettings.SectionName));
+
+var dataDirectory = Path.Combine(builder.Environment.ContentRootPath, "App_Data");
+Directory.CreateDirectory(dataDirectory);
+var databasePath = Path.Combine(dataDirectory, "competition.db");
+builder.Services.AddDbContext<CompetitionDbContext>(options =>
+    options.UseSqlite($"Data Source={databasePath}"));
 
 var adminAccess = builder.Configuration
     .GetSection(AdminAccessSettings.SectionName)
@@ -33,6 +41,12 @@ builder.Services.AddSingleton<AdminCredentialValidator>();
 var app = builder.Build();
 
 app.Logger.LogInformation("Starting Competition app in {Environment}", app.Environment.EnvironmentName);
+
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<CompetitionDbContext>();
+    dbContext.Database.Migrate();
+}
 
 if (!app.Environment.IsDevelopment())
 {
