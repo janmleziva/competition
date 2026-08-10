@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
+using Competition.Configuration;
 using Competition.Data;
 using Competition.Domain;
 using Competition.Models;
@@ -9,6 +10,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Competition.Tests;
 
@@ -542,6 +544,161 @@ public sealed class PhaseSetupServiceTests
         Assert.Equal(MatchStatus.Scheduled, (await db.Matches.SingleAsync()).Status);
         Assert.Equal("Dílčí skóre bylo smazáno.", page.MatchStatusMessage);
         Assert.Equal(match.Id, page.MatchStatusMatchId);
+    }
+
+    [Fact]
+    public async Task AnonymousResultEditing_GlobalSwitchBlocksVisitorsButNotAdmins()
+    {
+        await using var db = CreateDbContext();
+        var (editionId, disciplineId, _) = await SeedDisciplineAsync(db, 2, PlayingSystemType.RoundRobin);
+        var service = new PhaseSetupService(db, Options.Create(new AnonymousResultEditingSettings { Enabled = false }));
+        await service.GetSetupAsync(editionId, disciplineId);
+        await service.GeneratePresetMatchesAsync(editionId, disciplineId);
+        var match = await db.Matches.SingleAsync();
+        var input = new MatchResultInput
+        {
+            MatchId = match.Id, HomeScore = 2, AwayScore = 1, Version = match.Version
+        };
+
+        var error = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.UpdateMatchResultAsync(editionId, disciplineId, input, false));
+
+        Assert.Contains("uzavřená", error.Message);
+        Assert.False((await service.GetSetupAsync(editionId, disciplineId))!.IsAnonymousResultEditingEnabled);
+        Assert.True(await service.UpdateMatchResultAsync(editionId, disciplineId, input, true));
+    }
+
+    [Fact]
+    public async Task StaleResultEditShowsConflictAndReloadsCurrentResult()
+    {
+        await using var db = CreateDbContext();
+        var (editionId, disciplineId, _) = await SeedDisciplineAsync(db, 2, PlayingSystemType.RoundRobin);
+        var service = new PhaseSetupService(db);
+        await service.GetSetupAsync(editionId, disciplineId);
+        await service.GeneratePresetMatchesAsync(editionId, disciplineId);
+        var match = await db.Matches.SingleAsync();
+        var staleVersion = match.Version;
+        await service.UpdateMatchResultAsync(editionId, disciplineId, new MatchResultInput
+        {
+            MatchId = match.Id, HomeScore = 2, AwayScore = 0, Version = staleVersion
+        }, false);
+        var page = new DisciplinePhasesModel(service)
+        {
+            PageContext = new PageContext { HttpContext = new DefaultHttpContext() },
+            ResultInput = new MatchResultInput
+            {
+                MatchId = match.Id, HomeScore = 0, AwayScore = 2, Version = staleVersion
+            }
+        };
+
+        Assert.IsType<PageResult>(await page.OnPostUpdateResultAsync(editionId, disciplineId, default));
+
+        Assert.Contains("někdo jiný", page.MatchValidationMessage);
+        var current = page.Setup.Phases.SelectMany(x => x.Groups.SelectMany(g => g.Matches).Concat(x.Matches))
+            .Single(x => x.Id == match.Id);
+        Assert.Equal((2, 0), (current.HomeScore, current.AwayScore));
+    }
+
+    [Fact]
+    public async Task AnonymousResultEditCannotChangeMatchAdministrationFields()
+    {
+        await using var db = CreateDbContext();
+        var (editionId, disciplineId, _) = await SeedDisciplineAsync(db, 2, PlayingSystemType.RoundRobin);
+        var service = new PhaseSetupService(db);
+        await service.GetSetupAsync(editionId, disciplineId);
+        await service.GeneratePresetMatchesAsync(editionId, disciplineId);
+        var match = await db.Matches.SingleAsync();
+        var original = (match.DisciplinePhaseId, match.PhaseGroupId, match.HomeTeamId, match.AwayTeamId, match.Name, match.Order);
+
+        await service.UpdateMatchResultAsync(editionId, disciplineId, new MatchResultInput
+        {
+            MatchId = match.Id, HomeScore = 4, AwayScore = 3, Version = match.Version
+        }, false);
+
+        var saved = await db.Matches.SingleAsync();
+        Assert.Equal(original, (saved.DisciplinePhaseId, saved.PhaseGroupId, saved.HomeTeamId, saved.AwayTeamId, saved.Name, saved.Order));
+    }
+
+    [Fact]
+    public async Task SetScoresRejectDuplicateOrSkippedSetNumbers()
+    {
+        await using var db = CreateDbContext();
+        var (editionId, disciplineId, _) = await SeedDisciplineAsync(db, 2, PlayingSystemType.RoundRobin);
+        var discipline = await db.CompetitionDisciplines.SingleAsync();
+        discipline.UsesSetScores = true;
+        discipline.SetsToWin = 2;
+        await db.SaveChangesAsync();
+        var service = new PhaseSetupService(db);
+        await service.GetSetupAsync(editionId, disciplineId);
+        await service.GeneratePresetMatchesAsync(editionId, disciplineId);
+        var match = await db.Matches.SingleAsync();
+
+        await Assert.ThrowsAsync<ValidationException>(() => service.UpdateMatchSetScoresAsync(
+            editionId, disciplineId, new MatchSetScoresInput
+            {
+                MatchId = match.Id,
+                Version = match.Version,
+                Sets =
+                [
+                    new MatchSetScoreInput { SetNumber = 1, HomeScore = 6, AwayScore = 3 },
+                    new MatchSetScoreInput { SetNumber = 1, HomeScore = 2, AwayScore = 6 }
+                ]
+            }, false));
+
+        await Assert.ThrowsAsync<ValidationException>(() => service.UpdateMatchSetScoresAsync(
+            editionId, disciplineId, new MatchSetScoresInput
+            {
+                MatchId = match.Id,
+                Version = match.Version,
+                Sets = [new MatchSetScoreInput { SetNumber = 2, HomeScore = 6, AwayScore = 3 }]
+            }, false));
+    }
+
+    [Fact]
+    public async Task AnonymousUserCanEditResultsButCannotUseAdministrationHandlers()
+    {
+        await using var db = CreateDbContext();
+        var (editionId, disciplineId, _) = await SeedDisciplineAsync(db, 2, PlayingSystemType.RoundRobin);
+        var service = new PhaseSetupService(db);
+        await service.GetSetupAsync(editionId, disciplineId);
+        await service.GeneratePresetMatchesAsync(editionId, disciplineId);
+        var match = await db.Matches.SingleAsync();
+        var page = new DisciplinePhasesModel(service)
+        {
+            PageContext = new PageContext { HttpContext = new DefaultHttpContext() },
+            ResultInput = new MatchResultInput
+            {
+                MatchId = match.Id, HomeScore = 1, AwayScore = 0, Version = match.Version
+            }
+        };
+
+        Assert.IsType<RedirectToPageResult>(await page.OnPostUpdateResultAsync(editionId, disciplineId, default));
+        Assert.IsType<ChallengeResult>(await page.OnPostLockResultsAsync(editionId, disciplineId, default));
+    }
+
+    [Fact]
+    public async Task ResultEditRequiresVersionAndDistinctAssignedTeams()
+    {
+        await using var db = CreateDbContext();
+        var (editionId, disciplineId, _) = await SeedDisciplineAsync(db, 2, PlayingSystemType.RoundRobin);
+        var service = new PhaseSetupService(db);
+        await service.GetSetupAsync(editionId, disciplineId);
+        await service.GeneratePresetMatchesAsync(editionId, disciplineId);
+        var match = await db.Matches.SingleAsync();
+
+        await Assert.ThrowsAsync<ValidationException>(() => service.UpdateMatchResultAsync(
+            editionId, disciplineId, new MatchResultInput
+            {
+                MatchId = match.Id, HomeScore = 1, AwayScore = 0
+            }, false));
+
+        match.AwayTeamId = match.HomeTeamId;
+        await db.SaveChangesAsync();
+        await Assert.ThrowsAsync<ValidationException>(() => service.UpdateMatchResultAsync(
+            editionId, disciplineId, new MatchResultInput
+            {
+                MatchId = match.Id, HomeScore = 1, AwayScore = 0, Version = match.Version
+            }, false));
     }
 
     [Theory]

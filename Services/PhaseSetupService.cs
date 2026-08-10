@@ -1,15 +1,32 @@
 using System.ComponentModel.DataAnnotations;
+using Competition.Configuration;
 using Competition.Data;
 using Competition.Domain;
 using Competition.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Regex = System.Text.RegularExpressions.Regex;
 using RegexOptions = System.Text.RegularExpressions.RegexOptions;
 
 namespace Competition.Services;
 
-public sealed class PhaseSetupService(CompetitionDbContext dbContext) : IPhaseSetupService
+public sealed class PhaseSetupService : IPhaseSetupService
 {
+    private readonly CompetitionDbContext dbContext;
+    private readonly AnonymousResultEditingSettings anonymousEditing;
+    private readonly ILogger<PhaseSetupService> logger;
+
+    public PhaseSetupService(
+        CompetitionDbContext dbContext,
+        IOptions<AnonymousResultEditingSettings>? anonymousEditingOptions = null,
+        ILogger<PhaseSetupService>? logger = null)
+    {
+        this.dbContext = dbContext;
+        anonymousEditing = anonymousEditingOptions?.Value ?? new AnonymousResultEditingSettings();
+        this.logger = logger ?? NullLogger<PhaseSetupService>.Instance;
+    }
+
     public async Task<DisciplinePhaseSetup?> GetSetupAsync(long editionId, long competitionDisciplineId, CancellationToken cancellationToken = default)
     {
         if (!await EnsurePresetAsync(editionId, competitionDisciplineId, cancellationToken))
@@ -98,7 +115,7 @@ public sealed class PhaseSetupService(CompetitionDbContext dbContext) : IPhaseSe
         return new DisciplinePhaseSetup(
             discipline.CompetitionEditionId, discipline.CompetitionEdition.Name, discipline.Id, discipline.Discipline.Name,
             discipline.PlayingSystem, discipline.UsesSetScores, discipline.SetsToWin, discipline.IsScheduleLocked,
-            discipline.AreResultsLocked,
+            discipline.AreResultsLocked, anonymousEditing.Enabled,
             discipline.Phases.SelectMany(x => x.Matches).Any(x =>
                 x.HomeScore != null || x.AwayScore != null || x.SetScores.Count != 0 || x.Status != MatchStatus.Scheduled),
             discipline.Teams.OrderBy(x => x.Seed).Select(x => new PhaseSetupTeam(x.Id, x.Seed, TeamName(x))).ToList(), phases);
@@ -820,8 +837,15 @@ public sealed class PhaseSetupService(CompetitionDbContext dbContext) : IPhaseSe
         {
             throw new ValidationException("Výsledek nelze zapsat, dokud nejsou známy oba týmy.");
         }
+        if (match.HomeTeamId is not null && match.HomeTeamId == match.AwayTeamId)
+        {
+            throw new ValidationException("Tým nemůže hrát sám proti sobě.");
+        }
         ValidateMainScore(match, input.HomeScore, input.AwayScore);
 
+        var previousHomeScore = match.HomeScore;
+        var previousAwayScore = match.AwayScore;
+        var previousStatus = match.Status;
         dbContext.Entry(match).Property(x => x.Version).OriginalValue = input.Version;
         match.HomeScore = input.HomeScore;
         match.AwayScore = input.AwayScore;
@@ -833,6 +857,11 @@ public sealed class PhaseSetupService(CompetitionDbContext dbContext) : IPhaseSe
         LockScheduleAfterResult(match);
         await UpdateKnockoutAdvancementAsync(match, cancellationToken);
         await SaveMatchEditAsync(cancellationToken);
+        logger.LogInformation(
+            "Match result changed. EditionId={EditionId} DisciplineId={DisciplineId} MatchId={MatchId} Actor={Actor} OldScore={OldHomeScore}:{OldAwayScore} NewScore={NewHomeScore}:{NewAwayScore} OldStatus={OldStatus} NewStatus={NewStatus} SubmittedVersion={SubmittedVersion} SavedVersion={SavedVersion}",
+            editionId, competitionDisciplineId, match.Id, isAdmin ? "Admin" : "Anonymous",
+            previousHomeScore, previousAwayScore, input.HomeScore, input.AwayScore,
+            previousStatus, match.Status, input.Version, match.Version);
         return true;
     }
 
@@ -848,6 +877,11 @@ public sealed class PhaseSetupService(CompetitionDbContext dbContext) : IPhaseSe
         if (match.HomeTeamId is null || match.AwayTeamId is null)
         {
             throw new ValidationException("Dílčí skóre nelze zapsat, dokud nejsou známy oba týmy.");
+        }
+
+        if (match.HomeTeamId == match.AwayTeamId)
+        {
+            throw new ValidationException("Tým nemůže hrát sám proti sobě.");
         }
 
         foreach (var set in input.Sets)
@@ -880,6 +914,8 @@ public sealed class PhaseSetupService(CompetitionDbContext dbContext) : IPhaseSe
         ValidateSetResultConsistency(match, orderedSets
             .Select(x => new SetResult(x.SetNumber, x.HomeScore!.Value, x.AwayScore!.Value)).ToList());
 
+        var previousSets = match.SetScores.OrderBy(x => x.SetNumber)
+            .Select(x => $"{x.SetNumber}:{x.HomeScore}-{x.AwayScore}").ToArray();
         dbContext.Entry(match).Property(x => x.Version).OriginalValue = input.Version;
         dbContext.MatchSetScores.RemoveRange(match.SetScores);
         foreach (var set in suppliedSets.OrderBy(x => x.SetNumber))
@@ -896,6 +932,12 @@ public sealed class PhaseSetupService(CompetitionDbContext dbContext) : IPhaseSe
         match.UpdatedAtUtc = DateTime.UtcNow;
         LockScheduleAfterResult(match);
         await SaveMatchEditAsync(cancellationToken);
+        logger.LogInformation(
+            "Match set scores changed. EditionId={EditionId} DisciplineId={DisciplineId} MatchId={MatchId} Actor={Actor} OldSets={OldSets} NewSets={NewSets} SubmittedVersion={SubmittedVersion} SavedVersion={SavedVersion}",
+            editionId, competitionDisciplineId, match.Id, isAdmin ? "Admin" : "Anonymous",
+            string.Join(",", previousSets),
+            string.Join(",", suppliedSets.OrderBy(x => x.SetNumber).Select(x => $"{x.SetNumber}:{x.HomeScore}-{x.AwayScore}")),
+            input.Version, match.Version);
         return true;
     }
 
@@ -908,13 +950,17 @@ public sealed class PhaseSetupService(CompetitionDbContext dbContext) : IPhaseSe
                 x.DisciplinePhase.CompetitionDiscipline.CompetitionEditionId == editionId, cancellationToken)
         ?? throw new ValidationException("Zápas neexistuje.");
 
-    private static void EnsureMatchCanBeEdited(Match match, int version, bool isAdmin)
+    private void EnsureMatchCanBeEdited(Match match, int version, bool isAdmin)
     {
         if (match.Version != version)
         {
             throw new ValidationException("Výsledek mezitím změnil někdo jiný. Obnovte stránku a zkuste to znovu.");
         }
         var discipline = match.DisciplinePhase.CompetitionDiscipline;
+        if (!isAdmin && !anonymousEditing.Enabled)
+        {
+            throw new ValidationException("Veřejná editace výsledků je momentálně uzavřená.");
+        }
         if (discipline.AreResultsLocked)
         {
             throw new ValidationException("Výsledky jsou uzamčené.");

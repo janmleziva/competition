@@ -199,7 +199,7 @@ public sealed class DisciplinePhasesModel(IPhaseSetupService phases) : PageModel
 
     public bool HasMatches => Setup.Phases.SelectMany(x => x.Groups.SelectMany(g => g.Matches).Concat(x.Matches)).Any();
 
-    public bool CanEditResults(bool isAdmin) => !Setup.AreResultsLocked &&
+    public bool CanEditResults(bool isAdmin) => (isAdmin || Setup.IsAnonymousResultEditingEnabled) && !Setup.AreResultsLocked &&
         (Setup.PlayingSystem == PlayingSystemType.Knockout
             ? Setup.IsScheduleLocked
             : true);

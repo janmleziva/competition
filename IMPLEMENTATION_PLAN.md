@@ -87,7 +87,7 @@ Acceptance: each edition has its ordered discipline list, independently formed t
 
 Acceptance: an admin can produce every match slot for a discipline before results are known.
 
-### Step 6 - Public match views and anonymous result editing
+### Step 6 - Public match views and anonymous result editing (completed)
 
 - Add public edition/discipline pages, grouped by phase and group.
 - Add an intentionally anonymous result-edit endpoint limited to score/status fields; do not expose general entity binding.
