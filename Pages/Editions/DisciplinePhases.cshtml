@@ -110,6 +110,14 @@
             </div>
         }
 
+        @if (!isAdmin && !Model.Setup.IsAnonymousResultEditingEnabled)
+        {
+            <div class="schedule-lock-notice results-lock-notice" role="status">
+                <strong>Veřejná editace výsledků je uzavřená.</strong>
+                Aktuální rozpis a uložené výsledky zůstávají veřejně dostupné jen pro čtení.
+            </div>
+        }
+
         @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
         {
             <div class="status-message" role="status">@Model.StatusMessage</div>

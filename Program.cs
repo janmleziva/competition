@@ -4,6 +4,7 @@ using Competition.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,6 +14,8 @@ builder.Logging.AddConsole();
 builder.Services.Configure<CompetitionSettings>(builder.Configuration.GetSection(CompetitionSettings.SectionName));
 builder.Services.Configure<AdminAccessSettings>(builder.Configuration.GetSection(AdminAccessSettings.SectionName));
 builder.Services.Configure<ThemeSettings>(builder.Configuration.GetSection(ThemeSettings.SectionName));
+builder.Services.Configure<AnonymousResultEditingSettings>(
+    builder.Configuration.GetSection(AnonymousResultEditingSettings.SectionName));
 
 var configuredConnectionString = builder.Configuration.GetConnectionString("CompetitionDb")
     ?? throw new InvalidOperationException(
@@ -59,6 +62,38 @@ builder.Services
     });
 
 builder.Services.AddAuthorization();
+var anonymousEditing = builder.Configuration
+    .GetSection(AnonymousResultEditingSettings.SectionName)
+    .Get<AnonymousResultEditingSettings>() ?? new AnonymousResultEditingSettings();
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+    {
+        var handler = context.Request.Query["handler"].ToString();
+        var isResultEditHandler = handler.Equals("UpdateResult", StringComparison.OrdinalIgnoreCase) ||
+            handler.Equals("UpdateSetScores", StringComparison.OrdinalIgnoreCase) ||
+            handler.Equals("DeleteSetScores", StringComparison.OrdinalIgnoreCase);
+        var isResultEdit = HttpMethods.IsPost(context.Request.Method) &&
+            context.Request.Path.StartsWithSegments("/Editions", StringComparison.OrdinalIgnoreCase) &&
+            context.Request.Path.Value?.EndsWith("/Phases", StringComparison.OrdinalIgnoreCase) == true &&
+            isResultEditHandler;
+
+        if (!isResultEdit)
+        {
+            return RateLimitPartition.GetNoLimiter("unlimited");
+        }
+
+        var clientKey = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        return RateLimitPartition.GetFixedWindowLimiter(clientKey, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = Math.Clamp(anonymousEditing.PermitLimit, 1, 1000),
+            Window = TimeSpan.FromSeconds(Math.Clamp(anonymousEditing.WindowSeconds, 1, 3600)),
+            QueueLimit = 0,
+            AutoReplenishment = true
+        });
+    });
+});
 builder.Services.AddRazorPages()
     .AddMvcOptions(options =>
     {
@@ -87,6 +122,7 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseMiddleware<ConfigurableAdminAuthorizationMiddleware>();
 app.UseAuthorization();

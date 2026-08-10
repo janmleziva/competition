@@ -65,7 +65,7 @@ public sealed class MatchResultInput
     public int? AwayScore { get; set; }
 
     [Range(0, int.MaxValue)]
-    public int Version { get; set; }
+    public int Version { get; set; } = -1;
 }
 
 public sealed class MatchTeamsInput
@@ -86,7 +86,7 @@ public sealed class MatchSetScoresInput
     public long MatchId { get; set; }
 
     [Range(0, int.MaxValue)]
-    public int Version { get; set; }
+    public int Version { get; set; } = -1;
 
     public List<MatchSetScoreInput> Sets { get; set; } = [];
 }
