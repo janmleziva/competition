@@ -1,0 +1,70 @@
+@page
+@model Competition.Pages.Disciplines.IndexModel
+
+@{
+    ViewData["Title"] = "Seznam disciplín";
+}
+
+<main class="shell">
+    <section class="panel admin">
+        <div class="page-heading">
+            <div>
+                <h1>Disciplíny</h1>
+                <p class="lead">Opakovaně použitelný seznam disciplín</p>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+        {
+            <div class="status-message" role="status">@Model.StatusMessage</div>
+        }
+
+        <div asp-validation-summary="ModelOnly" class="error validation-panel"></div>
+
+        @if (User.Identity?.IsAuthenticated == true)
+        {
+            <form method="post" asp-page-handler="Create" class="registration-form inline-form">
+                <div>
+                    <label asp-for="Input.Name">Název</label>
+                    <input asp-for="Input.Name" maxlength="120" />
+                </div>
+
+                <button class="button button-small" type="submit">Vytvořit novou</button>
+            </form>
+        }
+
+        @if (Model.Items.Count == 0)
+        {
+            <div class="empty-state">Seznam disciplín je zatím prázdný.</div>
+        }
+        else
+        {
+            <div class="edition-list">
+                @foreach (var item in Model.Items)
+                {
+                    <article class="edition-row">
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            <form method="post" asp-page-handler="Rename" class="catalog-name-form">
+                                <input type="hidden" name="id" value="@item.Id" />
+                                <input name="name" value="@item.Name" maxlength="120" required />
+                                <button class="button button-ghost button-small" type="submit">Přejmenovat</button>
+                            </form>
+
+                            <form method="post" asp-page-handler="Delete">
+                                <input type="hidden" name="id" value="@item.Id" />
+                                <button class="button button-danger button-small" type="submit" disabled="@item.IsInUse">
+                                    Smazat
+                                </button>
+                            </form>
+                        }
+                        else
+                        {
+                            <strong>@item.Name</strong>
+                        }
+                    </article>
+                }
+            </div>
+        }
+    </section>
+</main>

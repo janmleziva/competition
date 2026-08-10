@@ -11,6 +11,12 @@ public sealed class Match
     public DisciplineTeam? HomeTeam { get; set; }
     public long? AwayTeamId { get; set; }
     public DisciplineTeam? AwayTeam { get; set; }
+    public long? HomeSourceMatchId { get; set; }
+    public long? AwaySourceMatchId { get; set; }
+    public long? HomeSourceGroupId { get; set; }
+    public int? HomeSourceRank { get; set; }
+    public long? AwaySourceGroupId { get; set; }
+    public int? AwaySourceRank { get; set; }
     public required string Name { get; set; }
     public int Order { get; set; }
     public MatchStatus Status { get; set; }

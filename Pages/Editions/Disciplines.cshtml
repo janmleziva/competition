@@ -1,0 +1,439 @@
+@page "/Editions/{id:long}/Disciplines"
+@model Competition.Pages.Editions.DisciplinesModel
+@using Competition.Domain
+
+@{
+    ViewData["Title"] = $"Disciplíny – {Model.Setup.EditionName}";
+}
+
+<main class="shell shell-wide">
+    <section class="panel admin disciplines-page">
+        <div class="page-heading">
+            <div>
+                <h1>Disciplíny</h1>
+                <p class="lead">@Model.Setup.EditionName</p>
+            </div>
+
+            <a class="button button-ghost" asp-page="/Editions/Details" asp-route-id="@Model.Setup.EditionId">Zpět</a>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+        {
+            <div class="status-message" role="status">@Model.StatusMessage</div>
+        }
+
+        <div asp-validation-summary="ModelOnly" class="error validation-panel"></div>
+
+        @if (User.Identity?.IsAuthenticated == true)
+        {
+            <section class="registration-form discipline-attach-section" aria-labelledby="attach-discipline-heading">
+                <h2 id="attach-discipline-heading">Přidat disciplínu</h2>
+
+                @if (Model.Setup.AvailableDisciplines.Count == 0)
+                {
+                    <p class="meta-inline">K dispozici není žádná disciplína.</p>
+                }
+                else
+                {
+                    <form id="attach-discipline-form"
+                          method="post"
+                          asp-page-handler="Attach"
+                          class="discipline-settings-grid">
+                        <div>
+                            <label asp-for="Input.DisciplineId">Disciplína</label>
+                            <select asp-for="Input.DisciplineId">
+                                <option value="">Vyberte</option>
+                                @foreach (var discipline in Model.Setup.AvailableDisciplines)
+                                {
+                                    <option value="@discipline.Id">@discipline.Name</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div>
+                            <label asp-for="Input.Order">Pořadí</label>
+                            <input asp-for="Input.Order" type="number" min="1" />
+                        </div>
+
+                        <div>
+                            <label asp-for="Input.TeamSize">Velikost týmu</label>
+                            <input asp-for="Input.TeamSize" type="number" min="1" />
+                        </div>
+
+                        <div>
+                            <label asp-for="Input.PlayingSystem">Herní systém</label>
+                            <select asp-for="Input.PlayingSystem">
+                                @foreach (var system in Enum.GetValues<PlayingSystemType>())
+                                {
+                                    <option value="@system">@Model.GetPlayingSystemLabel(system)</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="checkbox-label">
+                                <input asp-for="Input.UsesSetScores" data-uses-set-scores />
+                                Dílčí skóre (sety)
+                            </label>
+                        </div>
+
+                        <div data-sets-to-win-container hidden="@(!Model.Input.UsesSetScores)">
+                            <label asp-for="Input.SetsToWin">Vítězné sety</label>
+                            <input asp-for="Input.SetsToWin" type="number" min="1" max="10" disabled="@(!Model.Input.UsesSetScores)" />
+                        </div>
+
+                        <div>
+                            <label asp-for="Input.ScheduledAt">Datum a čas</label>
+                            @Html.TextBox(
+                                "Input.ScheduledAt",
+                                Model.Input.ScheduledAt?.ToString("dd/MM/yyyy HH:mm"),
+                                new
+                                {
+                                    type = "text",
+                                    inputmode = "numeric",
+                                    placeholder = "dd/mm/rrrr hh:mm",
+                                    autocomplete = "off",
+                                    data_czech_datetime_picker = "true"
+                                })
+                        </div>
+
+                        <button class="button button-small" type="submit">Přiřadit</button>
+                    </form>
+                }
+            </section>
+
+            <div class="choice-divider discipline-create-divider" aria-hidden="true"><span>nebo</span></div>
+
+            <section class="registration-form discipline-create-section" aria-labelledby="create-discipline-heading">
+                <h2 id="create-discipline-heading">Vytvořte novou</h2>
+
+                <form id="create-discipline-form"
+                      method="post"
+                      asp-page-handler="CreateAndSelect"
+                      class="edition-form">
+                    <label for="newDiscipline_Name">Název</label>
+                    @Html.TextBox("NewDiscipline.Name", Model.NewDiscipline.Name, new { maxlength = 120, required = "required" })
+                    @Html.ValidationMessage("NewDiscipline.Name", null, new { @class = "field-error" })
+
+                    <input type="hidden"
+                           name="Input.Order"
+                           value="@Model.Input.Order"
+                           data-copy-value-from="Input_Order" />
+                    <input type="hidden"
+                           name="Input.TeamSize"
+                           value="@Model.Input.TeamSize"
+                           data-copy-value-from="Input_TeamSize" />
+                    <input type="hidden"
+                           name="Input.PlayingSystem"
+                           value="@Model.Input.PlayingSystem"
+                           data-copy-value-from="Input_PlayingSystem" />
+                    <input type="hidden"
+                           name="Input.UsesSetScores"
+                           value="@Model.Input.UsesSetScores.ToString().ToLowerInvariant()"
+                           data-copy-checked-from="Input_UsesSetScores" />
+                    <input type="hidden"
+                           name="Input.SetsToWin"
+                           value="@Model.Input.SetsToWin"
+                           data-copy-value-from="Input_SetsToWin" />
+                    <input type="hidden"
+                           name="Input.ScheduledAt"
+                           value="@(Model.Input.ScheduledAt?.ToString("dd/MM/yyyy HH:mm"))"
+                           data-copy-value-from="Input_ScheduledAt" />
+
+                    <div class="form-actions">
+                        <button class="button" type="submit">Vytvořit a připravit k přiřazení</button>
+                    </div>
+                </form>
+            </section>
+        }
+
+        @if (Model.Setup.Disciplines.Count == 0)
+        {
+            <div class="empty-state configured-disciplines-empty">K ročníku zatím není přiřazena žádná disciplína.</div>
+        }
+        else
+        {
+            <div class="discipline-list">
+                @foreach (var item in Model.Setup.Disciplines)
+                {
+                    var canChangePlayingSystem = !item.IsLocked && !item.IsScheduleLocked;
+                    var canChangeSetSettings = !item.IsLocked && !item.HasResults;
+                    <article class="discipline-card">
+                        <div class="discipline-card-heading">
+                            <div>
+                                <div class="edition-title">
+                                    <span class="seed-badge">@item.Order</span>
+                                    <h2>@item.Name</h2>
+                                    @if (item.IsLocked)
+                                    {
+                                        <span class="configuration-lock-badge">Uzamčeno</span>
+                                    }
+                                </div>
+                                <p class="meta-inline">@item.ParticipantCount účastníků · @item.TeamCount týmů</p>
+                                @if (User.Identity?.IsAuthenticated == true && !item.CanRemove)
+                                {
+                                    <small class="blocked-action-reason">@item.RemoveBlockReason</small>
+                                }
+                            </div>
+
+                            @if (User.Identity?.IsAuthenticated == true)
+                            {
+                                <div class="discipline-assignment-actions">
+                                    <a class="button button-ghost button-small"
+                                       asp-page="/Editions/DisciplineDetail"
+                                       asp-route-id="@Model.Setup.EditionId"
+                                       asp-route-disciplineId="@item.Id">
+                                        Detail
+                                    </a>
+
+                                    <a class="button button-ghost button-small"
+                                       asp-page="/Editions/DisciplineParticipants"
+                                       asp-route-id="@Model.Setup.EditionId"
+                                       asp-route-disciplineId="@item.Id">
+                                        Účastníci a týmy
+                                    </a>
+
+                                    @if (item.IsPhaseSetupAvailable)
+                                    {
+                                        <a class="button button-ghost button-small"
+                                           asp-page="/Editions/DisciplinePhases"
+                                           asp-route-id="@Model.Setup.EditionId"
+                                           asp-route-disciplineId="@item.Id">
+                                            Rozpis a výsledky
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        <button class="button button-ghost button-small"
+                                                type="button"
+                                                disabled
+                                                title="Nejprve přiřaďte účastníky a vytvořte všechny týmy.">
+                                            Rozpis a výsledky
+                                        </button>
+                                    }
+
+                                    <button class="button button-danger button-small"
+                                            type="button"
+                                            data-open-modal="remove-discipline-modal-@item.Id"
+                                            disabled="@(!item.CanRemove)"
+                                            title="@item.RemoveBlockReason">
+                                        Odebrat
+                                    </button>
+                                    <form method="post" asp-page-handler="@(item.IsLocked ? "UnlockDiscipline" : "LockDiscipline")">
+                                        <input type="hidden" name="disciplineId" value="@item.Id" />
+                                        <button class="button button-small" type="submit">
+                                            @(item.IsLocked ? "Odemknout" : "Uzamknout")
+                                        </button>
+                                    </form>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="discipline-assignment-actions">
+                                    <a class="button button-ghost button-small"
+                                       asp-page="/Editions/DisciplineDetail"
+                                       asp-route-id="@Model.Setup.EditionId"
+                                       asp-route-disciplineId="@item.Id">
+                                        Detail
+                                    </a>
+                                    @if (item.IsPhaseSetupAvailable)
+                                    {
+                                        <a class="button button-ghost button-small"
+                                           asp-page="/Editions/DisciplinePhases"
+                                           asp-route-id="@Model.Setup.EditionId"
+                                           asp-route-disciplineId="@item.Id">
+                                            Výsledky
+                                        </a>
+                                    }
+                                </div>
+                            }
+                        </div>
+
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            <div class="discipline-assignment-row">
+                                <form method="post" asp-page-handler="Update" class="discipline-update-form">
+                                    <input type="hidden" name="disciplineId" value="@item.Id" />
+                                    <input type="hidden" name="input.DisciplineId" value="@item.DisciplineId" />
+                                    <input type="hidden" name="input.Description" value="@item.Description" />
+
+                                    <div>
+                                        <label>Pořadí</label>
+                                        <input name="input.Order" value="@item.Order" type="number" min="1" disabled="@item.IsLocked" />
+                                    </div>
+
+                                    <div>
+                                        <label>Velikost týmu</label>
+                                        @if (item.TeamCount > 0)
+                                        {
+                                            <input type="hidden" name="input.TeamSize" value="@item.TeamSize" />
+                                            <input value="@item.TeamSize"
+                                                   type="number"
+                                                   aria-label="Velikost týmu"
+                                                   title="Velikost týmu nelze změnit, protože už jsou vytvořené týmy."
+                                                   disabled />
+                                        }
+                                        else if (item.IsLocked)
+                                        {
+                                            <input type="hidden" name="input.TeamSize" value="@item.TeamSize" />
+                                            <input value="@item.TeamSize" type="number" disabled />
+                                        }
+                                        else
+                                        {
+                                            <input name="input.TeamSize" value="@item.TeamSize" type="number" min="1" />
+                                        }
+                                    </div>
+
+                                    <div>
+                                        <label>Herní systém</label>
+                                        <select name="input.PlayingSystem" disabled="@(!canChangePlayingSystem)">
+                                            @foreach (var system in Enum.GetValues<PlayingSystemType>())
+                                            {
+                                                <option value="@system" selected="@(system == item.PlayingSystem)">
+                                                    @Model.GetPlayingSystemLabel(system)
+                                                </option>
+                                            }
+                                        </select>
+                                        @if (!canChangePlayingSystem)
+                                        {
+                                            <input type="hidden" name="input.PlayingSystem" value="@item.PlayingSystem" />
+                                        }
+                                    </div>
+
+                                    <div>
+                                        <label class="checkbox-label">
+                                            <input name="input.UsesSetScores" type="checkbox" value="true" checked="@item.UsesSetScores" disabled="@(!canChangeSetSettings)" data-uses-set-scores data-set-settings-locked="@((!canChangeSetSettings).ToString().ToLowerInvariant())" />
+                                            Sety
+                                        </label>
+                                        <input type="hidden" name="input.UsesSetScores" value="@(canChangeSetSettings ? "false" : item.UsesSetScores.ToString().ToLowerInvariant())" />
+                                    </div>
+
+                                    <div data-sets-to-win-container hidden="@(!item.UsesSetScores)">
+                                        <label>Vítězné sety</label>
+                                        <input name="input.SetsToWin"
+                                               value="@item.SetsToWin"
+                                               type="number"
+                                               min="1"
+                                               max="10"
+                                               disabled="@(!item.UsesSetScores || !canChangeSetSettings)" />
+                                        @if (!canChangeSetSettings)
+                                        {
+                                            <input type="hidden" name="input.SetsToWin" value="@item.SetsToWin" />
+                                        }
+                                    </div>
+
+                                    <div>
+                                        <label>Datum a čas</label>
+                                        @Html.TextBox(
+                                            "input.ScheduledAt",
+                                            item.ScheduledAt?.ToString("dd/MM/yyyy HH:mm"),
+                                            new
+                                            {
+                                                type = "text",
+                                                inputmode = "numeric",
+                                                placeholder = "dd/mm/rrrr hh:mm",
+                                                autocomplete = "off",
+                                                data_czech_datetime_picker = "true",
+                                                disabled = item.IsLocked ? "disabled" : null
+                                            })
+                                    </div>
+
+                                    <button class="button button-small" type="submit" disabled="@item.IsLocked">Uložit</button>
+                                </form>
+
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="meta-inline">
+                                @(item.ScheduledAt?.ToString("dd/MM/yyyy HH:mm") ?? "Termín není určen")
+                                · tým po @item.TeamSize
+                            </p>
+                        }
+
+                        @if (User.Identity?.IsAuthenticated == true && item.CanRemove)
+                        {
+                            <div id="remove-discipline-modal-@item.Id" class="modal-backdrop" role="presentation" hidden>
+                                <section class="modal destructive-confirmation-modal" role="dialog" aria-modal="true" aria-labelledby="remove-discipline-title-@item.Id">
+                                    <h2 id="remove-discipline-title-@item.Id">Odebrat disciplínu @item.Name?</h2>
+                                    <div class="destructive-warning">
+                                        <strong>Tento krok nelze vrátit zpět.</strong>
+                                        <p>
+                                            Z ročníku bude odstraněna disciplína včetně účastníků, týmů, fází a vytvořeného rozpisu.
+                                            Samotná disciplína zůstane v katalogu.
+                                        </p>
+                                    </div>
+                                    <div class="modal-actions">
+                                        <form method="post" asp-page-handler="Remove">
+                                            <input type="hidden" name="disciplineId" value="@item.Id" />
+                                            <button class="button button-danger" type="submit">Ano, odebrat disciplínu</button>
+                                        </form>
+                                        <button class="button button-ghost" type="button" data-close-modal>Zrušit</button>
+                                    </div>
+                                </section>
+                            </div>
+                        }
+                    </article>
+                }
+            </div>
+        }
+    </section>
+</main>
+
+@section Scripts {
+    <script>
+        (() => {
+            const createForm = document.getElementById("create-discipline-form");
+            createForm?.addEventListener("submit", () => {
+                createForm.querySelectorAll("[data-copy-value-from]").forEach(hiddenInput => {
+                    const source = document.getElementById(hiddenInput.dataset.copyValueFrom);
+                    if (source) {
+                        hiddenInput.value = source.value;
+                    }
+                });
+                createForm.querySelectorAll("[data-copy-checked-from]").forEach(hiddenInput => {
+                    const source = document.getElementById(hiddenInput.dataset.copyCheckedFrom);
+                    hiddenInput.value = source?.checked ? "true" : "false";
+                });
+            });
+
+            document.querySelectorAll("form").forEach(form => {
+                const checkbox = form.querySelector("[data-uses-set-scores]");
+                const container = form.querySelector("[data-sets-to-win-container]");
+                const input = container?.querySelector("input");
+                if (!checkbox || !container || !input) {
+                    return;
+                }
+
+                const updateSetsToWin = () => {
+                    container.hidden = !checkbox.checked;
+                    input.disabled = checkbox.dataset.setSettingsLocked === "true" || !checkbox.checked || checkbox.disabled;
+                    input.required = checkbox.checked;
+                    if (checkbox.checked && !input.value) {
+                        input.value = "2";
+                    }
+                };
+                checkbox.addEventListener("change", updateSetsToWin);
+                updateSetsToWin();
+            });
+
+            document.querySelectorAll("[data-open-modal]").forEach(button => {
+                button.addEventListener("click", () => {
+                    const modal = document.getElementById(button.dataset.openModal);
+                    if (modal) {
+                        modal.hidden = false;
+                        modal.querySelector("button")?.focus();
+                    }
+                });
+            });
+            document.querySelectorAll("[data-close-modal]").forEach(button => {
+                button.addEventListener("click", () => button.closest(".modal-backdrop").hidden = true);
+            });
+            document.querySelectorAll(".modal-backdrop").forEach(backdrop => {
+                backdrop.addEventListener("click", event => {
+                    if (event.target === backdrop) backdrop.hidden = true;
+                });
+            });
+        })();
+    </script>
+}

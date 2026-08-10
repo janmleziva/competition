@@ -73,10 +73,64 @@ BEGIN
         PlayingSystem NVARCHAR(40) NOT NULL,
         TeamSize INT NOT NULL,
         [Order] INT NOT NULL,
+        ScheduledAt DATETIME2 NULL,
+        UsesSetScores BIT NOT NULL CONSTRAINT DF_CompetitionDisciplines_UsesSetScores DEFAULT (0),
+        SetsToWin INT NULL,
+        [Description] NVARCHAR(2000) NULL,
+        IsLocked BIT NOT NULL CONSTRAINT DF_CompetitionDisciplines_IsLocked DEFAULT (0),
+        IsScheduleLocked BIT NOT NULL CONSTRAINT DF_CompetitionDisciplines_IsScheduleLocked DEFAULT (0),
+        AreResultsLocked BIT NOT NULL CONSTRAINT DF_CompetitionDisciplines_AreResultsLocked DEFAULT (0),
         CONSTRAINT PK_CompetitionDisciplines PRIMARY KEY (Id),
         CONSTRAINT CK_CompetitionDisciplines_Order CHECK ([Order] > 0),
-        CONSTRAINT CK_CompetitionDisciplines_TeamSize CHECK (TeamSize > 0)
+        CONSTRAINT CK_CompetitionDisciplines_TeamSize CHECK (TeamSize > 0),
+        CONSTRAINT CK_CompetitionDisciplines_SetsToWin CHECK (SetsToWin IS NULL OR SetsToWin > 0)
     );
+END;
+
+IF COL_LENGTH(N'dbo.CompetitionDisciplines', N'ScheduledAt') IS NULL
+BEGIN
+    ALTER TABLE dbo.CompetitionDisciplines ADD ScheduledAt DATETIME2 NULL;
+END;
+
+IF COL_LENGTH(N'dbo.CompetitionDisciplines', N'UsesSetScores') IS NULL
+BEGIN
+    ALTER TABLE dbo.CompetitionDisciplines
+        ADD UsesSetScores BIT NOT NULL CONSTRAINT DF_CompetitionDisciplines_UsesSetScores DEFAULT (0);
+END;
+
+IF COL_LENGTH(N'dbo.CompetitionDisciplines', N'IsScheduleLocked') IS NULL
+BEGIN
+    ALTER TABLE dbo.CompetitionDisciplines
+        ADD IsScheduleLocked BIT NOT NULL CONSTRAINT DF_CompetitionDisciplines_IsScheduleLocked DEFAULT (0);
+END;
+
+IF COL_LENGTH(N'dbo.CompetitionDisciplines', N'AreResultsLocked') IS NULL
+BEGIN
+    ALTER TABLE dbo.CompetitionDisciplines
+        ADD AreResultsLocked BIT NOT NULL CONSTRAINT DF_CompetitionDisciplines_AreResultsLocked DEFAULT (0);
+END;
+
+IF COL_LENGTH(N'dbo.CompetitionDisciplines', N'SetsToWin') IS NULL
+BEGIN
+    ALTER TABLE dbo.CompetitionDisciplines ADD SetsToWin INT NULL;
+    UPDATE dbo.CompetitionDisciplines SET SetsToWin = 2 WHERE UsesSetScores = 1;
+END;
+
+IF COL_LENGTH(N'dbo.CompetitionDisciplines', N'Description') IS NULL
+BEGIN
+    ALTER TABLE dbo.CompetitionDisciplines ADD [Description] NVARCHAR(2000) NULL;
+END;
+
+IF COL_LENGTH(N'dbo.CompetitionDisciplines', N'IsLocked') IS NULL
+BEGIN
+    ALTER TABLE dbo.CompetitionDisciplines
+        ADD IsLocked BIT NOT NULL CONSTRAINT DF_CompetitionDisciplines_IsLocked DEFAULT (0);
+END;
+
+IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_CompetitionDisciplines_SetsToWin')
+BEGIN
+    ALTER TABLE dbo.CompetitionDisciplines
+        ADD CONSTRAINT CK_CompetitionDisciplines_SetsToWin CHECK (SetsToWin IS NULL OR SetsToWin > 0);
 END;
 
 IF OBJECT_ID(N'dbo.DisciplinePhases', N'U') IS NULL
@@ -162,6 +216,17 @@ BEGIN
         [Order] INT NOT NULL,
         CONSTRAINT PK_DisciplineTeamMembers PRIMARY KEY (Id),
         CONSTRAINT CK_DisciplineTeamMembers_Order CHECK ([Order] > 0)
+    );
+END;
+
+IF OBJECT_ID(N'dbo.DisciplineParticipantAssignments', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.DisciplineParticipantAssignments
+    (
+        Id BIGINT IDENTITY(1,1) NOT NULL,
+        CompetitionDisciplineId BIGINT NOT NULL,
+        CompetitionEntryId BIGINT NOT NULL,
+        CONSTRAINT PK_DisciplineParticipantAssignments PRIMARY KEY (Id)
     );
 END;
 
@@ -367,6 +432,20 @@ BEGIN
         FOREIGN KEY (CompetitionEntryId) REFERENCES dbo.CompetitionEntries (Id);
 END;
 
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_DisciplineParticipantAssignments_CompetitionDisciplines_CompetitionDisciplineId')
+BEGIN
+    ALTER TABLE dbo.DisciplineParticipantAssignments
+    ADD CONSTRAINT FK_DisciplineParticipantAssignments_CompetitionDisciplines_CompetitionDisciplineId
+        FOREIGN KEY (CompetitionDisciplineId) REFERENCES dbo.CompetitionDisciplines (Id);
+END;
+
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_DisciplineParticipantAssignments_CompetitionEntries_CompetitionEntryId')
+BEGIN
+    ALTER TABLE dbo.DisciplineParticipantAssignments
+    ADD CONSTRAINT FK_DisciplineParticipantAssignments_CompetitionEntries_CompetitionEntryId
+        FOREIGN KEY (CompetitionEntryId) REFERENCES dbo.CompetitionEntries (Id);
+END;
+
 IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_DisciplineTeamMembers_DisciplineTeams_CompetitionDisciplineId_DisciplineTeamId')
 BEGIN
     ALTER TABLE dbo.DisciplineTeamMembers
@@ -515,6 +594,12 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_DisciplineTeamMembers
 BEGIN
     CREATE UNIQUE INDEX IX_DisciplineTeamMembers_CompetitionDisciplineId_CompetitionEntryId
         ON dbo.DisciplineTeamMembers (CompetitionDisciplineId, CompetitionEntryId);
+END;
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_DisciplineParticipantAssignments_CompetitionDisciplineId_CompetitionEntryId' AND object_id = OBJECT_ID(N'dbo.DisciplineParticipantAssignments'))
+BEGIN
+    CREATE UNIQUE INDEX IX_DisciplineParticipantAssignments_CompetitionDisciplineId_CompetitionEntryId
+        ON dbo.DisciplineParticipantAssignments (CompetitionDisciplineId, CompetitionEntryId);
 END;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_DisciplineTeamMembers_CompetitionDisciplineId_DisciplineTeamId' AND object_id = OBJECT_ID(N'dbo.DisciplineTeamMembers'))

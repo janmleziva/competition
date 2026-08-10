@@ -1,0 +1,22 @@
+@model Competition.Models.CompetitorInput
+
+<form method="post" class="edition-form">
+    <div asp-validation-summary="ModelOnly" class="error"></div>
+
+    @Html.Label("Input.FirstName", "Jméno")
+    @Html.TextBox("Input.FirstName", Model.FirstName, new { maxlength = 100, required = "required", autofocus = "autofocus" })
+    @Html.ValidationMessage("Input.FirstName", null, new { @class = "field-error" })
+
+    @Html.Label("Input.LastName", "Příjmení")
+    @Html.TextBox("Input.LastName", Model.LastName, new { maxlength = 100, required = "required" })
+    @Html.ValidationMessage("Input.LastName", null, new { @class = "field-error" })
+
+    @Html.Label("Input.DateOfBirth", "Datum narození")
+    @Html.TextBox("Input.DateOfBirth", Model.DateOfBirth?.ToString("dd/MM/yyyy"), new { type = "text", inputmode = "numeric", placeholder = "dd/mm/rrrr", autocomplete = "off", data_czech_date_picker = "true" })
+    @Html.ValidationMessage("Input.DateOfBirth", null, new { @class = "field-error" })
+
+    <div class="form-actions">
+        <button class="button" type="submit">Uložit</button>
+        <a class="button button-ghost" asp-page="/Competitors/Index">Zrušit</a>
+    </div>
+</form>

@@ -20,6 +20,9 @@
     <Content Remove="deployment\**" />
     <None Remove="deployment\**" />
     <Compile Remove="deployment\**" />
+    <Content Remove="artifacts\**" />
+    <None Remove="artifacts\**" />
+    <Compile Remove="artifacts\**" />
     <Content Remove="appsettings.Development.json" />
     <None Remove="appsettings.Development.json" />
     <Compile Remove="Competition.Tests\**" />

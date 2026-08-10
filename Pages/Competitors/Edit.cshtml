@@ -1,0 +1,12 @@
+@page "{id:long}"
+@model Competition.Pages.Competitors.EditModel
+@{
+    ViewData["Title"] = "Upravit soutěžícího";
+}
+
+<main class="shell">
+    <section class="panel admin">
+        <h1>Upravit soutěžícího</h1>
+        <partial name="_CompetitorForm" model="Model.Input" />
+    </section>
+</main>

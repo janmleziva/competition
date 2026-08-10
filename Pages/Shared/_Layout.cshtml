@@ -29,6 +29,8 @@
     <header class="site-header">
         <nav class="site-nav" aria-label="Hlavní navigace">
             <a asp-page="/Editions/Index">Soutěže</a>
+            <a asp-page="/Competitors/Index">Soutěžící</a>
+            <a asp-page="/Disciplines/Index">Disciplíny</a>
         </nav>
 
         <div class="auth-actions">
@@ -46,6 +48,8 @@
     </header>
 
     @RenderBody()
+    <script src="~/js/czech-date-picker.js" asp-append-version="true" defer></script>
+    <script src="~/js/preserve-postback-position.js" asp-append-version="true" defer></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

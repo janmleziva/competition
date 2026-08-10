@@ -1,0 +1,339 @@
+@page "/Editions/{id:long}/Disciplines/{disciplineId:long}/Participants"
+@model Competition.Pages.Editions.DisciplineParticipantsModel
+
+@{
+    ViewData["Title"] = $"Účastníci – {Model.Setup.Discipline.Name}";
+    var isManagementLocked = Model.Setup.Discipline.IsScheduleLocked || Model.Setup.Discipline.HasMatches;
+}
+
+<main class="shell shell-wide">
+    <section class="panel admin">
+        <div class="page-heading">
+            <div>
+                <h1>@Model.Setup.Discipline.Name</h1>
+                <p class="lead">Účastníci a týmy · @Model.Setup.EditionName</p>
+            </div>
+
+            <div class="action-group">
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    @if (Model.Setup.Discipline.IsPhaseSetupAvailable)
+                    {
+                        <a class="button button-ghost"
+                           asp-page="/Editions/DisciplinePhases"
+                           asp-route-id="@Model.Setup.EditionId"
+                           asp-route-disciplineId="@Model.Setup.Discipline.Id">
+                            Rozpis a výsledky
+                        </a>
+                    }
+                    else
+                    {
+                        <button class="button button-ghost"
+                                type="button"
+                                disabled
+                                title="Nejprve přiřaďte účastníky a vytvořte všechny týmy.">
+                            Rozpis a výsledky
+                        </button>
+                    }
+                }
+
+                <a class="button button-ghost"
+                   asp-page="/Editions/Disciplines"
+                   asp-route-id="@Model.Setup.EditionId">
+                    Zpět
+                </a>
+            </div>
+        </div>
+
+        @if (isManagementLocked)
+        {
+            <div class="schedule-lock-notice" role="status">
+                @if (Model.Setup.Discipline.HasMatches)
+                {
+                    <strong>Rozpis už obsahuje zápasy.</strong>
+                    <span>Účastníky ani týmy už nelze přidávat, odebírat nebo měnit.</span>
+                }
+                else
+                {
+                    <strong>Rozpis je uzamčený.</strong>
+                    <span>Účastníky ani týmy nyní nelze přidávat, odebírat nebo měnit.</span>
+                }
+            </div>
+        }
+
+        <fieldset class="participant-management-lock" disabled="@isManagementLocked">
+        <section class="registration-form" aria-labelledby="participants-heading">
+            <h2 id="participants-heading">Účastníci disciplíny</h2>
+            
+
+            @if (!string.IsNullOrWhiteSpace(Model.ParticipantStatusMessage))
+            {
+                <div class="status-message" role="status">@Model.ParticipantStatusMessage</div>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(Model.ParticipantErrorMessage))
+            {
+                <div class="error-message" role="alert">@Model.ParticipantErrorMessage</div>
+            }
+
+            @if (User.Identity?.IsAuthenticated == true)
+            {
+                <div class="row-actions participant-toolbar">
+                    <form method="post" asp-page-handler="AssignAll">
+                        <button class="button" type="submit">Přiřadit všechny</button>
+                    </form>
+                </div>
+
+                <div class="participant-list">
+                    @foreach (var participant in Model.Setup.Participants)
+                    {
+                        var checkboxId = $"participant-checkbox-{participant.EntryId}";
+                        <form id="participant-@participant.EntryId"
+                              method="post"
+                              asp-page-handler="ToggleParticipant"
+                              class="participant-option @(participant.IsAssigned ? "is-assigned" : null)">
+                            <input type="hidden" name="entryId" value="@participant.EntryId" />
+                            <input type="hidden" name="isAssigned" value="@participant.IsAssigned.ToString().ToLowerInvariant()" />
+
+                            <label class="participant-option-content" for="@checkboxId">
+                                <input id="@checkboxId"
+                                       type="checkbox"
+                                       checked="@participant.IsAssigned"
+                                       onchange="submitParticipantAssignment(this)" />
+                                <span class="seed-badge">@participant.Seed</span>
+                                <span class="participant-name">@participant.FirstName @participant.LastName</span>
+                                <span class="assignment-status" aria-live="polite">
+                                    @(participant.IsAssigned ? "Účastní se" : "Nepřiřazen")
+                                </span>
+                            </label>
+                        </form>
+                    }
+                </div>
+            }
+        </section>
+
+        @if (Model.Setup.Discipline.TeamSize > 1)
+        {
+            <section class="registration-form team-management" aria-labelledby="teams-heading">
+                <h2 id="teams-heading">Skládání týmů</h2>
+                <p class="meta-inline">
+                    Tým má @Model.Setup.Discipline.TeamSize členy. Do výběru se nabízejí jen přiřazení soutěžící,
+                    kteří ještě nejsou v týmu.
+                </p>
+
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <div class="row-actions random-team-actions">
+                        @if (Model.Setup.Teams.Count == 0)
+                        {
+                            <form method="post" asp-page-handler="RandomizeTeams">
+                                <button class="button" type="submit">Náhodně vytvořit týmy</button>
+                            </form>
+                        }
+                        else
+                        {
+                            <button class="button" type="button" data-open-random-modal>
+                                Náhodně vytvořit týmy
+                            </button>
+                        }
+                    </div>
+
+                    <div id="team-list" class="team-list">
+                        @if (Model.Setup.Teams.Count == 0)
+                        {
+                            <div class="team-list-empty">Zatím nebyl vytvořen žádný tým.</div>
+                        }
+                        else
+                        {
+                            @foreach (var team in Model.Setup.Teams)
+                            {
+                                <article class="team-row">
+                                    <div>
+                                        <div class="edition-title">Tým @team.Seed</div>
+                                        <span class="meta-inline">
+                                            @string.Join(", ", team.Members.Select(x => $"{x.Seed} - {x.FirstName} {x.LastName}"))
+                                        </span>
+                                    </div>
+                                    <form method="post" asp-page-handler="DeleteTeam">
+                                        <input type="hidden" name="teamId" value="@team.TeamId" />
+                                        <button class="button button-danger button-small" type="submit">Smazat tým</button>
+                                    </form>
+                                </article>
+                            }
+                        }
+                    </div>
+
+                    <div id="team-feedback" class="team-feedback">
+                        @if (!string.IsNullOrWhiteSpace(Model.TeamStatusMessage))
+                        {
+                            <div class="status-message" role="status">@Model.TeamStatusMessage</div>
+                        }
+
+                        <div asp-validation-summary="ModelOnly" class="error validation-panel"></div>
+                    </div>
+
+                    @if (Model.Setup.AvailableForTeams.Count > 0)
+                    {
+                        <section id="new-team" class="new-team-box" aria-labelledby="new-team-heading">
+                            <h3 id="new-team-heading">Nový tým</h3>
+
+                            <form method="post"
+                                  asp-page-handler="CreateTeam"
+                                  asp-fragment="new-team"
+                                  class="team-builder"
+                                  data-team-builder
+                                  data-team-size="@Model.Setup.Discipline.TeamSize">
+                                @for (var slot = 0; slot < Model.NewTeamVisibleSlots; slot++)
+                                {
+                                    var selectId = $"NewTeamEntryIds_{slot}";
+                                    <div class="team-builder-row">
+                                        <label for="@selectId">Člen @(slot + 1)</label>
+                                        <select id="@selectId"
+                                                name="NewTeamEntryIds[@slot]"
+                                                class="team-member-select"
+                                                data-team-member-select
+                                                autofocus="@(Model.FocusTeamMemberSlot == slot)">
+                                            <option value="">Vyberte soutěžícího</option>
+                                            @foreach (var option in Model.GetOptionsForSlot(slot))
+                                            {
+                                                <option value="@option.EntryId"
+                                                        selected="@(Model.NewTeamEntryIds[slot] == option.EntryId)">
+                                                    @option.Seed - @option.FirstName @option.LastName
+                                                </option>
+                                            }
+                                        </select>
+                                    </div>
+                                }
+
+                                @for (var hiddenSlot = Model.NewTeamVisibleSlots;
+                                    hiddenSlot < Model.Setup.Discipline.TeamSize;
+                                    hiddenSlot++)
+                                {
+                                    <input type="hidden"
+                                           name="NewTeamEntryIds[@hiddenSlot]"
+                                           value="@Model.NewTeamEntryIds[hiddenSlot]" />
+                                }
+
+                                <input type="hidden" name="NewTeamVisibleSlots" value="@Model.NewTeamVisibleSlots" />
+
+                                <div class="form-actions">
+                                    @if (Model.NewTeamVisibleSlots < Model.Setup.Discipline.TeamSize)
+                                    {
+                                        <button class="button button-ghost"
+                                                type="submit"
+                                                asp-page-handler="AddMember"
+                                                asp-fragment="new-team"
+                                                data-add-team-member>
+                                            Přidej člena
+                                        </button>
+                                    }
+
+                                    <button class="button"
+                                            type="submit"
+                                            data-create-team
+                                            hidden="@(!Model.IsNewTeamComplete)">
+                                        Vytvořit tým
+                                    </button>
+                                </div>
+                            </form>
+                        </section>
+                    }
+                }
+            </section>
+        }
+        </fieldset>
+
+        @if (User.Identity?.IsAuthenticated == true && Model.Setup.Discipline.CanCreateSchedule)
+        {
+            <div class="phase-primary-action participant-create-schedule-action">
+                <a class="button"
+                   asp-page="/Editions/DisciplinePhases"
+                   asp-route-id="@Model.Setup.EditionId"
+                   asp-route-disciplineId="@Model.Setup.Discipline.Id">
+                    Vytvořit rozpis
+                </a>
+            </div>
+        }
+    </section>
+</main>
+
+@if (User.Identity?.IsAuthenticated == true && Model.Setup.Teams.Count > 0 && !isManagementLocked)
+{
+    <div id="random-teams-modal" class="modal-backdrop" role="presentation" hidden>
+        <section class="modal" role="dialog" aria-modal="true" aria-labelledby="random-teams-title">
+            <h2 id="random-teams-title">Vytvořit týmy znovu?</h2>
+            <p>
+                Pokračováním smažete všechny existující týmy a vytvoříte je znovu náhodným rozdělením účastníků.
+            </p>
+            <div class="modal-actions">
+                <form method="post" asp-page-handler="RandomizeTeams">
+                    <button class="button" type="submit">Pokračovat</button>
+                </form>
+                <button class="button button-ghost" type="button" data-close-random-modal>Zrušit</button>
+            </div>
+        </section>
+    </div>
+}
+
+@section Scripts {
+    <script>
+        function submitParticipantAssignment(checkbox) {
+            const form = checkbox.form;
+            const status = form.querySelector(".assignment-status");
+
+            form.elements.isAssigned.value = checkbox.checked.toString();
+            form.classList.add("is-saving");
+            checkbox.disabled = true;
+            status.textContent = "Ukládám…";
+            form.requestSubmit();
+        }
+
+        (() => {
+            const builder = document.querySelector("[data-team-builder]");
+            if (builder) {
+                const selects = [...builder.querySelectorAll("[data-team-member-select]")];
+                const addButton = builder.querySelector("[data-add-team-member]");
+                const createButton = builder.querySelector("[data-create-team]");
+                const teamSize = Number(builder.dataset.teamSize);
+
+                const updateTeamButtons = () => {
+                    const visibleSelectionsComplete = selects.every(select => select.value !== "");
+                    if (addButton) {
+                        addButton.disabled = !visibleSelectionsComplete;
+                    }
+                    if (createButton) {
+                        createButton.hidden = selects.length !== teamSize || !visibleSelectionsComplete;
+                    }
+                };
+
+                selects.forEach(select => select.addEventListener("change", updateTeamButtons));
+                updateTeamButtons();
+            }
+
+            const modal = document.getElementById("random-teams-modal");
+            const openButton = document.querySelector("[data-open-random-modal]");
+            const closeButton = document.querySelector("[data-close-random-modal]");
+
+            const closeModal = () => {
+                modal.hidden = true;
+                openButton.focus();
+            };
+
+            openButton?.addEventListener("click", () => {
+                modal.hidden = false;
+                modal.querySelector("button").focus();
+            });
+            closeButton?.addEventListener("click", closeModal);
+            modal?.addEventListener("click", event => {
+                if (event.target === modal) {
+                    closeModal();
+                }
+            });
+            document.addEventListener("keydown", event => {
+                if (event.key === "Escape" && modal && !modal.hidden) {
+                    closeModal();
+                }
+            });
+        })();
+    </script>
+}
