@@ -4,6 +4,7 @@ using Competition.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Competition.Data.Migrations
 {
     [DbContext(typeof(CompetitionDbContext))]
-    partial class CompetitionDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260807142603_AddPhasePresetProgression")]
+    partial class AddPhasePresetProgression
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -30,24 +33,11 @@ namespace Competition.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
 
-                    b.Property<bool>("AreResultsLocked")
-                        .HasColumnType("bit");
-
                     b.Property<long>("CompetitionEditionId")
                         .HasColumnType("bigint");
 
-                    b.Property<string>("Description")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
-
                     b.Property<long>("DisciplineId")
                         .HasColumnType("bigint");
-
-                    b.Property<bool>("IsLocked")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsScheduleLocked")
-                        .HasColumnType("bit");
 
                     b.Property<int>("Order")
                         .HasColumnType("int");
@@ -60,14 +50,8 @@ namespace Competition.Data.Migrations
                     b.Property<DateTime?>("ScheduledAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("SetsToWin")
-                        .HasColumnType("int");
-
                     b.Property<int>("TeamSize")
                         .HasColumnType("int");
-
-                    b.Property<bool>("UsesSetScores")
-                        .HasColumnType("bit");
 
                     b.HasKey("Id");
 
@@ -82,8 +66,6 @@ namespace Competition.Data.Migrations
                     b.ToTable("CompetitionDisciplines", null, t =>
                         {
                             t.HasCheckConstraint("CK_CompetitionDisciplines_Order", "\"Order\" > 0");
-
-                            t.HasCheckConstraint("CK_CompetitionDisciplines_SetsToWin", "SetsToWin IS NULL OR SetsToWin > 0");
 
                             t.HasCheckConstraint("CK_CompetitionDisciplines_TeamSize", "TeamSize > 0");
                         });

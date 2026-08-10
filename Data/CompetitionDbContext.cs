@@ -11,6 +11,7 @@ public sealed class CompetitionDbContext(DbContextOptions<CompetitionDbContext> 
     public DbSet<CompetitionEntry> CompetitionEntries => Set<CompetitionEntry>();
     public DbSet<Discipline> Disciplines => Set<Discipline>();
     public DbSet<CompetitionDiscipline> CompetitionDisciplines => Set<CompetitionDiscipline>();
+    public DbSet<DisciplineParticipantAssignment> DisciplineParticipantAssignments => Set<DisciplineParticipantAssignment>();
     public DbSet<DisciplineTeam> DisciplineTeams => Set<DisciplineTeam>();
     public DbSet<DisciplineTeamMember> DisciplineTeamMembers => Set<DisciplineTeamMember>();
     public DbSet<DisciplinePhase> DisciplinePhases => Set<DisciplinePhase>();
@@ -79,18 +80,32 @@ public sealed class CompetitionDbContext(DbContextOptions<CompetitionDbContext> 
         modelBuilder.Entity<CompetitionDiscipline>(entity =>
         {
             entity.Property(x => x.PlayingSystem).HasConversion<string>().HasMaxLength(40);
+            entity.Property(x => x.ScheduledAt).HasColumnType("datetime2");
+            entity.Property(x => x.Description).HasMaxLength(2000);
             entity.HasIndex(x => new { x.CompetitionEditionId, x.DisciplineId }).IsUnique();
             entity.HasIndex(x => new { x.CompetitionEditionId, x.Order }).IsUnique();
             entity.ToTable("CompetitionDisciplines", table =>
             {
                 table.HasCheckConstraint("CK_CompetitionDisciplines_Order", "\"Order\" > 0");
                 table.HasCheckConstraint("CK_CompetitionDisciplines_TeamSize", "TeamSize > 0");
+                table.HasCheckConstraint("CK_CompetitionDisciplines_SetsToWin", "SetsToWin IS NULL OR SetsToWin > 0");
             });
             entity.HasOne(x => x.CompetitionEdition)
                 .WithMany(x => x.Disciplines)
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Discipline)
                 .WithMany(x => x.CompetitionDisciplines)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<DisciplineParticipantAssignment>(entity =>
+        {
+            entity.HasIndex(x => new { x.CompetitionDisciplineId, x.CompetitionEntryId }).IsUnique();
+            entity.HasOne(x => x.CompetitionDiscipline)
+                .WithMany(x => x.ParticipantAssignments)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.CompetitionEntry)
+                .WithMany(x => x.DisciplineAssignments)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
@@ -143,7 +158,10 @@ public sealed class CompetitionDbContext(DbContextOptions<CompetitionDbContext> 
             entity.HasIndex(x => new { x.DisciplinePhaseId, x.Order }).IsUnique();
             entity.HasAlternateKey(x => new { x.DisciplinePhaseId, x.Id });
             entity.ToTable("PhaseGroups", table =>
-                table.HasCheckConstraint("CK_PhaseGroups_Order", "\"Order\" > 0"));
+            {
+                table.HasCheckConstraint("CK_PhaseGroups_Order", "\"Order\" > 0");
+                table.HasCheckConstraint("CK_PhaseGroups_Capacity", "Capacity IS NULL OR Capacity > 1");
+            });
             entity.HasOne(x => x.DisciplinePhase)
                 .WithMany(x => x.Groups)
                 .OnDelete(DeleteBehavior.Restrict);
@@ -178,6 +196,8 @@ public sealed class CompetitionDbContext(DbContextOptions<CompetitionDbContext> 
                 table.HasCheckConstraint("CK_Matches_DifferentTeams", "HomeTeamId IS NULL OR AwayTeamId IS NULL OR HomeTeamId <> AwayTeamId");
                 table.HasCheckConstraint("CK_Matches_Score", "(HomeScore IS NULL AND AwayScore IS NULL) OR (HomeScore >= 0 AND AwayScore >= 0)");
                 table.HasCheckConstraint("CK_Matches_CompletedHasScore", "Status <> 'Completed' OR (HomeScore IS NOT NULL AND AwayScore IS NOT NULL)");
+                table.HasCheckConstraint("CK_Matches_HomeSourceRank", "HomeSourceRank IS NULL OR HomeSourceRank > 0");
+                table.HasCheckConstraint("CK_Matches_AwaySourceRank", "AwaySourceRank IS NULL OR AwaySourceRank > 0");
             });
             entity.HasOne(x => x.DisciplinePhase)
                 .WithMany(x => x.Matches)

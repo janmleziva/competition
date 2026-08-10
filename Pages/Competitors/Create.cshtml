@@ -1,0 +1,33 @@
+@page
+@model Competition.Pages.Competitors.CreateModel
+@{
+    ViewData["Title"] = "Vytvořit nového soutěžícího";
+}
+
+<main class="shell">
+    <section class="panel admin">
+        <h1>Vytvořit nového soutěžícího</h1>
+        <p class="lead">Záznam zůstane v seznamu i pro další ročníky.</p>
+        <partial name="_CompetitorForm" model="Model.Input" />
+    </section>
+</main>
+
+@if (Model.ShowDuplicateConfirmation)
+{
+    <div class="modal-backdrop" id="duplicate-modal" role="presentation">
+        <section class="modal" role="dialog" aria-modal="true" aria-labelledby="duplicate-title">
+            <h2 id="duplicate-title">Soutěžící už existuje</h2>
+            <p>Soutěžící se stejným jménem a příjmením už je v seznamu. Opravdu chcete vytvořit dalšího?</p>
+            <div class="modal-actions">
+                <form method="post">
+                    <input type="hidden" name="Input.FirstName" value="@Model.Input.FirstName" />
+                    <input type="hidden" name="Input.LastName" value="@Model.Input.LastName" />
+                    <input type="hidden" name="Input.DateOfBirth" value="@(Model.Input.DateOfBirth?.ToString("yyyy-MM-dd"))" />
+                    <input type="hidden" name="AllowDuplicateName" value="true" />
+                    <button class="button" type="submit">Přesto vytvořit</button>
+                </form>
+                <button class="button button-ghost" type="button" onclick="document.getElementById('duplicate-modal').remove(); document.getElementById('Input_FirstName').focus();">Zpět k formuláři</button>
+            </div>
+        </section>
+    </div>
+}

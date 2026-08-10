@@ -1,0 +1,604 @@
+@page "/Editions/{id:long}/Disciplines/{disciplineId:long}/Phases"
+@model Competition.Pages.Editions.DisciplinePhasesModel
+@using Competition.Domain
+
+@{
+    ViewData["Title"] = $"Fáze a zápasy – {Model.Setup.DisciplineName}";
+    var isAdmin = User.Identity?.IsAuthenticated == true;
+}
+
+<main class="shell shell-wide">
+    <section class="panel admin phase-setup-page">
+        <div class="page-heading">
+            <div>
+                <h1>@Model.Setup.DisciplineName</h1>
+                <p class="lead">Fáze a zápasy · @Model.Setup.EditionName</p>
+            </div>
+            <div class="action-group phase-heading-actions">
+                @if (isAdmin && Model.HasMatches)
+                {
+                    @if (Model.Setup.IsScheduleLocked)
+                    {
+                        <form method="post" asp-page-handler="UnlockSchedule">
+                            <button class="button" type="submit">Odemknout rozpis</button>
+                        </form>
+                    }
+                    else
+                    {
+                        <form method="post" asp-page-handler="LockSchedule">
+                            <button class="button" type="submit">Uzamknout rozpis</button>
+                        </form>
+                    }
+                    @if (Model.Setup.AreResultsLocked)
+                    {
+                        <form method="post" asp-page-handler="UnlockResults">
+                            <button class="button" type="submit">Odemknout výsledky</button>
+                        </form>
+                    }
+                    else
+                    {
+                        <form method="post" asp-page-handler="LockResults">
+                            <button class="button" type="submit">Uzamknout výsledky</button>
+                        </form>
+                    }
+                }
+                @if (isAdmin && Model.HasMatches)
+                {
+                    <button class="button button-danger"
+                            type="button"
+                            data-open-modal="reset-schedule-modal"
+                            disabled="@(!Model.Setup.CanResetSchedule || Model.Setup.IsScheduleLocked)"
+                            title="@(Model.Setup.IsScheduleLocked ? "Nejprve odemkněte rozpis." : !Model.Setup.CanResetSchedule ? "Rozpis obsahuje výsledky a nelze jej smazat." : null)">
+                        Smazat rozpis
+                    </button>
+                    <button class="button button-danger"
+                            id="delete-results-button"
+                            type="button"
+                            data-open-modal="delete-results-modal"
+                            disabled="@Model.Setup.AreResultsLocked"
+                            title="@(Model.Setup.AreResultsLocked ? "Nejprve odemkněte výsledky." : null)">
+                        Smazat výsledky
+                    </button>
+                }
+                <a class="button button-ghost" asp-page="/Editions/Disciplines" asp-route-id="@Model.Setup.EditionId">Zpět</a>
+            </div>
+        </div>
+
+        <section class="playing-system-banner @(Model.Setup.IsScheduleLocked ? "is-locked" : null)" aria-label="Vybraný herní systém">
+            <span class="playing-system-label">Herní systém</span>
+            <div class="playing-system-value">
+                @if (isAdmin && !Model.HasMatches && !Model.Setup.IsScheduleLocked)
+                {
+                    <form method="post" asp-page-handler="ChangePlayingSystem" class="playing-system-change-form">
+                        <select asp-for="SelectedPlayingSystem" aria-label="Herní systém">
+                            @foreach (var system in Enum.GetValues<PlayingSystemType>())
+                            {
+                                <option value="@system">@DisciplinePhasesModel.GetPlayingSystemLabel(system)</option>
+                            }
+                        </select>
+                        <button class="button button-small" type="submit">Změnit</button>
+                    </form>
+                }
+                else
+                {
+                    <strong>@DisciplinePhasesModel.GetPlayingSystemLabel(Model.Setup.PlayingSystem)</strong>
+                }
+                @if (Model.Setup.IsScheduleLocked)
+                {
+                    <span class="schedule-lock-badge">Rozpis uzamčen</span>
+                }
+                @if (Model.Setup.AreResultsLocked)
+                {
+                    <span class="schedule-lock-badge results-lock-badge">Výsledky uzamčeny</span>
+                }
+            </div>
+        </section>
+
+        @if (Model.Setup.IsScheduleLocked)
+        {
+            <div class="schedule-lock-notice" role="status">
+                <strong>Rozpis je uzamčený.</strong>
+                Obsazení zápasů už nelze měnit. U vyřazovacího systému lze nyní zapisovat výsledky.
+            </div>
+        }
+
+        @if (Model.Setup.AreResultsLocked)
+        {
+            <div class="schedule-lock-notice results-lock-notice" role="status">
+                <strong>Výsledky jsou uzamčené.</strong>
+                Hlavní skóre ani výsledky setů nyní nemůže měnit veřejnost ani administrátor.
+            </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+        {
+            <div class="status-message" role="status">@Model.StatusMessage</div>
+        }
+        @if (Model.ValidationSection is null)
+        {
+            <div asp-validation-summary="ModelOnly" class="error validation-panel"></div>
+        }
+
+        @if (Model.Setup.PlayingSystem == PlayingSystemType.RoundRobin)
+        {
+            var phase = Model.Setup.Phases.Single(x => x.Type == PhaseType.Group);
+            var group = phase.Groups.Single();
+            <article class="phase-card">
+                <div class="phase-card-heading">
+                    <div>
+                        <span class="phase-eyebrow">Detaily</span>
+                        <h2>Každý s každým</h2>
+                    </div>
+                    <span class="points-badge">Body @phase.PointsForWin / @phase.PointsForDraw / @phase.PointsForLoss</span>
+                </div>
+
+                <div class="phase-team-list" aria-label="Týmy v rozpisu">
+                    @foreach (var team in Model.Setup.Teams)
+                    {
+                        <div class="participant-option participant-option-content is-assigned phase-team-option">
+                            <span class="seed-badge">@team.Seed</span>
+                            <span class="participant-name">@team.Name</span>
+                            @if (isAdmin)
+                            {
+                                <span class="assignment-status">V rozpisu</span>
+                            }
+                        </div>
+                    }
+                </div>
+
+                @if (group.Matches.Count == 0 && isAdmin)
+                {
+                    <form method="post" asp-page-handler="GeneratePresetMatches" class="phase-primary-action">
+                        <button class="button" type="submit" disabled="@(Model.Setup.Teams.Count < 2)">
+                            Vygenerovat zápasy podle Bergerových tabulek
+                        </button>
+                    </form>
+                }
+
+                @if (group.Matches.Count > 0)
+                {
+                    <section class="fixture-section">
+                        <h3>Rozpis zápasů</h3>
+                        <partial name="_PhaseMatchList"
+                                 model="new PhaseMatchListViewModel(group.Matches, Model.Setup.UsesSetScores, Model.Setup.SetsToWin, Model.CanEditResults(isAdmin), false, Model.MatchStatusMessage, Model.MatchStatusMatchId, ValidationMessage: Model.MatchValidationMessage, ValidationMatchId: Model.MatchValidationMatchId)" />
+                    </section>
+                }
+            </article>
+        }
+        else if (Model.Setup.PlayingSystem == PlayingSystemType.GroupsThenClassificationMatches)
+        {
+            var groupPhases = Model.Setup.Phases.Where(x => x.Type == PhaseType.Group).OrderBy(x => x.Order).ToList();
+            @foreach (var phase in groupPhases)
+            {
+                var group = phase.Groups.Single();
+                var options = Model.GetAssignableTeams(group);
+                <article class="phase-card">
+                    <div class="phase-card-heading">
+                        <div class="phase-title-with-order">
+                            <span class="seed-badge">@phase.Order</span>
+                            <div><span class="phase-eyebrow">Skupinová fáze</span><h2>@phase.Name</h2></div>
+                        </div>
+                        <span class="points-badge">Body @phase.PointsForWin / @phase.PointsForDraw / @phase.PointsForLoss</span>
+                    </div>
+
+                    @if (group.Matches.Count == 0 && isAdmin)
+                    {
+                        <form id="group-@group.Id" method="post" asp-page-handler="AssignGroupTeams" class="group-assignment-form" data-auto-assignment-form>
+                            <input type="hidden" name="phaseId" value="@phase.Id" />
+                            <input type="hidden" name="groupId" value="@group.Id" />
+                            <input type="hidden" name="focusTeamId" value="" data-focus-team-id />
+                            <div class="participant-list phase-team-list">
+                                @foreach (var team in options)
+                                {
+                                    var isSelected = group.TeamIds.Contains(team.Id);
+                                    <label class="participant-option participant-option-content phase-assignment-option @(isSelected ? "is-assigned" : null)"
+                                           data-phase-assignment-option>
+                                        <input id="group-@group.Id-team-@team.Id"
+                                               type="checkbox"
+                                               name="teamIds"
+                                               value="@team.Id"
+                                               checked="@isSelected"
+                                               data-auto-assign-team="@team.Id" />
+                                        <span class="seed-badge">@team.Seed</span>
+                                        <span class="participant-name">@team.Name</span>
+                                        <span class="assignment-status" data-assignment-status>
+                                            @(isSelected ? "Ve skupině" : "K dispozici")
+                                        </span>
+                                    </label>
+                                }
+                            </div>
+                        </form>
+
+                        var unassignedCount = Model.Setup.Teams.Count - Model.Setup.AssignedTeamIds.Count;
+                        @if (unassignedCount > 0)
+                        {
+                            <form method="post" asp-page-handler="RandomAssign" class="random-assignment-form">
+                                <input type="hidden" name="phaseId" value="@phase.Id" />
+                                <input type="hidden" name="groupId" value="@group.Id" />
+                                <label for="random-count-@group.Id">Náhodně přidat týmů</label>
+                                <input id="random-count-@group.Id" name="RandomAssignment.TeamCount" type="number" min="1" max="@unassignedCount" value="1" />
+                                <button class="button button-ghost button-small" type="submit">Náhodně přiřadit</button>
+                            </form>
+                        }
+                    }
+                    else
+                    {
+                        <div class="phase-team-list">
+                            @foreach (var teamId in group.TeamIds)
+                            {
+                                var team = Model.Setup.Teams.Single(x => x.Id == teamId);
+                                <div class="participant-option participant-option-content is-assigned phase-team-option">
+                                    <span class="seed-badge">@team.Seed</span>
+                                    <span class="participant-name">@team.Name</span>
+                                    @if (isAdmin)
+                                    {
+                                        <span class="assignment-status">Ve skupině</span>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    @if (group.Matches.Count > 0)
+                    {
+                        <section class="fixture-section">
+                            <h3>Rozpis @group.Name</h3>
+                            <partial name="_PhaseMatchList"
+                                     model="new PhaseMatchListViewModel(group.Matches, Model.Setup.UsesSetScores, Model.Setup.SetsToWin, Model.CanEditResults(isAdmin), false, Model.MatchStatusMessage, Model.MatchStatusMatchId, ValidationMessage: Model.MatchValidationMessage, ValidationMatchId: Model.MatchValidationMatchId)" />
+                        </section>
+                    }
+                </article>
+            }
+
+            var finalPhase = Model.Setup.Phases.Single(x => x.Type == PhaseType.FinalStanding);
+            <article class="phase-card final-phase-card">
+                <div class="phase-card-heading">
+                    <div class="phase-title-with-order"><span class="seed-badge">@finalPhase.Order</span><div><span class="phase-eyebrow">Finálová fáze</span><h2>@finalPhase.Name</h2></div></div>
+                </div>
+                @if (finalPhase.Matches.Count == 0)
+                {
+                    <p class="meta-inline">Finále a zápas o 3. místo se vytvoří společně se skupinovými zápasy.</p>
+                }
+                else
+                {
+                    <partial name="_PhaseMatchList"
+                             model="new PhaseMatchListViewModel(finalPhase.Matches, Model.Setup.UsesSetScores, Model.Setup.SetsToWin, Model.CanEditResults(isAdmin), true, Model.MatchStatusMessage, Model.MatchStatusMatchId, ValidationMessage: Model.MatchValidationMessage, ValidationMatchId: Model.MatchValidationMatchId)" />
+                }
+            </article>
+
+            @if (!Model.HasMatches && isAdmin)
+            {
+                <form method="post" asp-page-handler="GeneratePresetMatches" class="phase-primary-action phase-page-action">
+                    <button class="button" type="submit" disabled="@(!Model.Setup.AreAllTeamsAssigned)" title="@(Model.Setup.AreAllTeamsAssigned ? null : "Nejprve rozdělte všechny týmy do skupin.")">
+                        Vygenerovat skupinové a finálové zápasy
+                    </button>
+                </form>
+            }
+        }
+        else if (Model.Setup.PlayingSystem == PlayingSystemType.Knockout)
+        {
+            var phase = Model.Setup.Phases.Single(x => x.Type == PhaseType.Knockout);
+            <article class="phase-card">
+                <div class="phase-card-heading">
+                    <div><span class="phase-eyebrow">Vyřazovací fáze</span><h2>@phase.Name</h2></div>
+                </div>
+
+                @if (!Model.HasMatches && isAdmin)
+                {
+                    <div class="knockout-guidance" role="note">
+                        <strong>Etapy vytvářejte v pořadí, v jakém se budou hrát.</strong>
+                        U každé etapy vyberte jen týmy, které v ní přímo začínají. Vítězové zápasů z předchozí etapy
+                        budou do následující etapy doplněni automaticky.
+                    </div>
+                }
+
+                @{
+                    var previousStageCapacity = 0;
+                    var previousStageMatches = Enumerable.Empty<Competition.Services.PhaseSetupMatch>().ToList();
+                }
+                @foreach (var stage in phase.Groups)
+                {
+                    var advancingTeamCount = previousStageCapacity / 2;
+                    var directTeamCapacity = Math.Max(0, stage.Capacity.GetValueOrDefault() - advancingTeamCount);
+                    var options = Model.GetAssignableTeams(stage, directTeamCapacity);
+                    var sourceOptions = previousStageMatches
+                        .Select(x => new Competition.Services.PhaseSetupMatchSource(x.Id, x.Name))
+                        .ToList();
+                    <section class="knockout-stage">
+                        <div class="stage-heading">
+                            <div class="stage-title-block">
+                                <div><span class="seed-badge">@stage.Order</span><h3>@stage.Name</h3></div>
+                                @if (!Model.HasMatches && isAdmin)
+                                {
+                                    <small>Vyberte tým nebo týmy, které začínají přímo v této etapě.</small>
+                                }
+                            </div>
+                            <div class="stage-actions">
+                                <span class="points-badge">@directTeamCapacity přímo</span>
+                                @if (advancingTeamCount > 0)
+                                {
+                                    <span class="advancing-teams-badge">+ @advancingTeamCount postupující</span>
+                                }
+                                @if (isAdmin && stage.TeamIds.Count == 0 && stage.Matches.Count == 0)
+                                {
+                                    <form method="post" asp-page-handler="DeleteGroup">
+                                        <input type="hidden" name="phaseId" value="@phase.Id" />
+                                        <input type="hidden" name="groupId" value="@stage.Id" />
+                                        <button class="button button-danger button-small" type="submit">Smazat</button>
+                                    </form>
+                                }
+                            </div>
+                        </div>
+                        @if (!Model.HasMatches && isAdmin)
+                        {
+                            <form id="group-@stage.Id" method="post" asp-page-handler="AssignGroupTeams" class="group-assignment-form" data-auto-assignment-form>
+                                <input type="hidden" name="phaseId" value="@phase.Id" />
+                                <input type="hidden" name="groupId" value="@stage.Id" />
+                                <input type="hidden" name="focusTeamId" value="" data-focus-team-id />
+                                <div class="participant-list phase-team-list">
+                                    @foreach (var team in options)
+                                    {
+                                        var isSelected = stage.TeamIds.Contains(team.Id);
+                                        <label class="participant-option participant-option-content phase-assignment-option @(isSelected ? "is-assigned" : null)"
+                                               data-phase-assignment-option>
+                                            <input id="group-@stage.Id-team-@team.Id"
+                                                   type="checkbox"
+                                                   name="teamIds"
+                                                   value="@team.Id"
+                                                   checked="@isSelected"
+                                                   data-auto-assign-team="@team.Id" />
+                                            <span class="seed-badge">@team.Seed</span>
+                                            <span class="participant-name">@team.Name</span>
+                                            <span class="assignment-status" data-assignment-status>
+                                                @(isSelected ? "V etapě" : "K dispozici")
+                                            </span>
+                                        </label>
+                                    }
+                                </div>
+                            </form>
+                        }
+                        @if (stage.Matches.Count > 0)
+                        {
+                            <partial name="_PhaseMatchList"
+                                     model="new PhaseMatchListViewModel(stage.Matches, Model.Setup.UsesSetScores, Model.Setup.SetsToWin, Model.CanEditResults(isAdmin), true, Model.MatchStatusMessage, Model.MatchStatusMatchId, isAdmin && !Model.Setup.IsScheduleLocked, Model.Setup.Teams.Where(x => stage.TeamIds.Contains(x.Id)).ToList(), sourceOptions, Model.MatchValidationMessage, Model.MatchValidationMatchId)" />
+                        }
+                    </section>
+                    previousStageCapacity = stage.Capacity.GetValueOrDefault();
+                    previousStageMatches = stage.Matches.ToList();
+                }
+
+                @if (!Model.HasMatches && isAdmin)
+                {
+                    <section class="stage-create-box">
+                        <h3>Nová etapa</h3>
+                        <p class="meta-inline">Nejprve zadejte první hranou etapu, potom postupně přidávejte navazující etapy.</p>
+                        @if (Model.ValidationSection == "group-create")
+                        {
+                            <div asp-validation-summary="ModelOnly" class="error validation-panel local-validation-panel"></div>
+                        }
+                        <form method="post" asp-page-handler="CreateGroup" class="discipline-settings-grid">
+                            <input type="hidden" name="phaseId" value="@phase.Id" />
+                            <input type="hidden" name="NewGroup.Order" value="@(phase.Groups.Count == 0 ? 1 : phase.Groups.Max(x => x.Order) + 1)" />
+                            <div><label asp-for="NewGroup.Name">Název</label><input asp-for="NewGroup.Name" placeholder="např. Čtvrtfinále" /></div>
+                            <div><label asp-for="NewGroup.Capacity">Počet týmů</label><input asp-for="NewGroup.Capacity" type="number" min="2" step="2" /></div>
+                            <button class="button button-small" type="submit">Přidat etapu</button>
+                        </form>
+                    </section>
+
+                    @if (phase.Groups.Count > 0)
+                    {
+                        <div class="phase-primary-action knockout-generation-actions">
+                            @if (Model.ValidationSection == "knockout-generation")
+                            {
+                                <div asp-validation-summary="ModelOnly" class="error validation-panel local-validation-panel knockout-generation-error"></div>
+                            }
+                            <form method="post" asp-page-handler="GenerateKnockoutMatches">
+                                <input type="hidden" name="randomizeTeams" value="true" />
+                                <button class="button" type="submit">Vygenerovat pavouk náhodně</button>
+                            </form>
+                            <form method="post" asp-page-handler="GenerateKnockoutMatches">
+                                <input type="hidden" name="randomizeTeams" value="false" />
+                                <button class="button button-ghost" type="submit">Sestavit zápasy ručně</button>
+                            </form>
+                        </div>
+                    }
+                }
+            </article>
+        }
+        else if (Model.Setup.PlayingSystem == PlayingSystemType.Custom)
+        {
+            @if (isAdmin)
+            {
+                <section class="phase-card custom-phase-create">
+                    <div class="phase-card-heading"><div><span class="phase-eyebrow">Vlastní systém</span><h2>Nová fáze</h2></div></div>
+                    <form method="post" asp-page-handler="CreatePhase" class="discipline-settings-grid">
+                        <div><label asp-for="NewPhase.Name">Název</label><input asp-for="NewPhase.Name" /></div>
+                        <div>
+                            <label asp-for="NewPhase.Type">Typ</label>
+                            <select asp-for="NewPhase.Type">
+                                @foreach (var type in Enum.GetValues<PhaseType>())
+                                {
+                                    <option value="@type">@DisciplinePhasesModel.GetPhaseTypeLabel(type)</option>
+                                }
+                            </select>
+                        </div>
+                        <div><label asp-for="NewPhase.Order">Pořadí</label><input asp-for="NewPhase.Order" type="number" min="1" /></div>
+                        <div><label asp-for="NewPhase.PointsForWin">Výhra</label><input asp-for="NewPhase.PointsForWin" type="number" min="0" /></div>
+                        <div><label asp-for="NewPhase.PointsForDraw">Remíza</label><input asp-for="NewPhase.PointsForDraw" type="number" min="0" /></div>
+                        <div><label asp-for="NewPhase.PointsForLoss">Prohra</label><input asp-for="NewPhase.PointsForLoss" type="number" min="0" /></div>
+                        <button class="button button-small" type="submit">Přidat fázi</button>
+                    </form>
+                </section>
+            }
+
+            @if (Model.Setup.Phases.Count == 0)
+            {
+                <div class="empty-state">Vlastní systém zatím nemá žádnou fázi.</div>
+            }
+            @foreach (var phase in Model.Setup.Phases)
+            {
+                var assignedCount = phase.Groups.SelectMany(x => x.TeamIds).Distinct().Count();
+                var phaseHasMatches = phase.Matches.Count != 0 || phase.Groups.Any(x => x.Matches.Count != 0);
+                <article class="phase-card">
+                    <div class="phase-card-heading">
+                        <div class="phase-title-with-order">
+                            <span class="seed-badge">@phase.Order</span>
+                            <div><span class="phase-eyebrow">@DisciplinePhasesModel.GetPhaseTypeLabel(phase.Type)</span><h2>@phase.Name</h2></div>
+                        </div>
+                        <div class="stage-actions">
+                            <span class="points-badge">@assignedCount týmů</span>
+                            @if (isAdmin && assignedCount == 0 && !phaseHasMatches)
+                            {
+                                <form method="post" asp-page-handler="DeletePhase">
+                                    <input type="hidden" name="phaseId" value="@phase.Id" />
+                                    <button class="button button-danger button-small" type="submit">Smazat</button>
+                                </form>
+                            }
+                        </div>
+                    </div>
+                    <p class="meta-inline">Body @phase.PointsForWin / @phase.PointsForDraw / @phase.PointsForLoss</p>
+                </article>
+            }
+        }
+        else
+        {
+            <div class="empty-state">Automatické nastavení tohoto herního systému připravíme v dalším kroku.</div>
+        }
+    </section>
+</main>
+
+@if (isAdmin && Model.HasMatches)
+{
+    <div id="reset-schedule-modal" class="modal-backdrop" role="presentation" hidden>
+        <section class="modal destructive-confirmation-modal" role="dialog" aria-modal="true" aria-labelledby="reset-schedule-title">
+            <h2 id="reset-schedule-title">Smazat celý rozpis?</h2>
+            <div class="destructive-warning">
+                <strong>Tento krok nelze vrátit zpět.</strong>
+                <p>
+                    Budou trvale smazány všechny zápasy, hlavní i dílčí výsledky a všechna přiřazení týmů
+                    do skupin nebo vyřazovacích etap. Samotné fáze a jejich základní struktura zůstanou zachovány.
+                </p>
+            </div>
+            @if (Model.Setup.HasMatchResults)
+            {
+                <p class="error"><strong>Pozor:</strong> rozpis už obsahuje zapsané výsledky.</p>
+            }
+            <div class="modal-actions">
+                <form method="post" asp-page-handler="ResetSchedule">
+                    <button class="button button-danger" type="submit">Ano, vše smazat</button>
+                </form>
+                <button class="button button-ghost" type="button" data-close-modal>Zrušit</button>
+            </div>
+        </section>
+    </div>
+}
+
+@if (isAdmin && Model.HasMatches)
+{
+    <div id="delete-results-modal" class="modal-backdrop" role="presentation" hidden>
+        <section class="modal destructive-confirmation-modal" role="dialog" aria-modal="true" aria-labelledby="delete-results-title">
+            <h2 id="delete-results-title">Smazat všechny výsledky?</h2>
+            <div class="destructive-warning">
+                <strong>Tento krok nelze vrátit zpět.</strong>
+                <p>
+                    Budou trvale smazána hlavní skóre i výsledky všech setů. Zápasy, jejich pořadí a ručně sestavená
+                    obsazení zůstanou zachována. Postupující týmy budou z navazujících zápasů odebrány.
+                </p>
+            </div>
+            <p>Výsledky budou mazány od posledních etap směrem k prvním, aby zůstaly zachované vazby vyřazovacího pavouka.</p>
+            <div class="modal-actions">
+                <form method="post"
+                      asp-page-handler="DeleteResults"
+                      data-close-modal-after-post="true"
+                      data-postback-focus-id="delete-results-button">
+                    <button class="button button-danger" type="submit">Ano, smazat všechny výsledky</button>
+                </form>
+                <button class="button button-ghost" type="button" data-close-modal>Zrušit</button>
+            </div>
+        </section>
+    </div>
+}
+
+@section Scripts {
+    <script>
+        document.querySelectorAll("[data-phase-assignment-option]").forEach(option => {
+            const checkbox = option.querySelector('input[type="checkbox"]');
+            const status = option.querySelector("[data-assignment-status]");
+            checkbox?.addEventListener("change", () => {
+                option.classList.toggle("is-assigned", checkbox.checked);
+                if (status) {
+                    status.textContent = checkbox.checked
+                        ? (option.closest(".knockout-stage") ? "V etapě" : "Ve skupině")
+                        : "K dispozici";
+                }
+
+                const teamId = checkbox.dataset.autoAssignTeam;
+                const form = checkbox.closest("[data-auto-assignment-form]");
+                if (teamId && form) {
+                    form.querySelector("[data-focus-team-id]").value = teamId;
+                    option.classList.add("is-saving");
+                    if (status) {
+                        status.textContent = "Ukládám…";
+                    }
+                    form.requestSubmit();
+                }
+            });
+        });
+
+        document.querySelectorAll("[data-auto-match-team-select]").forEach(select => {
+            select.addEventListener("change", () => {
+                const formId = select.getAttribute("form");
+                const form = formId ? document.getElementById(formId) : null;
+                if (!form) {
+                    return;
+                }
+
+                const focusInput = form.querySelector("[data-match-team-focus-id]");
+                if (focusInput) {
+                    focusInput.value = select.id;
+                }
+                select.closest(".match-row")?.classList.add("is-saving");
+                form.requestSubmit();
+            });
+        });
+
+        if (window.location.hash) {
+            const focusedControl = document.getElementById(decodeURIComponent(window.location.hash.substring(1)));
+            focusedControl?.focus({ preventScroll: true });
+        }
+
+        document.querySelectorAll("[data-open-modal], [data-open-set-modal]").forEach(button => {
+            button.addEventListener("click", () => {
+                const modalId = button.dataset.openModal ?? button.dataset.openSetModal;
+                const modal = document.getElementById(modalId);
+                if (modal) {
+                    modal.hidden = false;
+                    modal.querySelector("input:not([type='hidden']), button")?.focus();
+                }
+            });
+        });
+
+        document.querySelectorAll("[data-close-modal]").forEach(button => {
+            button.addEventListener("click", () => {
+                button.closest(".modal-backdrop").hidden = true;
+            });
+        });
+
+        document.querySelectorAll("form[data-close-modal-after-post='true']").forEach(form => {
+            form.addEventListener("submit", () => {
+                const modal = form.closest(".modal-backdrop");
+                if (modal) {
+                    modal.hidden = true;
+                }
+            });
+        });
+
+        document.querySelectorAll(".modal-backdrop").forEach(backdrop => {
+            backdrop.addEventListener("click", event => {
+                if (event.target === backdrop) {
+                    backdrop.hidden = true;
+                }
+            });
+        });
+    </script>
+}

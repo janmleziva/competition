@@ -59,9 +59,20 @@ builder.Services
     });
 
 builder.Services.AddAuthorization();
-builder.Services.AddRazorPages();
+builder.Services.AddRazorPages()
+    .AddMvcOptions(options =>
+    {
+        options.ModelBindingMessageProvider.SetValueIsInvalidAccessor(value => $"Hodnota „{value}“ není platná.");
+        options.ModelBindingMessageProvider.SetAttemptedValueIsInvalidAccessor((value, field) =>
+            $"Hodnota „{value}“ není pro pole {field} platná.");
+        options.ModelBindingMessageProvider.SetValueMustBeANumberAccessor(field =>
+            $"Pole {field} musí obsahovat číslo.");
+    });
 builder.Services.AddSingleton<AdminCredentialValidator>();
 builder.Services.AddScoped<IEditionAdministrationService, EditionAdministrationService>();
+builder.Services.AddScoped<ICompetitorAdministrationService, CompetitorAdministrationService>();
+builder.Services.AddScoped<IDisciplineAdministrationService, DisciplineAdministrationService>();
+builder.Services.AddScoped<IPhaseSetupService, PhaseSetupService>();
 
 var app = builder.Build();
 

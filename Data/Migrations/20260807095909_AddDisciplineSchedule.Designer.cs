@@ -4,6 +4,7 @@ using Competition.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Competition.Data.Migrations
 {
     [DbContext(typeof(CompetitionDbContext))]
-    partial class CompetitionDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260807095909_AddDisciplineSchedule")]
+    partial class AddDisciplineSchedule
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -30,24 +33,11 @@ namespace Competition.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
 
-                    b.Property<bool>("AreResultsLocked")
-                        .HasColumnType("bit");
-
                     b.Property<long>("CompetitionEditionId")
                         .HasColumnType("bigint");
 
-                    b.Property<string>("Description")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
-
                     b.Property<long>("DisciplineId")
                         .HasColumnType("bigint");
-
-                    b.Property<bool>("IsLocked")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsScheduleLocked")
-                        .HasColumnType("bit");
 
                     b.Property<int>("Order")
                         .HasColumnType("int");
@@ -60,14 +50,8 @@ namespace Competition.Data.Migrations
                     b.Property<DateTime?>("ScheduledAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int?>("SetsToWin")
-                        .HasColumnType("int");
-
                     b.Property<int>("TeamSize")
                         .HasColumnType("int");
-
-                    b.Property<bool>("UsesSetScores")
-                        .HasColumnType("bit");
 
                     b.HasKey("Id");
 
@@ -82,8 +66,6 @@ namespace Competition.Data.Migrations
                     b.ToTable("CompetitionDisciplines", null, t =>
                         {
                             t.HasCheckConstraint("CK_CompetitionDisciplines_Order", "\"Order\" > 0");
-
-                            t.HasCheckConstraint("CK_CompetitionDisciplines_SetsToWin", "SetsToWin IS NULL OR SetsToWin > 0");
 
                             t.HasCheckConstraint("CK_CompetitionDisciplines_TeamSize", "TeamSize > 0");
                         });
@@ -214,30 +196,6 @@ namespace Competition.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("Disciplines");
-                });
-
-            modelBuilder.Entity("Competition.Domain.DisciplineParticipantAssignment", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
-
-                    b.Property<long>("CompetitionDisciplineId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("CompetitionEntryId")
-                        .HasColumnType("bigint");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompetitionEntryId");
-
-                    b.HasIndex("CompetitionDisciplineId", "CompetitionEntryId")
-                        .IsUnique();
-
-                    b.ToTable("DisciplineParticipantAssignments");
                 });
 
             modelBuilder.Entity("Competition.Domain.DisciplinePhase", b =>
@@ -397,15 +355,6 @@ namespace Competition.Data.Migrations
                     b.Property<int?>("AwayScore")
                         .HasColumnType("int");
 
-                    b.Property<long?>("AwaySourceGroupId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("AwaySourceMatchId")
-                        .HasColumnType("bigint");
-
-                    b.Property<int?>("AwaySourceRank")
-                        .HasColumnType("int");
-
                     b.Property<long?>("AwayTeamId")
                         .HasColumnType("bigint");
 
@@ -413,15 +362,6 @@ namespace Competition.Data.Migrations
                         .HasColumnType("bigint");
 
                     b.Property<int?>("HomeScore")
-                        .HasColumnType("int");
-
-                    b.Property<long?>("HomeSourceGroupId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("HomeSourceMatchId")
-                        .HasColumnType("bigint");
-
-                    b.Property<int?>("HomeSourceRank")
                         .HasColumnType("int");
 
                     b.Property<long?>("HomeTeamId")
@@ -465,13 +405,9 @@ namespace Competition.Data.Migrations
 
                     b.ToTable("Matches", null, t =>
                         {
-                            t.HasCheckConstraint("CK_Matches_AwaySourceRank", "AwaySourceRank IS NULL OR AwaySourceRank > 0");
-
                             t.HasCheckConstraint("CK_Matches_CompletedHasScore", "Status <> 'Completed' OR (HomeScore IS NOT NULL AND AwayScore IS NOT NULL)");
 
                             t.HasCheckConstraint("CK_Matches_DifferentTeams", "HomeTeamId IS NULL OR AwayTeamId IS NULL OR HomeTeamId <> AwayTeamId");
-
-                            t.HasCheckConstraint("CK_Matches_HomeSourceRank", "HomeSourceRank IS NULL OR HomeSourceRank > 0");
 
                             t.HasCheckConstraint("CK_Matches_Order", "\"Order\" > 0");
 
@@ -520,9 +456,6 @@ namespace Competition.Data.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
 
-                    b.Property<int?>("Capacity")
-                        .HasColumnType("int");
-
                     b.Property<long>("DisciplinePhaseId")
                         .HasColumnType("bigint");
 
@@ -544,8 +477,6 @@ namespace Competition.Data.Migrations
 
                     b.ToTable("PhaseGroups", null, t =>
                         {
-                            t.HasCheckConstraint("CK_PhaseGroups_Capacity", "Capacity IS NULL OR Capacity > 1");
-
                             t.HasCheckConstraint("CK_PhaseGroups_Order", "\"Order\" > 0");
                         });
                 });
@@ -654,25 +585,6 @@ namespace Competition.Data.Migrations
                     b.Navigation("CompetitionEdition");
 
                     b.Navigation("Competitor");
-                });
-
-            modelBuilder.Entity("Competition.Domain.DisciplineParticipantAssignment", b =>
-                {
-                    b.HasOne("Competition.Domain.CompetitionDiscipline", "CompetitionDiscipline")
-                        .WithMany("ParticipantAssignments")
-                        .HasForeignKey("CompetitionDisciplineId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Competition.Domain.CompetitionEntry", "CompetitionEntry")
-                        .WithMany("DisciplineAssignments")
-                        .HasForeignKey("CompetitionEntryId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("CompetitionDiscipline");
-
-                    b.Navigation("CompetitionEntry");
                 });
 
             modelBuilder.Entity("Competition.Domain.DisciplinePhase", b =>
@@ -826,8 +738,6 @@ namespace Competition.Data.Migrations
                 {
                     b.Navigation("FinalStandings");
 
-                    b.Navigation("ParticipantAssignments");
-
                     b.Navigation("Phases");
 
                     b.Navigation("RankingPointRules");
@@ -844,8 +754,6 @@ namespace Competition.Data.Migrations
 
             modelBuilder.Entity("Competition.Domain.CompetitionEntry", b =>
                 {
-                    b.Navigation("DisciplineAssignments");
-
                     b.Navigation("TeamMemberships");
                 });
 

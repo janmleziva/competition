@@ -1,0 +1,132 @@
+@page "/Editions/{id:long}/Competitors"
+@model Competition.Pages.Editions.CompetitorsModel
+@{
+    ViewData["Title"] = $"Soutěžící – {Model.Registration.EditionName}";
+}
+
+<main class="shell shell-wide">
+    <section class="panel admin">
+        <div class="page-heading">
+            <div>
+                <h1>Soutěžící</h1>
+                <p class="lead">@Model.Registration.EditionName</p>
+            </div>
+            <a class="button button-ghost" asp-page="/Editions/Details" asp-route-id="@Model.Registration.EditionId">Zpět</a>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+        {
+            <div class="status-message" role="status">@Model.StatusMessage</div>
+        }
+        <div asp-validation-summary="ModelOnly" class="error validation-panel"></div>
+
+        @if (User.Identity?.IsAuthenticated == true)
+        {
+            <section class="registration-form" aria-labelledby="register-heading">
+                <h2 id="register-heading">Přihlásit soutěžícího</h2>
+                @if (Model.Registration.AvailableCompetitors.Count == 0)
+                {
+                    <p class="meta-inline">K dispozici není žádný soutěžící.</p>
+                }
+                else
+                {
+                    <form method="post" asp-page-handler="Register" class="inline-form">
+                        <div>
+                            <label asp-for="CompetitorId" class="visually-hidden">Soutěžící</label>
+                            <select asp-for="CompetitorId">
+                                <option value="">Vyberte soutěžícího</option>
+                                @foreach (var competitor in Model.Registration.AvailableCompetitors)
+                                {
+                                    <option value="@competitor.Id">@competitor.LastName @competitor.FirstName</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="seed-field">
+                            <label asp-for="Seed">Nasazení</label>
+                            <input asp-for="Seed" type="number" min="1" />
+                            <span asp-validation-for="Seed" class="field-error"></span>
+                        </div>
+                        <button class="button button-small" type="submit">Přihlásit</button>
+                    </form>
+                }
+            </section>
+
+            <div class="choice-divider" aria-hidden="true"><span>nebo</span></div>
+
+            <section class="registration-form" aria-labelledby="create-register-heading">
+                <h2 id="create-register-heading">Vytvořte nového</h2>
+                <form method="post" asp-page-handler="CreateAndRegister" class="edition-form">
+                    <label for="newCompetitor_FirstName">Jméno</label>
+                    @Html.TextBox("newCompetitor.FirstName", Model.NewCompetitor.FirstName, new { maxlength = 100, required = "required" })
+                    @Html.ValidationMessage("newCompetitor.FirstName", null, new { @class = "field-error" })
+
+                    <label for="newCompetitor_LastName">Příjmení</label>
+                    @Html.TextBox("newCompetitor.LastName", Model.NewCompetitor.LastName, new { maxlength = 100, required = "required" })
+                    @Html.ValidationMessage("newCompetitor.LastName", null, new { @class = "field-error" })
+
+                    <label for="newCompetitor_DateOfBirth">Datum narození</label>
+                    @Html.TextBox("newCompetitor.DateOfBirth", Model.NewCompetitor.DateOfBirth?.ToString("dd/MM/yyyy"), new { type = "text", inputmode = "numeric", placeholder = "dd/mm/rrrr", autocomplete = "off", data_czech_date_picker = "true" })
+                    @Html.ValidationMessage("newCompetitor.DateOfBirth", null, new { @class = "field-error" })
+
+                    <div class="form-actions">
+                        <button class="button" type="submit">Vytvořit a přihlásit</button>
+                    </div>
+                </form>
+            </section>
+        }
+
+        @if (Model.Registration.Entries.Count == 0)
+        {
+            <div class="empty-state">Do tohoto ročníku zatím není nikdo přihlášen.</div>
+        }
+        else
+        {
+            <div class="edition-list">
+                @foreach (var entry in Model.Registration.Entries)
+                {
+                    <article class="edition-row">
+                        <div>
+                            <div class="edition-title"><span class="seed-badge">@entry.Seed</span> @entry.LastName @entry.FirstName</div>
+                            <span class="meta-inline">Narozen/a: @Model.FormatDate(entry.DateOfBirth)</span>
+                        </div>
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            <div class="row-actions registration-actions">
+                                <form method="post" asp-page-handler="UpdateSeed" class="seed-update-form">
+                                    <input type="hidden" name="entryId" value="@entry.Id" />
+                                    <label class="visually-hidden" for="seed-@entry.Id">Nasazení pro @entry.FirstName @entry.LastName</label>
+                                    <input id="seed-@entry.Id" name="entrySeed" type="number" min="1" value="@entry.Seed" />
+                                    <button class="button button-ghost button-small" type="submit">Změnit</button>
+                                </form>
+                                <form method="post" asp-page-handler="Remove">
+                                    <input type="hidden" name="entryId" value="@entry.Id" />
+                                    <button class="button button-danger button-small" type="submit">Odhlásit</button>
+                                </form>
+                            </div>
+                        }
+                    </article>
+                }
+            </div>
+        }
+    </section>
+</main>
+
+@if (Model.ShowDuplicateConfirmation)
+{
+    <div class="modal-backdrop" id="duplicate-modal" role="presentation">
+        <section class="modal" role="dialog" aria-modal="true" aria-labelledby="duplicate-title">
+            <h2 id="duplicate-title">Soutěžící už existuje</h2>
+            <p>Soutěžící se stejným jménem a příjmením už je v seznamu. Opravdu chcete vytvořit a přihlásit dalšího?</p>
+            <div class="modal-actions">
+                <form method="post" asp-page-handler="CreateAndRegister">
+                    <input type="hidden" name="newCompetitor.FirstName" value="@Model.NewCompetitor.FirstName" />
+                    <input type="hidden" name="newCompetitor.LastName" value="@Model.NewCompetitor.LastName" />
+                    <input type="hidden" name="newCompetitor.DateOfBirth" value="@(Model.NewCompetitor.DateOfBirth?.ToString("yyyy-MM-dd"))" />
+                    <input type="hidden" name="allowDuplicateName" value="true" />
+                    <button class="button" type="submit">Přesto vytvořit a přihlásit</button>
+                </form>
+                <button class="button button-ghost" type="button" onclick="document.getElementById('duplicate-modal').remove(); document.getElementById('newCompetitor_FirstName').focus();">Zpět k formuláři</button>
+            </div>
+        </section>
+    </div>
+}

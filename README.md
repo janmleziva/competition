@@ -128,6 +128,22 @@ After updating an existing database from Step 1, rerun `scripts/sql/001_initial_
 the Forpsi MSSQL web interface. It adds the Step 2 columns and indexes without recreating or
 deleting existing edition data.
 
+## Competitors and registration
+
+The reusable competitor catalogue is available at `/Competitors`. Anonymous visitors can
+search and read the catalogue. Authenticated administrators can add competitors and edit their
+first name, last name, and optional date of birth.
+
+Each edition detail links to its public registration list at `/Editions/{id}/Competitors`.
+Administrators can register catalogue competitors, assign or change a unique positive seed,
+and remove registrations. A competitor can appear only once in an edition, and registrations
+that are already used by a discipline team cannot be removed. All write handlers enforce
+authentication even when called directly.
+
+Step 3 uses the existing `Competitors` and `CompetitionEntries` tables, so it does not require
+a new schema migration. The unique database indexes remain the final safeguard for competitor
+and seed uniqueness within an edition.
+
 SQL connection behavior is configured under `Database` in `appsettings.json`. The defaults use
 a 5-second connection timeout, a 10-second command timeout, and one retry with at most a
 1-second delay. These values can be overridden with environment variables such as

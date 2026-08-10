@@ -10,4 +10,5 @@ public sealed class CompetitionEntry
     public int Seed { get; set; }
 
     public ICollection<DisciplineTeamMember> TeamMemberships { get; } = [];
+    public ICollection<DisciplineParticipantAssignment> DisciplineAssignments { get; } = [];
 }

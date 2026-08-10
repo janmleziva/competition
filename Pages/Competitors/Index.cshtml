@@ -1,0 +1,74 @@
+@page
+@model Competition.Pages.Competitors.IndexModel
+@{
+    ViewData["Title"] = "Soutěžící";
+}
+
+<main class="shell shell-wide">
+    <section class="panel admin">
+        <div class="page-heading">
+            <div>
+                <h1>Soutěžící</h1>
+                <p class="lead">Seznam soutěžících ve všech ročnících</p>
+            </div>
+            @if (User.Identity?.IsAuthenticated == true)
+            {
+                <a class="button" asp-page="/Competitors/Create">Přidat soutěžícího</a>
+            }
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+        {
+            <div class="status-message" role="status">@Model.StatusMessage</div>
+        }
+
+        <form method="get" class="search-form" role="search">
+            <label for="competitor-search">Hledat podle jména nebo příjmení</label>
+            <div class="search-actions">
+                <input id="competitor-search" asp-for="Search" type="search" />
+                <button class="button button-small" type="submit">Hledat</button>
+                @if (!string.IsNullOrWhiteSpace(Model.Search))
+                {
+                    <a class="button button-ghost button-small" asp-page="/Competitors/Index">Zrušit filtr</a>
+                }
+            </div>
+        </form>
+
+        @if (Model.Competitors.Count == 0)
+        {
+            <div class="empty-state">Žádný soutěžící neodpovídá hledání.</div>
+        }
+        else
+        {
+            <div class="edition-list">
+                @foreach (var competitor in Model.Competitors)
+                {
+                    <article class="edition-row">
+                        <div>
+                            <div class="edition-title">@competitor.LastName @competitor.FirstName</div>
+                            <span class="meta-inline">Narozen/a: @Model.FormatDate(competitor.DateOfBirth) · Ročníky: @competitor.EditionCount</span>
+                        </div>
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            <div class="row-actions">
+                                <a class="button button-ghost button-small" asp-page="/Competitors/Edit" asp-route-id="@competitor.Id">Upravit</a>
+                                @if (competitor.EditionCount == 0)
+                                {
+                                    <form method="post" asp-page-handler="Delete" asp-route-id="@competitor.Id">
+                                        <button class="button button-danger button-small" type="submit">Smazat</button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <span class="disabled-tooltip" title="zaregistrovaný soutěžící nemůže být smazán">
+                                        <button class="button button-danger button-small" type="button" disabled title="zaregistrovaný soutěžící nemůže být smazán">Smazat</button>
+                                    </span>
+                                }
+                            </div>
+                        }
+                    </article>
+                }
+            </div>
+        }
+    </section>
+</main>

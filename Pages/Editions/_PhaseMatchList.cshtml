@@ -1,0 +1,290 @@
+@model Competition.Pages.Editions.PhaseMatchListViewModel
+
+@if (!string.IsNullOrWhiteSpace(Model.StatusMessage) &&
+     Model.StatusMatchId is not null && Model.Matches.Any(x => x.Id == Model.StatusMatchId))
+{
+    <div class="status-message match-status-message" role="status">@Model.StatusMessage</div>
+}
+
+<div class="match-list @(Model.ShowMatchName ? "knockout-match-list" : null)">
+    @foreach (var match in Model.Matches)
+    {
+        var homeName = match.HomeTeamName ?? match.HomeSource ?? "neurčeno";
+        var awayName = match.AwayTeamName ?? match.AwaySource ?? "neurčeno";
+        var canEditMatch = Model.CanEdit && match.HomeTeamId is not null && match.AwayTeamId is not null;
+        var canEditHomeTeam = Model.CanEditTeams;
+        var canEditAwayTeam = Model.CanEditTeams;
+        var selectedHomeValue = match.HomeSourceMatchId is not null
+            ? $"match:{match.HomeSourceMatchId}"
+            : match.HomeTeamId is not null ? $"team:{match.HomeTeamId}" : "";
+        var selectedAwayValue = match.AwaySourceMatchId is not null
+            ? $"match:{match.AwaySourceMatchId}"
+            : match.AwayTeamId is not null ? $"team:{match.AwayTeamId}" : "";
+        var otherUsedTeamIds = Model.Matches.Where(x => x.Id != match.Id)
+            .SelectMany(x => new[]
+            {
+                x.HomeSourceMatchId is null ? x.HomeTeamId : null,
+                x.AwaySourceMatchId is null ? x.AwayTeamId : null
+            }).OfType<long>().ToHashSet();
+        var otherUsedSourceMatchIds = Model.Matches.Where(x => x.Id != match.Id)
+            .SelectMany(x => new[] { x.HomeSourceMatchId, x.AwaySourceMatchId })
+            .OfType<long>().ToHashSet();
+        <form id="match-@match.Id" method="post" asp-page-handler="UpdateResult" class="match-row @(canEditHomeTeam || canEditAwayTeam ? "has-editable-teams" : null) @(Model.ValidationMatchId == match.Id ? "is-invalid" : null)" novalidate>
+            <input type="hidden" name="ResultInput.MatchId" value="@match.Id" />
+            <input type="hidden" name="ResultInput.Version" value="@match.Version" />
+
+            <div class="match-identity">
+                @if (Model.ShowMatchName)
+                {
+                    <span class="match-name">@match.Name</span>
+                }
+                <strong class="matchup">
+                    <span class="match-team">
+                        @if (canEditHomeTeam)
+                        {
+                            <label class="visually-hidden" for="match-@match.Id-home-team">První tým zápasu @match.Name</label>
+                            <select id="match-@match.Id-home-team" name="MatchTeamsInput.HomeSelection" form="match-team-form-@match.Id" class="match-team-select" data-auto-match-team-select>
+                                <option value="clear" selected="@(selectedHomeValue == "")">Nevybráno</option>
+                                @if ((Model.TeamOptions?.Count ?? 0) > 0)
+                                {
+                                    <optgroup label="Týmy v etapě">
+                                        @foreach (var team in Model.TeamOptions ?? [])
+                                        {
+                                            var value = $"team:{team.Id}";
+                                            <option value="@value"
+                                                    selected="@(selectedHomeValue == value)"
+                                                    disabled="@(selectedHomeValue != value && otherUsedTeamIds.Contains(team.Id))">
+                                                @team.Name@(selectedHomeValue != value && otherUsedTeamIds.Contains(team.Id) ? " · již nasazen" : null)
+                                            </option>
+                                        }
+                                    </optgroup>
+                                }
+                                @if ((Model.SourceOptions?.Count ?? 0) > 0)
+                                {
+                                    <optgroup label="Postupující z předchozí etapy">
+                                        @foreach (var source in Model.SourceOptions ?? [])
+                                        {
+                                            var value = $"match:{source.MatchId}";
+                                            <option value="@value"
+                                                    selected="@(selectedHomeValue == value)"
+                                                    disabled="@(selectedHomeValue != value && otherUsedSourceMatchIds.Contains(source.MatchId))">
+                                                Vítěz – @source.Name@(selectedHomeValue != value && otherUsedSourceMatchIds.Contains(source.MatchId) ? " · již nasazen" : null)
+                                            </option>
+                                        }
+                                    </optgroup>
+                                }
+                            </select>
+                        }
+                        else
+                        {
+                            <span class="match-team-name">@homeName</span>
+                        }
+                        @if (match.HomeTeamName is not null && match.HomeAdvancementSource is not null)
+                        {
+                            <small class="advancement-source">postupuje z: @match.HomeAdvancementSource</small>
+                        }
+                    </span>
+                    <b>–</b>
+                    <span class="match-team">
+                        @if (canEditAwayTeam)
+                        {
+                            <label class="visually-hidden" for="match-@match.Id-away-team">Druhý tým zápasu @match.Name</label>
+                            <select id="match-@match.Id-away-team" name="MatchTeamsInput.AwaySelection" form="match-team-form-@match.Id" class="match-team-select" data-auto-match-team-select>
+                                <option value="clear" selected="@(selectedAwayValue == "")">Nevybráno</option>
+                                @if ((Model.TeamOptions?.Count ?? 0) > 0)
+                                {
+                                    <optgroup label="Týmy v etapě">
+                                        @foreach (var team in Model.TeamOptions ?? [])
+                                        {
+                                            var value = $"team:{team.Id}";
+                                            <option value="@value"
+                                                    selected="@(selectedAwayValue == value)"
+                                                    disabled="@(selectedAwayValue != value && otherUsedTeamIds.Contains(team.Id))">
+                                                @team.Name@(selectedAwayValue != value && otherUsedTeamIds.Contains(team.Id) ? " · již nasazen" : null)
+                                            </option>
+                                        }
+                                    </optgroup>
+                                }
+                                @if ((Model.SourceOptions?.Count ?? 0) > 0)
+                                {
+                                    <optgroup label="Postupující z předchozí etapy">
+                                        @foreach (var source in Model.SourceOptions ?? [])
+                                        {
+                                            var value = $"match:{source.MatchId}";
+                                            <option value="@value"
+                                                    selected="@(selectedAwayValue == value)"
+                                                    disabled="@(selectedAwayValue != value && otherUsedSourceMatchIds.Contains(source.MatchId))">
+                                                Vítěz – @source.Name@(selectedAwayValue != value && otherUsedSourceMatchIds.Contains(source.MatchId) ? " · již nasazen" : null)
+                                            </option>
+                                        }
+                                    </optgroup>
+                                }
+                            </select>
+                        }
+                        else
+                        {
+                            <span class="match-team-name">@awayName</span>
+                        }
+                        @if (match.AwayTeamName is not null && match.AwayAdvancementSource is not null)
+                        {
+                            <small class="advancement-source">postupuje z: @match.AwayAdvancementSource</small>
+                        }
+                    </span>
+                </strong>
+                @if (Model.ValidationMatchId == match.Id && !string.IsNullOrWhiteSpace(Model.ValidationMessage))
+                {
+                    <span class="match-row-error">@Model.ValidationMessage</span>
+                }
+            </div>
+
+            <div class="score-editor" aria-label="Hlavní skóre">
+                <input name="ResultInput.HomeScore"
+                       id="match-@match.Id-home-score"
+                       value="@match.HomeScore"
+                       type="number"
+                       min="0"
+                       max="@(Model.UsesSetScores ? Model.SetsToWin : null)"
+                       inputmode="numeric"
+                       aria-label="Skóre @homeName"
+                       disabled="@(!canEditMatch)" />
+                <span>:</span>
+                <input name="ResultInput.AwayScore"
+                       id="match-@match.Id-away-score"
+                       value="@match.AwayScore"
+                       type="number"
+                       min="0"
+                       max="@(Model.UsesSetScores ? Model.SetsToWin : null)"
+                       inputmode="numeric"
+                       aria-label="Skóre @awayName"
+                       disabled="@(!canEditMatch)" />
+                @if (canEditMatch)
+                {
+                    <button id="match-@match.Id-save-result" class="button button-small score-save-button" type="submit">Uložit</button>
+                }
+            </div>
+
+            @if (Model.UsesSetScores)
+            {
+                <div class="subscore-control">
+                    @if (match.SetScores.Count > 0)
+                    {
+                        <span class="subscore-summary">
+                            @string.Join(" · ", match.SetScores.Select(x => $"{x.HomeScore}:{x.AwayScore}"))
+                        </span>
+                    }
+                    @if (canEditMatch)
+                    {
+                        <button id="match-@match.Id-open-sets"
+                                class="button button-ghost button-small"
+                                type="button"
+                                data-open-set-modal="set-score-modal-@match.Id">
+                            @(match.SetScores.Count == 0 ? "Přidat sety" : "Upravit sety")
+                        </button>
+                    }
+                </div>
+            }
+
+            <span class="round-label">@match.RoundLabel</span>
+        </form>
+        @if (canEditHomeTeam || canEditAwayTeam)
+        {
+            <form id="match-team-form-@match.Id" method="post" asp-page-handler="UpdateKnockoutMatchTeams">
+                <input type="hidden" name="MatchTeamsInput.MatchId" value="@match.Id" />
+                <input type="hidden" name="focusControlId" value="" data-match-team-focus-id />
+                @if (!canEditHomeTeam)
+                {
+                    <input type="hidden" name="MatchTeamsInput.HomeTeamId" value="@match.HomeTeamId" />
+                    <input type="hidden" name="MatchTeamsInput.HomeSelection" value="@selectedHomeValue" />
+                }
+                @if (!canEditAwayTeam)
+                {
+                    <input type="hidden" name="MatchTeamsInput.AwayTeamId" value="@match.AwayTeamId" />
+                    <input type="hidden" name="MatchTeamsInput.AwaySelection" value="@selectedAwayValue" />
+                }
+            </form>
+        }
+    }
+</div>
+
+@if (Model.UsesSetScores && Model.CanEdit)
+{
+    @foreach (var match in Model.Matches.Where(x => x.HomeTeamId is not null && x.AwayTeamId is not null))
+    {
+        var homeName = match.HomeTeamName ?? match.HomeSource ?? "neurčeno";
+        var awayName = match.AwayTeamName ?? match.AwaySource ?? "neurčeno";
+        var homeScore = match.HomeScore;
+        var awayScore = match.AwayScore;
+        var maximumSets = Math.Max(1, Model.SetsToWin.GetValueOrDefault(1) * 2 - 1);
+        <div id="set-score-modal-@match.Id" class="modal-backdrop" role="presentation" hidden>
+            <section class="modal set-score-modal" role="dialog" aria-modal="true" aria-labelledby="set-score-title-@match.Id">
+                <h2 id="set-score-title-@match.Id">Výsledky setů</h2>
+                <p class="set-score-matchup">
+                    <strong>@homeName</strong> – <strong>@awayName</strong>
+                    @if (homeScore is not null && awayScore is not null)
+                    {
+                        <span>@homeScore : @awayScore</span>
+                    }
+                </p>
+                <form id="match-set-form-@match.Id"
+                      method="post"
+                      asp-page-handler="UpdateSetScores"
+                      data-close-modal-after-post="true"
+                      data-postback-focus-id="match-@match.Id-open-sets">
+                    <input type="hidden" name="SetScoresInput.MatchId" value="@match.Id" />
+                    <input type="hidden" name="SetScoresInput.Version" value="@match.Version" />
+                    <div class="set-score-grid">
+                        @for (var index = 0; index < maximumSets; index++)
+                        {
+                            var setNumber = index + 1;
+                            var score = match.SetScores.SingleOrDefault(x => x.SetNumber == setNumber);
+                            <strong>Set @setNumber</strong>
+                            <input type="hidden" name="SetScoresInput.Sets[@index].SetNumber" value="@setNumber" />
+                            <input id="match-@match.Id-set-@setNumber-home" name="SetScoresInput.Sets[@index].HomeScore" value="@score?.HomeScore" type="number" min="0" inputmode="numeric" aria-label="@homeName, set @setNumber" />
+                            <span>:</span>
+                            <input id="match-@match.Id-set-@setNumber-away" name="SetScoresInput.Sets[@index].AwayScore" value="@score?.AwayScore" type="number" min="0" inputmode="numeric" aria-label="@awayName, set @setNumber" />
+                        }
+                    </div>
+                    <div class="modal-actions">
+                        <button id="match-@match.Id-save-sets" class="button" type="submit">Uložit sety</button>
+                        @if (match.SetScores.Count > 0)
+                        {
+                            <button class="button button-danger"
+                                    type="button"
+                                    data-open-modal="delete-set-score-modal-@match.Id">
+                                Smazat
+                            </button>
+                        }
+                        <button class="button button-ghost" type="button" data-close-modal>Zrušit</button>
+                    </div>
+                </form>
+            </section>
+        </div>
+
+        @if (match.SetScores.Count > 0)
+        {
+            <div id="delete-set-score-modal-@match.Id" class="modal-backdrop" role="presentation" hidden>
+                <section class="modal destructive-confirmation-modal" role="dialog" aria-modal="true" aria-labelledby="delete-set-score-title-@match.Id">
+                    <h2 id="delete-set-score-title-@match.Id">Smazat výsledky setů?</h2>
+                    <div class="destructive-warning">
+                        <strong>Tento krok nelze vrátit zpět.</strong>
+                        <p>
+                            Všechny sety zápasu <strong>@homeName – @awayName</strong> budou trvale smazány.
+                            Hlavní skóre zápasu zůstane zachováno.
+                        </p>
+                    </div>
+                    <div class="modal-actions">
+                        <form method="post"
+                              asp-page-handler="DeleteSetScores"
+                              data-close-modal-after-post="true"
+                              data-postback-focus-id="match-@match.Id-open-sets">
+                            <input type="hidden" name="SetScoresInput.MatchId" value="@match.Id" />
+                            <input type="hidden" name="SetScoresInput.Version" value="@match.Version" />
+                            <button class="button button-danger" type="submit">Ano, smazat výsledky setů</button>
+                        </form>
+                        <button class="button button-ghost" type="button" data-close-modal>Zrušit</button>
+                    </div>
+                </section>
+            </div>
+        }
+    }
+}

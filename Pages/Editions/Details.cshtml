@@ -20,24 +20,33 @@
         }
 
         <dl class="details-grid">
-            <div><dt>Město</dt><dd>@Model.Edition.City</dd></div>
+            <div class="details-wide"><dt>Město</dt><dd>@Model.Edition.City</dd></div>
             <div><dt>Začátek</dt><dd>@Model.FormatDate(Model.Edition.StartDate)</dd></div>
             <div><dt>Konec</dt><dd>@Model.FormatDate(Model.Edition.EndDate)</dd></div>
         </dl>
 
-        <div class="form-actions">
-            @if (User.Identity?.IsAuthenticated == true)
-            {
-                <a class="button" asp-page="/Editions/Create">Vytvořit soutěž</a>
-                <a class="button" asp-page="/Editions/Edit" asp-route-id="@Model.Edition.Id">Upravit</a>
-                @if (!Model.Edition.IsActive)
+        <div class="edition-actions">
+            <div class="action-group" aria-label="Tento ročník">
+                <a class="button" asp-page="/Editions/Competitors" asp-route-id="@Model.Edition.Id">Soutěžící</a>
+                <a class="button" asp-page="/Editions/Disciplines" asp-route-id="@Model.Edition.Id">Disciplíny</a>
+                @if (User.Identity?.IsAuthenticated == true)
                 {
-                    <form method="post" asp-page-handler="SetActive">
-                        <button class="button" type="submit">Nastavit jako aktivní</button>
-                    </form>
+                <a class="button" asp-page="/Editions/Edit" asp-route-id="@Model.Edition.Id">Upravit</a>
+                    @if (!Model.Edition.IsActive)
+                    {
+                        <form method="post" asp-page-handler="SetActive">
+                            <button class="button" type="submit">Nastavit jako aktivní</button>
+                        </form>
+                    }
                 }
-            }
-            <a class="button button-ghost" asp-page="/Editions/Index">Všechny soutěže</a>
+            </div>
+            <div class="action-group action-group-navigation" aria-label="Navigace mezi ročníky">
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <a class="button button-ghost" asp-page="/Editions/Create">Nový ročník</a>
+                }
+                <a class="button button-ghost" asp-page="/Editions/Index">Všechny ročníky</a>
+            </div>
         </div>
     </section>
 </main>

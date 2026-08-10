@@ -3,9 +3,9 @@ namespace Competition.Domain;
 public enum PlayingSystemType
 {
     RoundRobin,
+    GroupsThenClassificationMatches,
     Knockout,
     RoundRobinThenKnockout,
-    ClassificationMatches,
     Custom
 }
 
