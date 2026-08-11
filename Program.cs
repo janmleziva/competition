@@ -2,8 +2,8 @@ using Competition.Configuration;
 using Competition.Data;
 using Competition.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.Sqlite;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -17,34 +17,24 @@ builder.Services.Configure<ThemeSettings>(builder.Configuration.GetSection(Theme
 builder.Services.Configure<AnonymousResultEditingSettings>(
     builder.Configuration.GetSection(AnonymousResultEditingSettings.SectionName));
 
-var configuredConnectionString = builder.Configuration.GetConnectionString("CompetitionDb")
-    ?? throw new InvalidOperationException(
-        "Connection string 'CompetitionDb' is missing. Configure it in user secrets or environment variables.");
-
-var databaseSettings = builder.Configuration
-    .GetSection(DatabaseSettings.SectionName)
-    .Get<DatabaseSettings>() ?? new DatabaseSettings();
-
-var connectionStringBuilder = new SqlConnectionStringBuilder(configuredConnectionString)
+var dataDirectory = Path.Combine(builder.Environment.ContentRootPath, "App_Data");
+Directory.CreateDirectory(dataDirectory);
+var databasePath = Path.Combine(dataDirectory, "competition.db");
+var connectionStringBuilder = new SqliteConnectionStringBuilder
 {
-    ConnectTimeout = Math.Clamp(databaseSettings.ConnectTimeoutSeconds, 1, 60)
+    DataSource = databasePath,
+    Mode = SqliteOpenMode.ReadWriteCreate,
+    Cache = SqliteCacheMode.Shared,
+    DefaultTimeout = 10,
+    ForeignKeys = true
 };
 var effectiveConnectionString = connectionStringBuilder.ConnectionString;
 
-// Keep diagnostics aligned with the connection string actually passed to SqlClient.
+// Keep development diagnostics aligned with the connection string passed to SQLite.
 builder.Configuration["ConnectionStrings:CompetitionDb"] = effectiveConnectionString;
 
 builder.Services.AddDbContext<CompetitionDbContext>(options =>
-    options.UseSqlServer(
-        effectiveConnectionString,
-        sqlServerOptions =>
-        {
-            sqlServerOptions.CommandTimeout(Math.Clamp(databaseSettings.CommandTimeoutSeconds, 1, 300));
-            sqlServerOptions.EnableRetryOnFailure(
-                Math.Clamp(databaseSettings.MaxRetryCount, 0, 10),
-                TimeSpan.FromSeconds(Math.Clamp(databaseSettings.MaxRetryDelaySeconds, 1, 60)),
-                errorNumbersToAdd: null);
-        }));
+    options.UseSqlite(effectiveConnectionString));
 
 var adminAccess = builder.Configuration
     .GetSection(AdminAccessSettings.SectionName)
@@ -115,6 +105,14 @@ builder.Services.AddScoped<ICompetitionScoringService, CompetitionScoringService
 var app = builder.Build();
 
 app.Logger.LogInformation("Starting Competition app in {Environment}", app.Environment.EnvironmentName);
+
+using (var scope = app.Services.CreateScope())
+{
+    var database = scope.ServiceProvider.GetRequiredService<CompetitionDbContext>();
+    database.Database.EnsureCreated();
+    // Keep committed data in the main file so FTP backups are self-contained.
+    database.Database.ExecuteSqlRaw("PRAGMA journal_mode=DELETE;");
+}
 
 if (!app.Environment.IsDevelopment())
 {

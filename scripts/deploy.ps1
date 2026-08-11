@@ -5,7 +5,8 @@ param(
     [string]$RemoteDir = "/www",
     [string]$LogDir = (Join-Path $PSScriptRoot "..\deployment\logs"),
     [string]$CredsPath = (Join-Path $PSScriptRoot "..\deployment\ftp-creds.json"),
-    [string]$RollbackCacheDir = (Join-Path $PSScriptRoot "..\deployment\rollback-cache")
+    [string]$RollbackCacheDir = (Join-Path $PSScriptRoot "..\deployment\rollback-cache"),
+    [string]$DatabaseBackupDir = (Join-Path $PSScriptRoot "..\deployment\database-backups")
 )
 
 $ErrorActionPreference = "Stop"
@@ -15,6 +16,8 @@ $script:LogFile = Join-Path $LogDir ("deploy-{0}.log" -f (Get-Date -Format "yyyy
 $script:HadError = $false
 $script:Credential = $null
 $script:RollbackMap = @()
+$script:OfflineMarkerUploaded = $false
+$script:OfflineMarkerUri = $null
 
 function Write-Log {
     param(
@@ -330,7 +333,9 @@ try {
     $resolvedProjectPath = (Resolve-Path $ProjectPath).Path
     $resolvedPublishDir = [System.IO.Path]::GetFullPath($PublishDir)
     $resolvedRollbackCacheDir = [System.IO.Path]::GetFullPath($RollbackCacheDir)
+    $resolvedDatabaseBackupDir = [System.IO.Path]::GetFullPath($DatabaseBackupDir)
     $null = New-Item -ItemType Directory -Force -Path $resolvedRollbackCacheDir
+    $null = New-Item -ItemType Directory -Force -Path $resolvedDatabaseBackupDir
 
     Write-Log "Publishing project: $resolvedProjectPath"
     Publish-App -ResolvedProjectPath $resolvedProjectPath -OutputPath $resolvedPublishDir
@@ -342,9 +347,24 @@ try {
     Write-Log "Ensuring remote folder: $remoteBaseUri"
     Ensure-RemoteDirectory -RemoteUri $remoteBaseUri -Credential $script:Credential -KnownDirectories $ensuredRemoteDirectories
 
-    $files = Get-ChildItem -Path $resolvedPublishDir -File -Recurse | Where-Object {
-        $_.Name -ne 'appsettings.Development.json' -and $_.Name -ne 'ftp-creds.json'
-    }
+    $offlineMarkerPath = Join-Path $resolvedPublishDir 'app_offline.htm'
+    $script:OfflineMarkerUri = $remoteBaseUri + 'app_offline.htm'
+    [System.IO.File]::WriteAllText(
+        $offlineMarkerPath,
+        '<!doctype html><title>Deployment in progress</title><p>The application will be back shortly.</p>'
+    )
+    Write-Log "Taking the application offline for a consistent database backup and file deployment."
+    Upload-File -LocalPath $offlineMarkerPath -RemoteUri $script:OfflineMarkerUri -Credential $script:Credential
+    $script:OfflineMarkerUploaded = $true
+    Start-Sleep -Seconds 2
+
+    $files = @(Get-ChildItem -Path $resolvedPublishDir -File -Recurse | Where-Object {
+        $_.Name -ne 'appsettings.Development.json' -and
+        $_.Name -ne 'ftp-creds.json' -and
+        $_.Name -ne 'app_offline.htm'
+    } | Sort-Object `
+        @{ Expression = { if ($_.FullName.EndsWith('App_Data\competition.db', [StringComparison]::OrdinalIgnoreCase)) { 0 } else { 1 } } }, `
+        FullName)
     Write-Log ("Uploading {0} file(s)." -f $files.Count)
     foreach ($file in $files) {
         $relativePath = $file.FullName.Substring($resolvedPublishDir.Length).TrimStart('\')
@@ -359,6 +379,34 @@ try {
                 Write-Log "Ensuring remote folder: $remoteDirectoryUri"
                 Ensure-RemoteDirectory -RemoteUri $remoteDirectoryUri -Credential $script:Credential -KnownDirectories $ensuredRemoteDirectories
             }
+        }
+
+        $normalizedRelativePath = $relativePath -replace '\\', '/'
+        if ($normalizedRelativePath -ieq 'App_Data/competition.db') {
+            $databaseBackupPath = Join-Path $resolvedDatabaseBackupDir (
+                "competition-{0}.db" -f (Get-Date -Format "yyyyMMdd-HHmmss")
+            )
+
+            try {
+                Download-RemoteFile `
+                    -RemoteUri $remoteFileUri `
+                    -LocalPath $databaseBackupPath `
+                    -Credential $script:Credential
+                Write-Log "Preserving the existing production database; local seed was not uploaded." -Level SUCCESS
+            }
+            catch {
+                $ftpResponse = Get-FtpErrorResponse -Exception $_.Exception
+                if ($null -ne $ftpResponse -and
+                    $ftpResponse.StatusCode -eq [System.Net.FtpStatusCode]::ActionNotTakenFileUnavailable) {
+                    Write-Log "No production database exists; uploading the converted local database as the initial seed." -Level WARN
+                    Upload-File -LocalPath $file.FullName -RemoteUri $remoteFileUri -Credential $script:Credential
+                }
+                else {
+                    throw
+                }
+            }
+
+            continue
         }
 
         try {
@@ -380,6 +428,9 @@ try {
         Upload-File -LocalPath $file.FullName -RemoteUri $remoteFileUri -Credential $script:Credential
     }
 
+    Delete-RemoteFile -RemoteUri $script:OfflineMarkerUri -Credential $script:Credential
+    $script:OfflineMarkerUploaded = $false
+
     Write-Banner "DEPLOYMENT SUCCESS"
     Write-Log ("Deployment complete. Log saved to {0}" -f $script:LogFile) -Level SUCCESS
 }
@@ -390,6 +441,11 @@ catch {
     if ($script:RollbackMap.Count -gt 0 -and $null -ne $script:Credential) {
         Write-Log "Restoring backups from local cache..." -Level WARN
         Restore-RollbackCache -Credential $script:Credential
+    }
+    if ($script:OfflineMarkerUploaded -and $null -ne $script:Credential) {
+        Write-Log "Bringing the application back online after deployment failure." -Level WARN
+        Delete-RemoteFile -RemoteUri $script:OfflineMarkerUri -Credential $script:Credential
+        $script:OfflineMarkerUploaded = $false
     }
     Write-Log ("See log file: {0}" -f $script:LogFile) -Level ERROR
     throw
