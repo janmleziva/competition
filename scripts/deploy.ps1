@@ -2,7 +2,7 @@ param(
     [string]$ProjectPath = (Join-Path $PSScriptRoot "..\Competition.csproj"),
     [string]$PublishDir = (Join-Path $PSScriptRoot "..\artifacts\publish"),
     [string]$FtpHost = "d113wh.forpsi.com",
-    [string]$RemoteDir = "/www",
+    [string]$RemoteDir = "/subdoms/pohoda-cup",
     [string]$LogDir = (Join-Path $PSScriptRoot "..\deployment\logs"),
     [string]$CredsPath = (Join-Path $PSScriptRoot "..\deployment\ftp-creds.json"),
     [string]$RollbackCacheDir = (Join-Path $PSScriptRoot "..\deployment\rollback-cache"),

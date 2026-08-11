@@ -66,7 +66,7 @@ Required local file:
 Defaults used by the script:
 
 - `FTP_HOST = d113wh.forpsi.com`
-- `REMOTE_DIR = /www`
+- `REMOTE_DIR = /subdoms/pohoda-cup`
 
 ### Run it
 
@@ -107,7 +107,7 @@ You can also override the defaults if needed:
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy.ps1 `
   -FtpHost "d113wh.forpsi.com" `
-  -RemoteDir "/www"
+  -RemoteDir "/subdoms/pohoda-cup"
 ```
 
 Each deployment writes a timestamped log file to `deployment/logs/`. The folder is intentionally ignored by Git so local run logs stay on your machine.
