@@ -263,7 +263,7 @@ h1 { font-size: clamp(1.9rem, 4.5vw, 3.2rem); }
 .fixture-row .fixture-order { display: grid; place-items: center; width: 30px; height: 30px; color: #fff; background: var(--accent); border-radius: 999px; font-weight: 750; }
 .fixture-row b { color: var(--text); padding: 0 5px; }
 .match-list { overflow: hidden; background: #fff; border: 1px solid #dbe3ef; border-radius: calc(var(--radius) * 0.55); }
-.match-row { display: grid; grid-template-columns: minmax(240px, 1fr) 210px 318px 72px; align-items: center; gap: 16px; min-height: 68px; padding: 12px 14px; }
+.match-row { display: grid; grid-template-columns: minmax(320px, 1fr) 210px 238px 72px; align-items: center; gap: 16px; min-height: 68px; padding: 12px 14px; }
 .match-row.is-invalid { background: #fef2f2; }
 .match-row + .match-row { border-top: 1px solid #dbe3ef; }
 .match-list > .match-row { border-top: 1px solid #dbe3ef; }
@@ -285,7 +285,7 @@ h1 { font-size: clamp(1.9rem, 4.5vw, 3.2rem); }
 .score-editor input:disabled { color: var(--muted); background: #f1f5f9; }
 .score-save-button { margin: 0 0 0 4px; }
 .match-row-error { display: block; max-width: 36rem; margin-top: 6px; color: #b91c1c; font-size: .78rem; font-weight: 650; line-height: 1.25; }
-.subscore-control { display: grid; grid-template-columns: 200px 110px; align-items: center; gap: 8px; }
+.subscore-control { display: grid; grid-template-columns: minmax(120px, 1fr) auto; align-items: center; gap: 8px; }
 .subscore-control .button { grid-column: 2; justify-self: end; margin: 0; white-space: nowrap; }
 .subscore-summary { grid-column: 1; overflow: hidden; color: var(--muted); font-size: 0.82rem; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
 .round-label { color: var(--muted); font-size: 0.82rem; text-align: right; white-space: nowrap; }
@@ -468,9 +468,14 @@ h1 { font-size: clamp(1.9rem, 4.5vw, 3.2rem); }
 .point-system-summary-actions { flex: 0 0 auto; }
 .point-system-edit-panel { margin-top: 18px; padding-top: 18px; border-top: 1px solid #dbe3ef; }
 .point-system-edit-panel h3 { margin: 0 0 18px; font-size: 1.05rem; }
-.overall-standings-table th, .overall-standings-table td { min-width: 130px; vertical-align: top; }
-.overall-standings-table th:nth-child(2) { min-width: 190px; }
+.overall-standings-table { width: min-content; }
+.overall-standings-table th, .overall-standings-table td { min-width: 96px; padding: 8px 9px; vertical-align: top; }
+.overall-standings-table .overall-standing-column { width: 1%; min-width: 40px; padding-right: 6px; padding-left: 6px; }
+.overall-standings-table th.overall-name-column { width: 1%; min-width: 0; }
+.overall-standings-table .overall-total-column { width: 1%; min-width: 76px; }
+.overall-standings-table .overall-discipline-column { width: 110px; min-width: 110px; max-width: 110px; white-space: normal; }
 .overall-standings-table small, .standing-pending { display: block; margin-top: 4px; color: var(--muted); font-size: .72rem; font-weight: 500; }
+.overall-standings-table .standing-team { width: 92px; margin-top: 2px; line-height: 1.2; overflow-wrap: anywhere; }
 .standing-empty { color: var(--muted); text-align: center; }
 
 @media (max-width: 700px) {

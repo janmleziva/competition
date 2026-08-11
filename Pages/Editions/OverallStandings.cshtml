@@ -23,11 +23,12 @@
             <table class="standings-table overall-standings-table">
                 <thead>
                     <tr>
-                        <th scope="col">#</th>
-                        <th scope="col">Soutěžící</th>
+                        <th scope="col" class="overall-standing-column">#</th>
+                        <th scope="col" class="overall-name-column">Soutěžící</th>
+                        <th scope="col" class="overall-total-column">Celkem</th>
                         @foreach (var discipline in Model.Standing.Disciplines)
                         {
-                            <th scope="col">
+                            <th scope="col" class="overall-discipline-column">
                                 @discipline.Name
                                 @if (!discipline.IsClosed)
                                 {
@@ -35,30 +36,30 @@
                                 }
                             </th>
                         }
-                        <th scope="col">Celkem</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var row in Model.Standing.Rows)
                     {
                         <tr>
-                            <td class="standing-position">@row.Place.</td>
-                            <th scope="row">@row.FirstName @row.LastName</th>
+                            <td class="standing-position overall-standing-column">@row.Place.</td>
+                            <th scope="row" class="overall-name-column">@row.FirstName @row.LastName</th>
+                            <td class="standing-points overall-total-column"><strong>@row.TotalPoints b.</strong></td>
                             @foreach (var discipline in Model.Standing.Disciplines)
                             {
                                 if (row.Disciplines.TryGetValue(discipline.Id, out var cell))
                                 {
-                                    <td>
+                                    <td class="overall-discipline-column">
                                         <strong>@cell.Points b.</strong>
-                                        <small>@cell.Rank. místo · @cell.TeamName</small>
+                                        <small>@cell.Rank. místo</small>
+                                        <small class="standing-team">@cell.TeamName</small>
                                     </td>
                                 }
                                 else
                                 {
-                                    <td class="standing-empty">—</td>
+                                    <td class="standing-empty overall-discipline-column">—</td>
                                 }
                             }
-                            <td class="standing-points"><strong>@row.TotalPoints b.</strong></td>
                         </tr>
                     }
                 </tbody>
