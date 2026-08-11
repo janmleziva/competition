@@ -154,3 +154,19 @@ Run the automated checks with:
 ```powershell
 dotnet test Competition.sln -c Release
 ```
+
+## Group standings
+
+Public group and round-robin pages show a live standings table for every configured group,
+including assigned teams that have not played yet. The table is recalculated from completed
+matches on every request, so result edits are visible immediately without a cache or stored
+aggregate values.
+
+Teams are ordered by table points; points, score difference, and applicable subscore difference
+in a head-to-head mini-table among teams tied on total points; overall score difference;
+applicable overall subscore difference; score ratio; competition seed; and finally team ID.
+The phase's configured win/draw/loss values are used (2/1/0 by default).
+
+When completed stages determine final placements, the page also exposes a progressive
+`Konečné umístění` view. Knockout teams eliminated in the same stage are ordered by total score
+difference, applicable subscore difference, score ratio, applicable subscore ratio, and seed.

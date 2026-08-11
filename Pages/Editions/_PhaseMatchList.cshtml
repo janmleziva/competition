@@ -79,6 +79,10 @@
                         {
                             <span class="match-team-name">@homeName</span>
                         }
+                        @if (match.HomeTeamName is not null && match.HomeSource is not null && match.HomeAdvancementSource is null)
+                        {
+                            <small class="matchup-source">@match.HomeSource</small>
+                        }
                         @if (match.HomeTeamName is not null && match.HomeAdvancementSource is not null)
                         {
                             <small class="advancement-source">postupuje z: @match.HomeAdvancementSource</small>
@@ -124,6 +128,10 @@
                         else
                         {
                             <span class="match-team-name">@awayName</span>
+                        }
+                        @if (match.AwayTeamName is not null && match.AwaySource is not null && match.AwayAdvancementSource is null)
+                        {
+                            <small class="matchup-source">@match.AwaySource</small>
                         }
                         @if (match.AwayTeamName is not null && match.AwayAdvancementSource is not null)
                         {

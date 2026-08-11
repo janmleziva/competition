@@ -98,11 +98,12 @@ Acceptance: an admin can produce every match slot for a discipline before result
 
 Acceptance: any visitor can edit an allowed match result without signing in, but cannot change its teams, phase, discipline, or other administration data.
 
-### Step 7 - Group standings
+### Step 7 - Group standings (completed)
 
 - Implement a query service over completed group matches.
 - Return played, wins, draws, losses, table points, score for, score against, and score difference for every assigned group team.
-- Define deterministic tie-break order before coding it; recommended default is table points, head-to-head, score difference, score for, then seed.
+- Use this deterministic tie-break order: table points; points, score difference, and (when applicable) subscore difference in a mini-table among every team tied on table points; overall score difference; applicable overall subscore difference; score ratio; competition seed; then team ID as a stable final fallback.
+- Show progressive final standings once completed group or knockout stages determine a team's final placement.
 - Recalculate on every read at this scale; add caching only if measurements justify it.
 - Test empty groups, draws, incomplete matches, tied tables, edits, and the default 2/1/0 calculation.
 

@@ -1,0 +1,46 @@
+@model Competition.Services.FinalStandingTable
+
+<section class="standings-section final-standings-section" aria-labelledby="final-standings-title">
+    <div class="phase-card-heading">
+        <div>
+            <span class="phase-eyebrow">Rozhodnutá pořadí</span>
+            <h2 id="final-standings-title">Konečné umístění</h2>
+        </div>
+    </div>
+    <p class="meta-inline">Zobrazeny jsou pouze pozice, které už odehrané fáze jednoznačně určily.</p>
+    <div class="standings-table-scroll">
+        <table class="standings-table final-standings-table">
+            <thead>
+                <tr>
+                    <th scope="col"><span class="visually-hidden">Pořadí</span>#</th>
+                    <th scope="col">Tým</th>
+                    <th scope="col">Rozhodnuto</th>
+                    <th scope="col">Skóre</th>
+                    <th scope="col" title="Rozdíl skóre">+/-</th>
+                    @if (Model.ShowsSubscore)
+                    {
+                        <th scope="col">Dílčí skóre</th>
+                        <th scope="col" title="Rozdíl dílčího skóre">D +/-</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in Model.Rows)
+                {
+                    <tr>
+                        <td class="standing-position">@row.Position.</td>
+                        <th scope="row">@row.TeamName <span class="standing-seed">(@row.Seed)</span></th>
+                        <td class="standing-decided-by">@row.DecidedBy</td>
+                        <td class="standing-score">@row.ScoreFor:@row.ScoreAgainst</td>
+                        <td>@(row.ScoreDifference > 0 ? $"+{row.ScoreDifference}" : row.ScoreDifference)</td>
+                        @if (Model.ShowsSubscore)
+                        {
+                            <td class="standing-score">@row.SubscoreFor:@row.SubscoreAgainst</td>
+                            <td>@(row.SubscoreDifference > 0 ? $"+{row.SubscoreDifference}" : row.SubscoreDifference)</td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</section>

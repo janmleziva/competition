@@ -34,6 +34,7 @@ public sealed class PhaseSetupService : IPhaseSetupService
             return null;
         }
         await ReconcileKnockoutAdvancementAsync(editionId, competitionDisciplineId, cancellationToken);
+        await ReconcileGroupStandingMatchesAsync(editionId, competitionDisciplineId, cancellationToken);
 
         var discipline = await dbContext.CompetitionDisciplines.AsNoTrackingWithIdentityResolution()
             .AsSplitQuery()
@@ -133,8 +134,12 @@ public sealed class PhaseSetupService : IPhaseSetupService
         var phase = new DisciplinePhase
         {
             CompetitionDisciplineId = competitionDisciplineId,
-            Name = input.Name.Trim(), Type = input.Type, Order = input.Order,
-            PointsForWin = input.PointsForWin, PointsForDraw = input.PointsForDraw, PointsForLoss = input.PointsForLoss
+            Name = input.Name.Trim(),
+            Type = input.Type,
+            Order = input.Order,
+            PointsForWin = input.PointsForWin,
+            PointsForDraw = input.PointsForDraw,
+            PointsForLoss = input.PointsForLoss
         };
         dbContext.DisciplinePhases.Add(phase);
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -208,7 +213,9 @@ public sealed class PhaseSetupService : IPhaseSetupService
 
         var group = new PhaseGroup
         {
-            DisciplinePhaseId = phaseId, Name = input.Name.Trim(), Order = input.Order,
+            DisciplinePhaseId = phaseId,
+            Name = input.Name.Trim(),
+            Order = input.Order,
             Capacity = phase.Type == PhaseType.Knockout ? input.Capacity : null
         };
         dbContext.PhaseGroups.Add(group);
@@ -257,8 +264,10 @@ public sealed class PhaseSetupService : IPhaseSetupService
         {
             dbContext.PhaseGroupTeams.Add(new PhaseGroupTeam
             {
-                DisciplinePhaseId = phaseId, PhaseGroupId = groupId,
-                DisciplineTeamId = distinctIds[index], Seed = index + 1
+                DisciplinePhaseId = phaseId,
+                PhaseGroupId = groupId,
+                DisciplineTeamId = distinctIds[index],
+                Seed = index + 1
             });
         }
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -367,8 +376,10 @@ public sealed class PhaseSetupService : IPhaseSetupService
         {
             dbContext.PhaseGroupTeams.Add(new PhaseGroupTeam
             {
-                DisciplinePhaseId = phaseId, PhaseGroupId = groupId,
-                DisciplineTeamId = selected[index], Seed = currentIds.Count + index + 1
+                DisciplinePhaseId = phaseId,
+                PhaseGroupId = groupId,
+                DisciplineTeamId = selected[index],
+                Seed = currentIds.Count + index + 1
             });
         }
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -468,15 +479,25 @@ public sealed class PhaseSetupService : IPhaseSetupService
             dbContext.Matches.AddRange(
                 new Match
                 {
-                    DisciplinePhaseId = finalPhase.Id, Name = "Finále", Order = 1, Status = MatchStatus.Scheduled,
-                    HomeSourceGroupId = groups[0].Id, HomeSourceRank = 1,
-                    AwaySourceGroupId = groups[1].Id, AwaySourceRank = 1
+                    DisciplinePhaseId = finalPhase.Id,
+                    Name = "Finále",
+                    Order = 1,
+                    Status = MatchStatus.Scheduled,
+                    HomeSourceGroupId = groups[0].Id,
+                    HomeSourceRank = 1,
+                    AwaySourceGroupId = groups[1].Id,
+                    AwaySourceRank = 1
                 },
                 new Match
                 {
-                    DisciplinePhaseId = finalPhase.Id, Name = "O 3. místo", Order = 2, Status = MatchStatus.Scheduled,
-                    HomeSourceGroupId = groups[0].Id, HomeSourceRank = 2,
-                    AwaySourceGroupId = groups[1].Id, AwaySourceRank = 2
+                    DisciplinePhaseId = finalPhase.Id,
+                    Name = "O 3. místo",
+                    Order = 2,
+                    Status = MatchStatus.Scheduled,
+                    HomeSourceGroupId = groups[0].Id,
+                    HomeSourceRank = 2,
+                    AwaySourceGroupId = groups[1].Id,
+                    AwaySourceRank = 2
                 });
             total += 2;
             await dbContext.SaveChangesAsync(cancellationToken);
@@ -524,12 +545,15 @@ public sealed class PhaseSetupService : IPhaseSetupService
                 {
                     stageMatches.Add(new Match
                     {
-                        DisciplinePhaseId = phase.Id, PhaseGroupId = stage.Id,
+                        DisciplinePhaseId = phase.Id,
+                        PhaseGroupId = stage.Id,
                         Name = sources.Count == 2 ? stage.Name : $"{stage.Name} {index / 2 + 1}",
                         Order = total + index / 2 + 1,
                         Status = MatchStatus.Scheduled,
-                        HomeTeamId = sources[index].TeamId, HomeSourceMatchId = sources[index].MatchId,
-                        AwayTeamId = sources[index + 1].TeamId, AwaySourceMatchId = sources[index + 1].MatchId
+                        HomeTeamId = sources[index].TeamId,
+                        HomeSourceMatchId = sources[index].MatchId,
+                        AwayTeamId = sources[index + 1].TeamId,
+                        AwaySourceMatchId = sources[index + 1].MatchId
                     });
                 }
                 dbContext.Matches.AddRange(stageMatches);
@@ -562,8 +586,12 @@ public sealed class PhaseSetupService : IPhaseSetupService
             .Select(x => (int?)x.Order).MaxAsync(cancellationToken) ?? 0) + 1;
         var match = new Match
         {
-            DisciplinePhaseId = phaseId, HomeTeamId = input.HomeTeamId, AwayTeamId = input.AwayTeamId,
-            Name = input.Name.Trim(), Order = order, Status = MatchStatus.Scheduled
+            DisciplinePhaseId = phaseId,
+            HomeTeamId = input.HomeTeamId,
+            AwayTeamId = input.AwayTeamId,
+            Name = input.Name.Trim(),
+            Order = order,
+            Status = MatchStatus.Scheduled
         };
         dbContext.Matches.Add(match);
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -807,11 +835,11 @@ public sealed class PhaseSetupService : IPhaseSetupService
             match.HomeScore = null;
             match.AwayScore = null;
             match.Status = MatchStatus.Scheduled;
-            if (match.HomeSourceMatchId is not null)
+            if (match.HomeSourceMatchId is not null || match.HomeSourceGroupId is not null)
             {
                 match.HomeTeamId = null;
             }
-            if (match.AwaySourceMatchId is not null)
+            if (match.AwaySourceMatchId is not null || match.AwaySourceGroupId is not null)
             {
                 match.AwayTeamId = null;
             }
@@ -857,6 +885,7 @@ public sealed class PhaseSetupService : IPhaseSetupService
         LockScheduleAfterResult(match);
         await UpdateKnockoutAdvancementAsync(match, cancellationToken);
         await SaveMatchEditAsync(cancellationToken);
+        await ReconcileGroupStandingMatchesAsync(editionId, competitionDisciplineId, cancellationToken);
         logger.LogInformation(
             "Match result changed. EditionId={EditionId} DisciplineId={DisciplineId} MatchId={MatchId} Actor={Actor} OldScore={OldHomeScore}:{OldAwayScore} NewScore={NewHomeScore}:{NewAwayScore} OldStatus={OldStatus} NewStatus={NewStatus} SubmittedVersion={SubmittedVersion} SavedVersion={SavedVersion}",
             editionId, competitionDisciplineId, match.Id, isAdmin ? "Admin" : "Anonymous",
@@ -922,8 +951,10 @@ public sealed class PhaseSetupService : IPhaseSetupService
         {
             dbContext.MatchSetScores.Add(new MatchSetScore
             {
-                MatchId = match.Id, SetNumber = set.SetNumber,
-                HomeScore = set.HomeScore!.Value, AwayScore = set.AwayScore!.Value
+                MatchId = match.Id,
+                SetNumber = set.SetNumber,
+                HomeScore = set.HomeScore!.Value,
+                AwayScore = set.AwayScore!.Value
             });
         }
         match.Status = match.HomeScore is not null
@@ -932,6 +963,7 @@ public sealed class PhaseSetupService : IPhaseSetupService
         match.UpdatedAtUtc = DateTime.UtcNow;
         LockScheduleAfterResult(match);
         await SaveMatchEditAsync(cancellationToken);
+        await ReconcileGroupStandingMatchesAsync(editionId, competitionDisciplineId, cancellationToken);
         logger.LogInformation(
             "Match set scores changed. EditionId={EditionId} DisciplineId={DisciplineId} MatchId={MatchId} Actor={Actor} OldSets={OldSets} NewSets={NewSets} SubmittedVersion={SubmittedVersion} SavedVersion={SavedVersion}",
             editionId, competitionDisciplineId, match.Id, isAdmin ? "Admin" : "Anonymous",
@@ -1078,6 +1110,123 @@ public sealed class PhaseSetupService : IPhaseSetupService
         }
     }
 
+    private async Task ReconcileGroupStandingMatchesAsync(long editionId, long competitionDisciplineId, CancellationToken cancellationToken)
+    {
+        var isTwoGroupClassification = await dbContext.CompetitionDisciplines.AsNoTracking().AnyAsync(x =>
+            x.Id == competitionDisciplineId &&
+            x.CompetitionEditionId == editionId &&
+            x.PlayingSystem == PlayingSystemType.GroupsThenClassificationMatches, cancellationToken);
+        if (!isTwoGroupClassification)
+        {
+            return;
+        }
+
+        var homeSourceGroupIds = await dbContext.Matches.AsNoTracking()
+            .Where(x =>
+                x.DisciplinePhase.CompetitionDisciplineId == competitionDisciplineId &&
+                x.HomeSourceGroupId != null)
+            .Select(x => x.HomeSourceGroupId!.Value)
+            .ToListAsync(cancellationToken);
+        var awaySourceGroupIds = await dbContext.Matches.AsNoTracking()
+            .Where(x =>
+                x.DisciplinePhase.CompetitionDisciplineId == competitionDisciplineId &&
+                x.AwaySourceGroupId != null)
+            .Select(x => x.AwaySourceGroupId!.Value)
+            .ToListAsync(cancellationToken);
+        var sourceGroupIds = homeSourceGroupIds
+            .Concat(awaySourceGroupIds)
+            .Distinct()
+            .ToList();
+        if (sourceGroupIds.Count == 0)
+        {
+            return;
+        }
+
+        var completion = await dbContext.PhaseGroups.AsNoTracking()
+            .Where(x => sourceGroupIds.Contains(x.Id))
+            .Select(x => new
+            {
+                x.Id,
+                TeamCount = x.Teams.Count,
+                MatchCount = x.Matches.Count,
+                CompletedMatchCount = x.Matches.Count(match =>
+                    match.Status == MatchStatus.Completed &&
+                    match.HomeTeamId != null &&
+                    match.AwayTeamId != null &&
+                    match.HomeScore != null &&
+                    match.AwayScore != null)
+            })
+            .ToDictionaryAsync(x => x.Id, cancellationToken);
+        var standings = await new GroupStandingsService(dbContext)
+            .GetForDisciplineAsync(editionId, competitionDisciplineId, cancellationToken);
+        var settledSlots = standings
+            .Where(table =>
+                completion.TryGetValue(table.GroupId, out var group) &&
+                group.TeamCount >= 2 &&
+                group.MatchCount == group.TeamCount * (group.TeamCount - 1) / 2 &&
+                group.CompletedMatchCount == group.MatchCount)
+            .SelectMany(table => table.Rows.Select(row => new
+            {
+                table.GroupId,
+                row.Position,
+                row.TeamId
+            }))
+            .ToDictionary(x => (x.GroupId, x.Position), x => x.TeamId);
+
+        var matches = await dbContext.Matches
+            .Include(x => x.SetScores)
+            .Where(x =>
+                x.DisciplinePhase.CompetitionDisciplineId == competitionDisciplineId &&
+                (x.HomeSourceGroupId != null || x.AwaySourceGroupId != null))
+            .ToListAsync(cancellationToken);
+
+        var changed = false;
+        foreach (var match in matches)
+        {
+            changed |= ReconcileGroupStandingSlot(match, settledSlots, home: true);
+            changed |= ReconcileGroupStandingSlot(match, settledSlots, home: false);
+        }
+
+        if (changed)
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    private static bool ReconcileGroupStandingSlot(
+        Match match,
+        IReadOnlyDictionary<(long GroupId, int Position), long> settledSlots,
+        bool home)
+    {
+        var sourceGroupId = home ? match.HomeSourceGroupId : match.AwaySourceGroupId;
+        var sourceRank = home ? match.HomeSourceRank : match.AwaySourceRank;
+        if (sourceGroupId is null || sourceRank is null)
+        {
+            return false;
+        }
+
+        long? desiredTeamId = settledSlots.TryGetValue((sourceGroupId.Value, sourceRank.Value), out var settledTeamId)
+            ? settledTeamId
+            : null;
+        var currentTeamId = home ? match.HomeTeamId : match.AwayTeamId;
+        if (currentTeamId == desiredTeamId || HasResult(match))
+        {
+            return false;
+        }
+
+        if (home)
+        {
+            match.HomeTeamId = desiredTeamId;
+        }
+        else
+        {
+            match.AwayTeamId = desiredTeamId;
+        }
+        match.Version++;
+        match.UpdatedAtUtc = DateTime.UtcNow;
+        return true;
+    }
+
     private async Task ReconcileKnockoutAdvancementAsync(long editionId, long competitionDisciplineId, CancellationToken cancellationToken)
     {
         var isKnockout = await dbContext.CompetitionDisciplines.AnyAsync(x =>
@@ -1188,10 +1337,13 @@ public sealed class PhaseSetupService : IPhaseSetupService
             matchInRound[pairing.Round] = matchInRound.GetValueOrDefault(pairing.Round) + 1;
             dbContext.Matches.Add(new Match
             {
-                DisciplinePhaseId = phaseId, PhaseGroupId = groupId,
-                HomeTeamId = pairing.HomeTeamId, AwayTeamId = pairing.AwayTeamId,
+                DisciplinePhaseId = phaseId,
+                PhaseGroupId = groupId,
+                HomeTeamId = pairing.HomeTeamId,
+                AwayTeamId = pairing.AwayTeamId,
                 Name = $"{groupName} – {pairing.Round}. kolo, zápas {matchInRound[pairing.Round]}",
-                Order = index + 1, Status = MatchStatus.Scheduled
+                Order = index + 1,
+                Status = MatchStatus.Scheduled
             });
         }
         return pairings.Count;
@@ -1234,7 +1386,8 @@ public sealed class PhaseSetupService : IPhaseSetupService
                 {
                     presetGroup.Teams.Add(new PhaseGroupTeam
                     {
-                        DisciplineTeamId = team.Id, Seed = presetGroup.Teams.Count + 1
+                        DisciplineTeamId = team.Id,
+                        Seed = presetGroup.Teams.Count + 1
                     });
                 }
                 dbContext.DisciplinePhases.Add(phase);
@@ -1250,7 +1403,8 @@ public sealed class PhaseSetupService : IPhaseSetupService
                 {
                     group.Teams.Add(new PhaseGroupTeam
                     {
-                        DisciplinePhaseId = group.DisciplinePhaseId, DisciplineTeamId = team.Id,
+                        DisciplinePhaseId = group.DisciplinePhaseId,
+                        DisciplineTeamId = team.Id,
                         Seed = group.Teams.Count + 1
                     });
                 }
@@ -1292,8 +1446,13 @@ public sealed class PhaseSetupService : IPhaseSetupService
 
     private static DisciplinePhase CreatePresetPhase(long disciplineId, string name, PhaseType type, int order) => new()
     {
-        CompetitionDisciplineId = disciplineId, Name = name, Type = type, Order = order,
-        PointsForWin = 2, PointsForDraw = 1, PointsForLoss = 0
+        CompetitionDisciplineId = disciplineId,
+        Name = name,
+        Type = type,
+        Order = order,
+        PointsForWin = 2,
+        PointsForDraw = 1,
+        PointsForLoss = 0
     };
 
     private static bool HasRoundRobinPreset(CompetitionDiscipline discipline) =>

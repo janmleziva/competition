@@ -1,0 +1,48 @@
+@model Competition.Services.GroupStandingTable
+
+<section class="standings-section" aria-labelledby="standings-title-@Model.GroupId">
+    <h3 id="standings-title-@Model.GroupId">Tabulka</h3>
+    <div class="standings-table-scroll">
+        <table class="standings-table">
+            <thead>
+                <tr>
+                    <th scope="col"><span class="visually-hidden">Pořadí</span>#</th>
+                    <th scope="col">Tým</th>
+                    <th scope="col" title="Odehrané zápasy">Z</th>
+                    <th scope="col" title="Výhry">V</th>
+                    <th scope="col" title="Remízy">R</th>
+                    <th scope="col" title="Prohry">P</th>
+                    <th scope="col">Skóre</th>
+                    <th scope="col" title="Rozdíl skóre">+/-</th>
+                    @if (Model.ShowsSubscore)
+                    {
+                        <th scope="col">Dílčí skóre</th>
+                        <th scope="col" title="Rozdíl dílčího skóre">D +/-</th>
+                    }
+                    <th scope="col" title="Body">B</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in Model.Rows)
+                {
+                    <tr>
+                        <td class="standing-position">@row.Position.</td>
+                        <th scope="row">@row.TeamName <span class="standing-seed">(@row.Seed)</span></th>
+                        <td>@row.Played</td>
+                        <td>@row.Wins</td>
+                        <td>@row.Draws</td>
+                        <td>@row.Losses</td>
+                        <td class="standing-score">@row.ScoreFor:@row.ScoreAgainst</td>
+                        <td>@(row.ScoreDifference > 0 ? $"+{row.ScoreDifference}" : row.ScoreDifference)</td>
+                        @if (Model.ShowsSubscore)
+                        {
+                            <td class="standing-score">@row.SubscoreFor:@row.SubscoreAgainst</td>
+                            <td>@(row.SubscoreDifference > 0 ? $"+{row.SubscoreDifference}" : row.SubscoreDifference)</td>
+                        }
+                        <td class="standing-points">@row.TablePoints</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
