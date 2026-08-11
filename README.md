@@ -97,6 +97,11 @@ automation or when the pause is not wanted. Console output shows when the site g
 comes back online, every file that was uploaded, upload/skip totals, and total deployment time;
 the detailed per-file comparison trace remains in the timestamped log.
 
+Deployments publish a Windows x64 framework-dependent build by default, using the .NET runtime
+installed by FORPSI. This keeps the upload small, excludes native assets for other operating
+systems, and generates FORPSI's documented `dotnet`/DLL launch setup. Pass `-SelfContained` only
+for a host without the required .NET runtime; use `-RuntimeIdentifier` to override `win-x64`.
+
 You can also override the defaults if needed:
 
 ```powershell
@@ -108,15 +113,25 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy.ps1 `
 Each deployment writes a timestamped log file to `deployment/logs/`. The folder is intentionally ignored by Git so local run logs stay on your machine.
 
 The first deployment uploads the converted `App_Data/competition.db` as the production seed.
-Later deployments detect the existing production database, download a timestamped backup into
-`deployment/database-backups/`, and leave the live production database untouched. This allows
-production data to keep evolving independently without being overwritten by a code deployment.
-The deployment briefly takes the application offline so the SQLite backup and application-file
-replacement are consistent, then automatically brings it back online after success or rollback.
-Files whose content already matches production are skipped. Existing third-party DLLs and files
-under `runtimes/` are replaced only when the published file has a strictly newer file version;
-when a reliable version comparison is unavailable, the remote file is preserved and the reason
-is recorded in the deployment log.
+Later deployments leave the live production database untouched, so production data can keep
+evolving independently without being overwritten by a code deployment. Backups are disabled by
+default. Pass `-Backup` to download a timestamped database backup and local copies of files that
+will be replaced; those file copies are used for rollback if deployment fails:
+
+```powershell
+.\deployment\deploy.cmd -Backup
+```
+
+The deployment briefly takes the application offline and automatically brings it back online.
+It stores a small `competition-deploy-manifest.json` on the server, allowing later deployments
+to compare hashes and versions with one manifest download instead of downloading every remote
+file. Existing third-party DLLs and files under `runtimes/` are replaced only when the published
+file has a strictly newer file version. When a reliable version comparison is unavailable, the
+remote file is preserved and the reason is recorded in the deployment log. The first deployment
+after this feature is introduced inventories existing protected dependencies by directory name
+and preserves them without downloading them. Pass `-InspectRemoteDependencies` when a one-time
+full version comparison of those untracked dependencies is required. Files uploaded by the
+script have complete manifest metadata, so subsequent comparisons stay fast.
 
 ## Local run
 
