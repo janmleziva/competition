@@ -42,7 +42,8 @@ public sealed record GroupStandingRow(
 
 public sealed record FinalStandingTable(
     bool ShowsSubscore,
-    IReadOnlyList<FinalStandingRow> Rows);
+    IReadOnlyList<FinalStandingRow> Rows,
+    bool IsFinalized = false);
 
 public sealed record FinalStandingRow(
     int Position,
@@ -53,7 +54,8 @@ public sealed record FinalStandingRow(
     int ScoreFor,
     int ScoreAgainst,
     int SubscoreFor,
-    int SubscoreAgainst)
+    int SubscoreAgainst,
+    int? PointsAwarded = null)
 {
     public int ScoreDifference => ScoreFor - ScoreAgainst;
     public int SubscoreDifference => SubscoreFor - SubscoreAgainst;

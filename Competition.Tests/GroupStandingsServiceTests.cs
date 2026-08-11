@@ -93,6 +93,24 @@ public sealed class GroupStandingsServiceTests
     }
 
     [Fact]
+    public async Task EqualDifferences_UseMoreScoredPointsInsteadOfScoreRatio()
+    {
+        await using var db = CreateDbContext();
+        var setup = await SeedGroupAsync(db, ["Alpha", "Beta", "Gamma"]);
+        await AddMatchAsync(db, setup, 0, 1, MatchStatus.Completed, 0, 0);
+        await AddMatchAsync(db, setup, 0, 2, MatchStatus.Completed, 5, 3);
+        await AddMatchAsync(db, setup, 1, 2, MatchStatus.Completed, 3, 1);
+
+        var rows = Assert.Single(await new GroupStandingsService(db)
+            .GetForDisciplineAsync(setup.EditionId, setup.DisciplineId)).Rows;
+
+        Assert.Equal(["Alpha", "Beta", "Gamma"], rows.Select(row => row.TeamName));
+        Assert.Equal(rows[0].ScoreDifference, rows[1].ScoreDifference);
+        Assert.True(rows[0].ScoreRatio < rows[1].ScoreRatio);
+        Assert.True(rows[0].ScoreFor > rows[1].ScoreFor);
+    }
+
+    [Fact]
     public async Task ReadingAgainImmediatelyReflectsAnEditedResult()
     {
         await using var db = CreateDbContext();
@@ -276,7 +294,7 @@ public sealed class GroupStandingsServiceTests
         var entries = lastNames.Select((lastName, index) => new CompetitionEntry
         {
             CompetitionEdition = edition,
-            Competitor = new Competitor { FirstName = $"Player {index + 1}", LastName = lastName },
+            Competitor = new Competitor { FirstName = string.Empty, LastName = lastName },
             Seed = index + 1
         }).ToList();
         db.AddRange(entries);

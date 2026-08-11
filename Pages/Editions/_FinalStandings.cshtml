@@ -7,7 +7,11 @@
             <h2 id="final-standings-title">Konečné umístění</h2>
         </div>
     </div>
-    <p class="meta-inline">Zobrazeny jsou pouze pozice, které už odehrané fáze jednoznačně určily.</p>
+    <p class="meta-inline">
+        @(Model.IsFinalized
+            ? "Pořadí i přidělené body jsou uzavřené a nelze je dále měnit. Každý člen týmu získal uvedený počet bodů."
+            : "Zobrazeny jsou pouze pozice, které už odehrané fáze jednoznačně určily.")
+    </p>
     <div class="standings-table-scroll">
         <table class="standings-table final-standings-table">
             <thead>
@@ -21,6 +25,10 @@
                     {
                         <th scope="col">Dílčí skóre</th>
                         <th scope="col" title="Rozdíl dílčího skóre">D +/-</th>
+                    }
+                    @if (Model.IsFinalized)
+                    {
+                        <th scope="col" class="standing-awarded-points">Body pro každého člena</th>
                     }
                 </tr>
             </thead>
@@ -37,6 +45,10 @@
                         {
                             <td class="standing-score">@row.SubscoreFor:@row.SubscoreAgainst</td>
                             <td>@(row.SubscoreDifference > 0 ? $"+{row.SubscoreDifference}" : row.SubscoreDifference)</td>
+                        }
+                        @if (Model.IsFinalized)
+                        {
+                            <td class="standing-points standing-awarded-points">@(row.PointsAwarded ?? 0) b.</td>
                         }
                     </tr>
                 }

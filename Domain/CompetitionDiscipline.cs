@@ -17,10 +17,13 @@ public sealed class CompetitionDiscipline
     public bool IsLocked { get; set; }
     public bool IsScheduleLocked { get; set; }
     public bool AreResultsLocked { get; set; }
+    public bool IsClosed { get; set; }
+    public DateTime? ClosedAtUtc { get; set; }
+    public long? AwardPointSystemId { get; set; }
+    public AwardPointSystem? AwardPointSystem { get; set; }
 
     public ICollection<DisciplineParticipantAssignment> ParticipantAssignments { get; } = [];
     public ICollection<DisciplineTeam> Teams { get; } = [];
     public ICollection<DisciplinePhase> Phases { get; } = [];
-    public ICollection<RankingPointRule> RankingPointRules { get; } = [];
     public ICollection<DisciplineStanding> FinalStandings { get; } = [];
 }

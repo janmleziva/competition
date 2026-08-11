@@ -31,17 +31,24 @@ public sealed record ConfiguredDisciplineItem(
     long Id, long DisciplineId, string Name, int Order, PlayingSystemType PlayingSystem,
     int TeamSize, DateTime? ScheduledAt, bool UsesSetScores, int TeamCount, int ParticipantCount,
     string? Description = null, int? SetsToWin = null, bool IsLocked = false, bool HasResults = false,
-    bool IsScheduleLocked = false, bool HasMatches = false, bool HasPhases = false, bool HasPhaseAssignments = false)
+    bool IsScheduleLocked = false, bool HasMatches = false, bool HasPhases = false, bool HasPhaseAssignments = false,
+    bool IsClosed = false, long? AwardPointSystemId = null, string? AwardPointSystemName = null,
+    IReadOnlyList<DisciplineAwardedStanding>? FinalStandings = null, bool AreAllMatchesCompleted = false,
+    IReadOnlyList<AwardPointRuleItem>? AwardPointRules = null)
 {
     public bool IsPhaseSetupAvailable =>
         ParticipantCount > 0 && TeamCount * TeamSize == ParticipantCount;
-    public bool CanRemove => !IsScheduleLocked && !HasResults;
-    public string? RemoveBlockReason => HasResults
+    public bool CanRemove => !IsClosed && !IsScheduleLocked && !HasResults;
+    public string? RemoveBlockReason => IsClosed
+        ? "Uzavřenou disciplínu nelze odebrat."
+        : HasResults
         ? "Disciplínu nelze odebrat, protože obsahuje výsledky."
         : IsScheduleLocked
             ? "Disciplínu nelze odebrat, protože její rozpis je uzamčený."
             : null;
     public bool CanCreateSchedule => IsPhaseSetupAvailable && !HasPhases && !HasMatches;
+    public bool CanFinalize => !IsClosed && FinalStandings is not { Count: > 0 } &&
+        AwardPointSystemId is not null && HasMatches && AreAllMatchesCompleted;
 }
 public sealed record EditionDisciplineSetup(
     long EditionId, string EditionName, IReadOnlyList<DisciplineCatalogItem> AvailableDisciplines,

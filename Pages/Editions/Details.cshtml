@@ -29,6 +29,7 @@
             <div class="action-group" aria-label="Tento ročník">
                 <a class="button" asp-page="/Editions/Competitors" asp-route-id="@Model.Edition.Id">Soutěžící</a>
                 <a class="button" asp-page="/Editions/Disciplines" asp-route-id="@Model.Edition.Id">Disciplíny</a>
+                <a class="button" asp-page="/Editions/OverallStandings" asp-route-id="@Model.Edition.Id">Celkové pořadí</a>
                 @if (User.Identity?.IsAuthenticated == true)
                 {
                 <a class="button" asp-page="/Editions/Edit" asp-route-id="@Model.Edition.Id">Upravit</a>

@@ -19,6 +19,7 @@ public sealed class CompetitionDbContext(DbContextOptions<CompetitionDbContext> 
     public DbSet<PhaseGroupTeam> PhaseGroupTeams => Set<PhaseGroupTeam>();
     public DbSet<Match> Matches => Set<Match>();
     public DbSet<MatchSetScore> MatchSetScores => Set<MatchSetScore>();
+    public DbSet<AwardPointSystem> AwardPointSystems => Set<AwardPointSystem>();
     public DbSet<RankingPointRule> RankingPointRules => Set<RankingPointRule>();
     public DbSet<DisciplineStanding> DisciplineStandings => Set<DisciplineStanding>();
 
@@ -96,6 +97,15 @@ public sealed class CompetitionDbContext(DbContextOptions<CompetitionDbContext> 
             entity.HasOne(x => x.Discipline)
                 .WithMany(x => x.CompetitionDisciplines)
                 .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.AwardPointSystem)
+                .WithMany(x => x.CompetitionDisciplines)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<AwardPointSystem>(entity =>
+        {
+            entity.Property(x => x.Name).HasMaxLength(120);
+            entity.HasIndex(x => x.Name).IsUnique();
         });
 
         modelBuilder.Entity<DisciplineParticipantAssignment>(entity =>
@@ -230,14 +240,14 @@ public sealed class CompetitionDbContext(DbContextOptions<CompetitionDbContext> 
 
         modelBuilder.Entity<RankingPointRule>(entity =>
         {
-            entity.HasIndex(x => new { x.CompetitionDisciplineId, x.Rank }).IsUnique();
+            entity.HasIndex(x => new { x.AwardPointSystemId, x.Rank }).IsUnique();
             entity.ToTable("RankingPointRules", table =>
             {
                 table.HasCheckConstraint("CK_RankingPointRules_Rank", "Rank > 0");
                 table.HasCheckConstraint("CK_RankingPointRules_Points", "Points >= 0");
             });
-            entity.HasOne(x => x.CompetitionDiscipline)
-                .WithMany(x => x.RankingPointRules)
+            entity.HasOne(x => x.AwardPointSystem)
+                .WithMany(x => x.Rules)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

@@ -25,12 +25,14 @@ public sealed record PhaseFilterItem(string Key, string Label);
 
 public sealed class DisciplinePhasesModel(
     IPhaseSetupService phases,
-    IGroupStandingsService groupStandings) : PageModel
+    IGroupStandingsService groupStandings,
+    ICompetitionScoringService? scoring = null) : PageModel
 {
     public DisciplinePhaseSetup Setup { get; private set; } = null!;
     public IReadOnlyDictionary<long, GroupStandingTable> GroupStandings { get; private set; } =
         new Dictionary<long, GroupStandingTable>();
     public FinalStandingTable? FinalStandings { get; private set; }
+    public DisciplineScoringSetup Scoring { get; private set; } = null!;
 
     [BindProperty]
     public PhaseInput NewPhase { get; set; } = new();
@@ -167,6 +169,29 @@ public sealed class DisciplinePhasesModel(
             () => phases.DeleteResultsAsync(id, disciplineId, ct),
             "Všechny výsledky a výsledky setů byly smazány.");
 
+    public async Task<IActionResult> OnPostGenerateRandomResultsAsync(long id, long disciplineId, CancellationToken ct) =>
+        await ExecuteAsync(id, disciplineId, ct,
+            () => phases.GenerateRandomResultsAsync(id, disciplineId, ct),
+            "Všechny výsledky byly náhodně vygenerovány.");
+
+    public async Task<IActionResult> OnPostFinalizeAsync(long id, long disciplineId, CancellationToken ct) =>
+        await ExecuteAsync(id, disciplineId, ct,
+            () => (scoring ?? throw new InvalidOperationException("Služba bodování není dostupná."))
+                .FinalizeDisciplineAsync(id, disciplineId, ct),
+            "Body byly přiděleny a disciplína byla uzavřena.");
+
+    public async Task<IActionResult> OnPostReopenAsync(long id, long disciplineId, CancellationToken ct) =>
+        await ExecuteAsync(id, disciplineId, ct,
+            () => (scoring ?? throw new InvalidOperationException("Služba bodování není dostupná."))
+                .ReopenDisciplineAsync(id, disciplineId, ct),
+            "Disciplína byla znovu otevřena. Přidělené body zatím zůstaly zachovány.");
+
+    public async Task<IActionResult> OnPostRemoveAwardedPointsAsync(long id, long disciplineId, CancellationToken ct) =>
+        await ExecuteAsync(id, disciplineId, ct,
+            () => (scoring ?? throw new InvalidOperationException("Služba bodování není dostupná."))
+                .RemoveAwardedPointsAsync(id, disciplineId, ct),
+            "Přidělené body byly odebrány.");
+
     public async Task<IActionResult> OnPostUpdateResultAsync(long id, long disciplineId, CancellationToken ct) =>
         await ExecuteMatchEditAsync(id, disciplineId, ResultInput.MatchId, ct,
             () => phases.UpdateMatchResultAsync(id, disciplineId, ResultInput, User.Identity?.IsAuthenticated == true, ct),
@@ -299,6 +324,11 @@ public sealed class DisciplinePhasesModel(
         }
 
         Setup = setup;
+        Scoring = scoring is null
+            ? new DisciplineScoringSetup(editionId, disciplineId, setup.IsClosed, false,
+                "Bodování není dostupné.", null, null, [], [])
+            : await scoring.GetDisciplineSetupAsync(editionId, disciplineId, ct)
+                ?? throw new InvalidOperationException("Disciplína neexistuje.");
         GroupStandings = (await groupStandings.GetForDisciplineAsync(
                 editionId, disciplineId, ct))
             .ToDictionary(standing => standing.GroupId);

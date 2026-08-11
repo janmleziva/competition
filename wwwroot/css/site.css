@@ -41,7 +41,7 @@ body {
 .button-header { margin-top: 0; color: #fff; border-color: rgba(255, 255, 255, 0.72); }
 .button-header:hover { background: rgba(255, 255, 255, 0.12); }
 
-.shell { width: min(860px, 100%); margin: auto 0; }
+.shell { width: min(860px, 100%); margin: 0 0 auto; }
 .shell-wide { width: min(1040px, 100%); }
 
 .panel {
@@ -156,6 +156,7 @@ h1 { font-size: clamp(1.9rem, 4.5vw, 3.2rem); }
 
 .modal-backdrop {
     position: fixed;
+    z-index: 1000;
     inset: 0;
     display: grid;
     place-items: center;
@@ -211,6 +212,7 @@ h1 { font-size: clamp(1.9rem, 4.5vw, 3.2rem); }
 .playing-system-value { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
 .schedule-lock-badge { padding: 5px 9px; color: #7f1d1d; background: #fee2e2; border-radius: 999px; font-size: 0.75rem; font-weight: 800; }
 .results-lock-badge { color: #fff; background: #b91c1c; }
+.discipline-closed-badge { color: #14532d; background: #dcfce7; }
 .results-lock-notice { border-color: #fecaca; color: #991b1b; background: #fef2f2; }
 .schedule-lock-notice { padding: 13px 16px; color: #78350f; background: #fffbeb; border: 1px solid #fbbf24; border-radius: 11px; }
 .playing-system-label { font-size: 0.78rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.82; }
@@ -245,6 +247,7 @@ h1 { font-size: clamp(1.9rem, 4.5vw, 3.2rem); }
 .final-standings-card[hidden] { display: none; }
 .final-standings-section { margin-top: 0; }
 .final-standings-table .standing-decided-by { color: var(--muted); font-size: .88rem; text-align: left; }
+.final-standings-table .standing-awarded-points { padding-left: 20px; background: color-mix(in srgb, var(--accent) 7%, #fff); box-shadow: inset 3px 0 0 var(--accent); }
 .random-assignment-form { display: flex; align-items: end; gap: 10px; margin-top: 14px; padding-top: 14px; border-top: 1px solid #e2e8f0; }
 .random-assignment-form label { margin: 0; }
 .random-assignment-form input { width: 92px; padding: 9px 10px; border: 1px solid #cbd5e1; border-radius: 9px; font: inherit; }
@@ -437,6 +440,38 @@ h1 { font-size: clamp(1.9rem, 4.5vw, 3.2rem); }
 .discipline-assignment-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; flex: 0 0 auto; }
 .blocked-action-reason { display: block; margin-top: 6px; color: #991b1b; font-size: .76rem; }
 .discipline-assignment-actions form { display: contents; }
+.discipline-scoring-section { margin-top: 4px; }
+.point-system-inline-editor { margin-top: 14px; padding: 12px 14px; background: #f8fafc; border: 1px solid #dbe3ef; border-radius: 10px; }
+.point-system-inline-editor summary { cursor: pointer; font-weight: 750; }
+.point-system-inline-editor form { display: grid; gap: 12px; margin-top: 14px; }
+.discipline-final-inline { margin: 16px 0 0; padding: 12px 14px; color: #14532d; background: #f0fdf4; border: 1px solid #86efac; border-radius: 10px; line-height: 1.65; }
+.discipline-scoring-inline { margin-top: 16px; }
+.discipline-scoring-inline .point-system-rules-summary { margin-top: 8px; }
+.point-systems-page { display: grid; gap: 20px; }
+.point-system-list { display: grid; gap: 12px; }
+.point-system-create { margin: 0; }
+.point-system-create h2 { margin: 0 0 24px; }
+.point-system-form { display: grid; gap: 14px; }
+.point-system-name-input { width: 100%; padding: 12px 14px; color: var(--text); background: #fff; border: 1px solid #cbd5e1; border-radius: calc(var(--radius) * .5); font: inherit; }
+.point-system-name-input:focus { outline: 3px solid color-mix(in srgb, var(--accent) 22%, transparent); border-color: var(--accent); }
+.point-system-save-button { white-space: nowrap; }
+.point-rule-list { display: grid; gap: 8px; }
+.point-rule-row { display: grid; grid-template-columns: repeat(2, minmax(120px, 220px)); gap: 12px; }
+.point-rule-row label { display: grid; gap: 5px; font-weight: 650; }
+.point-rule-row input { width: 100%; padding: 9px 11px; border: 1px solid #cbd5e1; border-radius: 8px; font: inherit; }
+.point-system-summary-card { padding: 16px 18px; }
+.point-system-summary-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px 24px; }
+.point-system-title-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.point-system-title-row h2 { margin: 0; font-size: 1.08rem; }
+.point-system-rules-summary { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+.point-system-rules-summary span { padding: 5px 9px; color: #334155; background: #f1f5f9; border: 1px solid #dbe3ef; border-radius: 999px; font-size: .8rem; white-space: nowrap; }
+.point-system-summary-actions { flex: 0 0 auto; }
+.point-system-edit-panel { margin-top: 18px; padding-top: 18px; border-top: 1px solid #dbe3ef; }
+.point-system-edit-panel h3 { margin: 0 0 18px; font-size: 1.05rem; }
+.overall-standings-table th, .overall-standings-table td { min-width: 130px; vertical-align: top; }
+.overall-standings-table th:nth-child(2) { min-width: 190px; }
+.overall-standings-table small, .standing-pending { display: block; margin-top: 4px; color: var(--muted); font-size: .72rem; font-weight: 500; }
+.standing-empty { color: var(--muted); text-align: center; }
 
 @media (max-width: 700px) {
     .countdown, .admin-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -468,4 +503,6 @@ h1 { font-size: clamp(1.9rem, 4.5vw, 3.2rem); }
     .discipline-assignment-actions .button { width: 100%; }
     .discipline-detail-form { grid-template-columns: 1fr; }
     .discipline-description-field, .discipline-detail-actions { grid-column: auto; }
+    .point-rule-row { grid-template-columns: 1fr 1fr; }
+    .point-system-summary-heading { align-items: flex-start; flex-direction: column; }
 }
