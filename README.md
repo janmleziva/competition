@@ -4,23 +4,20 @@ Small ASP.NET Core countdown app for the competition landing page.
 
 ## Database
 
-The app uses Entity Framework Core with SQL Server for data access, but the initial schema is
-created from a rerunnable SQL script instead of EF migrations. This matches the Forpsi MSSQL
-hosting limitation where schema changes are applied through the web SQL interface.
+The app uses a SQLite database at `App_Data/competition.db` in both local development and
+production. It does not require a database server or a production connection string. On first
+startup, an empty database is created automatically if the file is missing.
 
-The initial schema script is:
-
-- `scripts/sql/001_initial_schema.sql`
-
-Run that script in the Forpsi MSSQL web interface. It is idempotent, so it can be rerun safely:
-existing tables, constraints, and indexes are skipped.
-
-For local development, keep the real connection string in user secrets instead of git-tracked
-files:
+The existing SQL Server LocalDB data can be converted with the included migration tool:
 
 ```powershell
-dotnet user-secrets set "ConnectionStrings:CompetitionDb" "Server=YOUR_SERVER;Database=Competition;User Id=YOUR_USER;Password=YOUR_PASSWORD;TrustServerCertificate=True;"
+dotnet run --project .\Tools\LocalDbToSqlite\LocalDbToSqlite.csproj -- --overwrite
 ```
+
+By default, the tool reads `(localdb)\MSSQLLocalDB` database `CompetitionDev`, writes
+`App_Data/competition.db`, verifies every table's row count, and creates a timestamped backup
+before replacing an existing SQLite file. Use `--source` or `--destination` to override those
+defaults.
 
 Restore packages with:
 
@@ -45,13 +42,9 @@ Access and appearance are configured in `appsettings.json`:
 - `Competition` contains the countdown title and target date.
 
 Configuration values can also be supplied as environment variables, for example
-`AdminAccess__Password` or `ConnectionStrings__CompetitionDb`, so production credentials do
-not need to be committed. Settings changes do not require recompilation; configuration-file
+`AdminAccess__Password`. Settings changes do not require recompilation; configuration-file
 changes are reloaded while the app is running, except cookie lifetime changes, which apply
 after an app restart.
-
-The application no longer runs `Database.Migrate()` on startup. The SQL schema must already be
-present before the app starts using the database.
 
 ## Azure publish
 
@@ -108,6 +101,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy.ps1 `
 
 Each deployment writes a timestamped log file to `deployment/logs/`. The folder is intentionally ignored by Git so local run logs stay on your machine.
 
+The first deployment uploads the converted `App_Data/competition.db` as the production seed.
+Later deployments detect the existing production database, download a timestamped backup into
+`deployment/database-backups/`, and leave the live production database untouched. This allows
+production data to keep evolving independently without being overwritten by a code deployment.
+The deployment briefly takes the application offline so the SQLite backup and application-file
+replacement are consistent, then automatically brings it back online after success or rollback.
+
 ## Local run
 
 Run the project from Visual Studio or with `dotnet run` from this folder.
@@ -124,10 +124,6 @@ The first edition is made active automatically. Later active-edition changes are
 the database permits at most one active edition. Creation forms use a unique submission token,
 so retrying the same form submission does not create a duplicate row.
 
-After updating an existing database from Step 1, rerun `scripts/sql/001_initial_schema.sql` in
-the Forpsi MSSQL web interface. It adds the Step 2 columns and indexes without recreating or
-deleting existing edition data.
-
 ## Competitors and registration
 
 The reusable competitor catalogue is available at `/Competitors`. Anonymous visitors can
@@ -143,11 +139,6 @@ authentication even when called directly.
 Step 3 uses the existing `Competitors` and `CompetitionEntries` tables, so it does not require
 a new schema migration. The unique database indexes remain the final safeguard for competitor
 and seed uniqueness within an edition.
-
-SQL connection behavior is configured under `Database` in `appsettings.json`. The defaults use
-a 5-second connection timeout, a 10-second command timeout, and one retry with at most a
-1-second delay. These values can be overridden with environment variables such as
-`Database__ConnectTimeoutSeconds`.
 
 Run the automated checks with:
 
