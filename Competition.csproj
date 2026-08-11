@@ -3,6 +3,7 @@
     <AssemblyName>Competition</AssemblyName>
     <RootNamespace>Competition</RootNamespace>
     <TargetFramework>net8.0</TargetFramework>
+    <AspNetCoreHostingModel>outofprocess</AspNetCoreHostingModel>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>Competition-8f1d11c4-3e6c-4c88-8862-f0bf4e8d7d39</UserSecretsId>

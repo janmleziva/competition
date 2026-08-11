@@ -6,7 +6,8 @@ param(
     [string]$LogDir = (Join-Path $PSScriptRoot "..\deployment\logs"),
     [string]$CredsPath = (Join-Path $PSScriptRoot "..\deployment\ftp-creds.json"),
     [string]$RollbackCacheDir = (Join-Path $PSScriptRoot "..\deployment\rollback-cache"),
-    [string]$DatabaseBackupDir = (Join-Path $PSScriptRoot "..\deployment\database-backups")
+    [string]$DatabaseBackupDir = (Join-Path $PSScriptRoot "..\deployment\database-backups"),
+    [switch]$NoPause
 )
 
 $ErrorActionPreference = "Stop"
@@ -18,6 +19,7 @@ $script:Credential = $null
 $script:RollbackMap = @()
 $script:OfflineMarkerUploaded = $false
 $script:OfflineMarkerUri = $null
+$script:DeploymentStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 
 function Write-Log {
     param(
@@ -25,21 +27,37 @@ function Write-Log {
         [string]$Message,
 
         [ValidateSet("INFO", "WARN", "ERROR", "SUCCESS")]
-        [string]$Level = "INFO"
+        [string]$Level = "INFO",
+
+        [switch]$Console
     )
 
     $line = "[{0}] {1}" -f $Level, $Message
-    Write-Host $line
+    if ($Console -or $Level -in @("WARN", "ERROR")) {
+        Write-Host $line
+    }
     Add-Content -Path $script:LogFile -Value $line
 }
 
 function Write-Banner {
     param([Parameter(Mandatory = $true)][string]$Text)
 
-    $separator = ("=" * 72)
-    Write-Log $separator
-    Write-Log $Text
-    Write-Log $separator
+    Write-Log $Text -Console
+}
+
+function Wait-ForExitAcknowledgement {
+    if ($NoPause -or [Console]::IsInputRedirected) {
+        return
+    }
+
+    Write-Host ""
+    Write-Host "Press any key to close this window..."
+    try {
+        $null = [Console]::ReadKey($true)
+    }
+    catch {
+        $null = Read-Host "Press Enter to close this window"
+    }
 }
 
 function Get-FtpCredentials {
@@ -273,12 +291,106 @@ function Upload-File {
         $stream.Dispose()
     }
 
-    $response = $request.GetResponse()
-    try {
-        Write-Host "Uploaded $LocalPath"
-    }
+        $response = $request.GetResponse()
+        try {
+            Write-Log "Uploaded $LocalPath"
+        }
     finally {
         $response.Dispose()
+    }
+}
+
+function Format-ElapsedTime {
+    param([Parameter(Mandatory = $true)][TimeSpan]$Elapsed)
+
+    if ($Elapsed.TotalMinutes -ge 1) {
+        return ("{0}m {1}s" -f [math]::Floor($Elapsed.TotalMinutes), $Elapsed.Seconds)
+    }
+
+    return ("{0:N1}s" -f $Elapsed.TotalSeconds)
+}
+
+function Get-FileSha256 {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash
+}
+
+function Get-ComparableFileVersion {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $versionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($Path)
+    if ([string]::IsNullOrWhiteSpace($versionInfo.FileVersion)) {
+        return $null
+    }
+
+    $match = [regex]::Match($versionInfo.FileVersion, '^\s*(\d+(?:\.\d+){1,3})')
+    if (-not $match.Success) {
+        return $null
+    }
+
+    try {
+        return [version]::Parse($match.Groups[1].Value)
+    }
+    catch {
+        return $null
+    }
+}
+
+function Test-IsThirdPartyOrRuntimeFile {
+    param([Parameter(Mandatory = $true)][string]$RelativePath)
+
+    $normalizedPath = $RelativePath -replace '\\', '/'
+    if ($normalizedPath.StartsWith('runtimes/', [StringComparison]::OrdinalIgnoreCase)) {
+        return $true
+    }
+
+    return [System.IO.Path]::GetExtension($normalizedPath).Equals('.dll', [StringComparison]::OrdinalIgnoreCase) -and
+        -not [System.IO.Path]::GetFileName($normalizedPath).Equals('Competition.dll', [StringComparison]::OrdinalIgnoreCase)
+}
+
+function Get-RemoteReplacementDecision {
+    param(
+        [Parameter(Mandatory = $true)][string]$LocalPath,
+        [Parameter(Mandatory = $true)][string]$RemoteBackupPath,
+        [Parameter(Mandatory = $true)][string]$RelativePath
+    )
+
+    $localHash = Get-FileSha256 -Path $LocalPath
+    $remoteHash = Get-FileSha256 -Path $RemoteBackupPath
+    if ($localHash -eq $remoteHash) {
+        return [pscustomobject]@{
+            ShouldUpload = $false
+            Reason = 'content is unchanged'
+        }
+    }
+
+    if (-not (Test-IsThirdPartyOrRuntimeFile -RelativePath $RelativePath)) {
+        return [pscustomobject]@{
+            ShouldUpload = $true
+            Reason = 'application file content changed'
+        }
+    }
+
+    $localVersion = Get-ComparableFileVersion -Path $LocalPath
+    $remoteVersion = Get-ComparableFileVersion -Path $RemoteBackupPath
+    if ($null -eq $localVersion -or $null -eq $remoteVersion) {
+        return [pscustomobject]@{
+            ShouldUpload = $false
+            Reason = 'third-party/runtime version could not be compared'
+        }
+    }
+
+    if ($localVersion -le $remoteVersion) {
+        return [pscustomobject]@{
+            ShouldUpload = $false
+            Reason = "local version $localVersion is not newer than remote version $remoteVersion"
+        }
+    }
+
+    return [pscustomobject]@{
+        ShouldUpload = $true
+        Reason = "local version $localVersion is newer than remote version $remoteVersion"
     }
 }
 
@@ -290,7 +402,16 @@ function Publish-App {
     }
 
     New-Item -ItemType Directory -Force -Path $OutputPath | Out-Null
-    dotnet publish $ResolvedProjectPath -c Release -o $OutputPath
+    $publishOutput = & dotnet publish $ResolvedProjectPath -c Release -o $OutputPath 2>&1
+    foreach ($outputLine in $publishOutput) {
+        Write-Log "dotnet publish: $outputLine"
+    }
+    if ($LASTEXITCODE -ne 0) {
+        foreach ($outputLine in $publishOutput) {
+            Write-Host $outputLine
+        }
+        throw "dotnet publish failed with exit code $LASTEXITCODE."
+    }
 }
 
 function New-LocalRollbackEntry {
@@ -337,6 +458,7 @@ try {
     $null = New-Item -ItemType Directory -Force -Path $resolvedRollbackCacheDir
     $null = New-Item -ItemType Directory -Force -Path $resolvedDatabaseBackupDir
 
+    Write-Log "Publishing application..." -Console
     Write-Log "Publishing project: $resolvedProjectPath"
     Publish-App -ResolvedProjectPath $resolvedProjectPath -OutputPath $resolvedPublishDir
 
@@ -353,10 +475,11 @@ try {
         $offlineMarkerPath,
         '<!doctype html><title>Deployment in progress</title><p>The application will be back shortly.</p>'
     )
-    Write-Log "Taking the application offline for a consistent database backup and file deployment."
+    Write-Log "Taking the application offline for deployment..." -Console
     Upload-File -LocalPath $offlineMarkerPath -RemoteUri $script:OfflineMarkerUri -Credential $script:Credential
     $script:OfflineMarkerUploaded = $true
     Start-Sleep -Seconds 2
+    Write-Log "Site is offline." -Console
 
     $files = @(Get-ChildItem -Path $resolvedPublishDir -File -Recurse | Where-Object {
         $_.Name -ne 'appsettings.Development.json' -and
@@ -365,7 +488,9 @@ try {
     } | Sort-Object `
         @{ Expression = { if ($_.FullName.EndsWith('App_Data\competition.db', [StringComparison]::OrdinalIgnoreCase)) { 0 } else { 1 } } }, `
         FullName)
-    Write-Log ("Uploading {0} file(s)." -f $files.Count)
+    $uploadedFileCount = 0
+    $skippedFileCount = 0
+    Write-Log ("Evaluating {0} published file(s)." -f $files.Count)
     foreach ($file in $files) {
         $relativePath = $file.FullName.Substring($resolvedPublishDir.Length).TrimStart('\')
         $remoteFileUri = ($remoteBaseUri + ($relativePath -replace '\\', '/'))
@@ -392,7 +517,7 @@ try {
                     -RemoteUri $remoteFileUri `
                     -LocalPath $databaseBackupPath `
                     -Credential $script:Credential
-                Write-Log "Preserving the existing production database; local seed was not uploaded." -Level SUCCESS
+                Write-Log "Preserving the existing production database; local seed was not uploaded." -Console
             }
             catch {
                 $ftpResponse = Get-FtpErrorResponse -Exception $_.Exception
@@ -400,6 +525,8 @@ try {
                     $ftpResponse.StatusCode -eq [System.Net.FtpStatusCode]::ActionNotTakenFileUnavailable) {
                     Write-Log "No production database exists; uploading the converted local database as the initial seed." -Level WARN
                     Upload-File -LocalPath $file.FullName -RemoteUri $remoteFileUri -Credential $script:Credential
+                    $uploadedFileCount++
+                    Write-Log "Uploaded App_Data/competition.db (initial database seed)." -Console
                 }
                 else {
                     throw
@@ -411,6 +538,18 @@ try {
 
         try {
             Download-RemoteFile -RemoteUri $remoteFileUri -LocalPath $localBackupPath -Credential $script:Credential
+            $replacementDecision = Get-RemoteReplacementDecision `
+                -LocalPath $file.FullName `
+                -RemoteBackupPath $localBackupPath `
+                -RelativePath $relativePath
+
+            if (-not $replacementDecision.ShouldUpload) {
+                Write-Log "Skipping ${relativePath}: $($replacementDecision.Reason)."
+                $skippedFileCount++
+                continue
+            }
+
+            Write-Log "Replacing ${relativePath}: $($replacementDecision.Reason)."
             New-LocalRollbackEntry -RemoteUri $remoteFileUri -BackupPath $localBackupPath
             Delete-RemoteFile -RemoteUri $remoteFileUri -Credential $script:Credential
         }
@@ -418,7 +557,7 @@ try {
             $ftpResponse = Get-FtpErrorResponse -Exception $_.Exception
             if ($null -ne $ftpResponse -and
                 $ftpResponse.StatusCode -eq [System.Net.FtpStatusCode]::ActionNotTakenFileUnavailable) {
-                Write-Log "No existing remote file to back up: $remoteFileUri" -Level WARN
+                Write-Log "No existing remote file to back up: $remoteFileUri"
             }
             else {
                 throw
@@ -426,13 +565,20 @@ try {
         }
 
         Upload-File -LocalPath $file.FullName -RemoteUri $remoteFileUri -Credential $script:Credential
+        $uploadedFileCount++
+        Write-Log "Uploaded $normalizedRelativePath" -Console
     }
 
     Delete-RemoteFile -RemoteUri $script:OfflineMarkerUri -Credential $script:Credential
     $script:OfflineMarkerUploaded = $false
+    Write-Log "Site is back online." -Console
+    $script:DeploymentStopwatch.Stop()
+    $elapsedText = Format-ElapsedTime -Elapsed $script:DeploymentStopwatch.Elapsed
 
     Write-Banner "DEPLOYMENT SUCCESS"
-    Write-Log ("Deployment complete. Log saved to {0}" -f $script:LogFile) -Level SUCCESS
+    Write-Log ("Uploaded {0} new or newer file(s); skipped {1} unchanged or non-newer file(s)." -f $uploadedFileCount, $skippedFileCount) -Level SUCCESS -Console
+    Write-Log "Deployment completed in $elapsedText." -Level SUCCESS -Console
+    Write-Log ("Deployment complete. Log saved to {0}" -f $script:LogFile)
 }
 catch {
     $script:HadError = $true
@@ -446,15 +592,14 @@ catch {
         Write-Log "Bringing the application back online after deployment failure." -Level WARN
         Delete-RemoteFile -RemoteUri $script:OfflineMarkerUri -Credential $script:Credential
         $script:OfflineMarkerUploaded = $false
+        Write-Log "Site is back online after rollback." -Console
     }
+    $script:DeploymentStopwatch.Stop()
+    $elapsedText = Format-ElapsedTime -Elapsed $script:DeploymentStopwatch.Elapsed
+    Write-Log "Deployment and rollback ended after $elapsedText." -Level ERROR
     Write-Log ("See log file: {0}" -f $script:LogFile) -Level ERROR
     throw
 }
 finally {
-    if ($script:HadError) {
-        Write-Log "Result: FAILED" -Level ERROR
-    }
-    else {
-        Write-Log "Result: SUCCESS" -Level SUCCESS
-    }
+    Wait-ForExitAcknowledgement
 }

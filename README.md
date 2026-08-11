@@ -91,6 +91,12 @@ If you prefer to call PowerShell directly:
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy.ps1
 ```
 
+Interactive deployments pause for a key press after displaying the final outcome, so a window
+opened through `deploy.cmd` does not close before the result can be read. Pass `-NoPause` for
+automation or when the pause is not wanted. Console output shows when the site goes offline and
+comes back online, every file that was uploaded, upload/skip totals, and total deployment time;
+the detailed per-file comparison trace remains in the timestamped log.
+
 You can also override the defaults if needed:
 
 ```powershell
@@ -107,6 +113,10 @@ Later deployments detect the existing production database, download a timestampe
 production data to keep evolving independently without being overwritten by a code deployment.
 The deployment briefly takes the application offline so the SQLite backup and application-file
 replacement are consistent, then automatically brings it back online after success or rollback.
+Files whose content already matches production are skipped. Existing third-party DLLs and files
+under `runtimes/` are replaced only when the published file has a strictly newer file version;
+when a reliable version comparison is unavailable, the remote file is preserved and the reason
+is recorded in the deployment log.
 
 ## Local run
 
