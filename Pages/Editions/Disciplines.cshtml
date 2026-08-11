@@ -176,7 +176,18 @@
                                         <span class="configuration-lock-badge results-lock-badge">Uzavřeno</span>
                                     }
                                 </div>
-                                <p class="meta-inline">@item.ParticipantCount účastníků · @item.TeamCount týmů</p>
+                                <p class="meta-inline">
+                                    @item.ParticipantCount účastníků ·
+                                    @if (item.TeamSize == 1)
+                                    {
+                                        <text>Individuální</text>
+                                    }
+                                    else
+                                    {
+                                        <text>@item.TeamCount týmů po @item.TeamSize hráčích</text>
+                                    }
+                                    · @Model.GetPlayingSystemLabel(item.PlayingSystem)
+                                </p>
                                 @if (User.Identity?.IsAuthenticated == true && !item.CanRemove)
                                 {
                                     <small class="blocked-action-reason">@item.RemoveBlockReason</small>
@@ -364,7 +375,6 @@
                         {
                             <p class="meta-inline">
                                 @(item.ScheduledAt?.ToString("dd/MM/yyyy HH:mm") ?? "Termín není určen")
-                                · tým po @item.TeamSize
                             </p>
                         }
 
