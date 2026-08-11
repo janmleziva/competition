@@ -63,6 +63,16 @@ BEGIN
     );
 END;
 
+IF OBJECT_ID(N'dbo.AwardPointSystems', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.AwardPointSystems
+    (
+        Id BIGINT IDENTITY(1,1) NOT NULL,
+        Name NVARCHAR(120) NOT NULL,
+        CONSTRAINT PK_AwardPointSystems PRIMARY KEY (Id)
+    );
+END;
+
 IF OBJECT_ID(N'dbo.CompetitionDisciplines', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.CompetitionDisciplines
@@ -80,6 +90,9 @@ BEGIN
         IsLocked BIT NOT NULL CONSTRAINT DF_CompetitionDisciplines_IsLocked DEFAULT (0),
         IsScheduleLocked BIT NOT NULL CONSTRAINT DF_CompetitionDisciplines_IsScheduleLocked DEFAULT (0),
         AreResultsLocked BIT NOT NULL CONSTRAINT DF_CompetitionDisciplines_AreResultsLocked DEFAULT (0),
+        IsClosed BIT NOT NULL CONSTRAINT DF_CompetitionDisciplines_IsClosed DEFAULT (0),
+        ClosedAtUtc DATETIME2 NULL,
+        AwardPointSystemId BIGINT NULL,
         CONSTRAINT PK_CompetitionDisciplines PRIMARY KEY (Id),
         CONSTRAINT CK_CompetitionDisciplines_Order CHECK ([Order] > 0),
         CONSTRAINT CK_CompetitionDisciplines_TeamSize CHECK (TeamSize > 0),
@@ -125,6 +138,22 @@ IF COL_LENGTH(N'dbo.CompetitionDisciplines', N'IsLocked') IS NULL
 BEGIN
     ALTER TABLE dbo.CompetitionDisciplines
         ADD IsLocked BIT NOT NULL CONSTRAINT DF_CompetitionDisciplines_IsLocked DEFAULT (0);
+END;
+
+IF COL_LENGTH(N'dbo.CompetitionDisciplines', N'IsClosed') IS NULL
+BEGIN
+    ALTER TABLE dbo.CompetitionDisciplines
+        ADD IsClosed BIT NOT NULL CONSTRAINT DF_CompetitionDisciplines_IsClosed DEFAULT (0);
+END;
+
+IF COL_LENGTH(N'dbo.CompetitionDisciplines', N'ClosedAtUtc') IS NULL
+BEGIN
+    ALTER TABLE dbo.CompetitionDisciplines ADD ClosedAtUtc DATETIME2 NULL;
+END;
+
+IF COL_LENGTH(N'dbo.CompetitionDisciplines', N'AwardPointSystemId') IS NULL
+BEGIN
+    ALTER TABLE dbo.CompetitionDisciplines ADD AwardPointSystemId BIGINT NULL;
 END;
 
 IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_CompetitionDisciplines_SetsToWin')
@@ -224,10 +253,38 @@ BEGIN
     CREATE TABLE dbo.DisciplineParticipantAssignments
     (
         Id BIGINT IDENTITY(1,1) NOT NULL,
-        CompetitionDisciplineId BIGINT NOT NULL,
+        AwardPointSystemId BIGINT NOT NULL,
         CompetitionEntryId BIGINT NOT NULL,
         CONSTRAINT PK_DisciplineParticipantAssignments PRIMARY KEY (Id)
     );
+END;
+
+IF COL_LENGTH(N'dbo.RankingPointRules', N'AwardPointSystemId') IS NULL
+   AND COL_LENGTH(N'dbo.RankingPointRules', N'CompetitionDisciplineId') IS NOT NULL
+BEGIN
+    IF EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_RankingPointRules_CompetitionDisciplines_CompetitionDisciplineId')
+        ALTER TABLE dbo.RankingPointRules DROP CONSTRAINT FK_RankingPointRules_CompetitionDisciplines_CompetitionDisciplineId;
+    IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_RankingPointRules_CompetitionDisciplineId_Rank' AND object_id = OBJECT_ID(N'dbo.RankingPointRules'))
+        DROP INDEX IX_RankingPointRules_CompetitionDisciplineId_Rank ON dbo.RankingPointRules;
+
+    EXEC sp_rename N'dbo.RankingPointRules.CompetitionDisciplineId', N'AwardPointSystemId', N'COLUMN';
+
+    INSERT INTO dbo.AwardPointSystems (Name)
+    SELECT DISTINCT CONCAT(N'Migrated point system #', AwardPointSystemId)
+    FROM dbo.RankingPointRules;
+
+    UPDATE discipline
+    SET AwardPointSystemId = system.Id
+    FROM dbo.CompetitionDisciplines discipline
+    INNER JOIN dbo.AwardPointSystems system
+        ON system.Name = CONCAT(N'Migrated point system #', discipline.Id)
+    WHERE discipline.AwardPointSystemId IS NULL;
+
+    UPDATE pointRule
+    SET AwardPointSystemId = system.Id
+    FROM dbo.RankingPointRules pointRule
+    INNER JOIN dbo.AwardPointSystems system
+        ON system.Name = CONCAT(N'Migrated point system #', pointRule.AwardPointSystemId);
 END;
 
 IF OBJECT_ID(N'dbo.Matches', N'U') IS NULL
@@ -383,6 +440,13 @@ BEGIN
         FOREIGN KEY (DisciplineId) REFERENCES dbo.Disciplines (Id);
 END;
 
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_CompetitionDisciplines_AwardPointSystems_AwardPointSystemId')
+BEGIN
+    ALTER TABLE dbo.CompetitionDisciplines
+    ADD CONSTRAINT FK_CompetitionDisciplines_AwardPointSystems_AwardPointSystemId
+        FOREIGN KEY (AwardPointSystemId) REFERENCES dbo.AwardPointSystems (Id);
+END;
+
 IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_DisciplinePhases_CompetitionDisciplines_CompetitionDisciplineId')
 BEGIN
     ALTER TABLE dbo.DisciplinePhases
@@ -397,11 +461,11 @@ BEGIN
         FOREIGN KEY (CompetitionDisciplineId) REFERENCES dbo.CompetitionDisciplines (Id);
 END;
 
-IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_RankingPointRules_CompetitionDisciplines_CompetitionDisciplineId')
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_RankingPointRules_AwardPointSystems_AwardPointSystemId')
 BEGIN
     ALTER TABLE dbo.RankingPointRules
-    ADD CONSTRAINT FK_RankingPointRules_CompetitionDisciplines_CompetitionDisciplineId
-        FOREIGN KEY (CompetitionDisciplineId) REFERENCES dbo.CompetitionDisciplines (Id);
+    ADD CONSTRAINT FK_RankingPointRules_AwardPointSystems_AwardPointSystemId
+        FOREIGN KEY (AwardPointSystemId) REFERENCES dbo.AwardPointSystems (Id);
 END;
 
 IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'FK_PhaseGroups_DisciplinePhases_DisciplinePhaseId')
@@ -692,8 +756,18 @@ BEGIN
         ON dbo.PhaseGroupTeams (PhaseGroupId, Seed);
 END;
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_RankingPointRules_CompetitionDisciplineId_Rank' AND object_id = OBJECT_ID(N'dbo.RankingPointRules'))
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_RankingPointRules_AwardPointSystemId_Rank' AND object_id = OBJECT_ID(N'dbo.RankingPointRules'))
 BEGIN
-    CREATE UNIQUE INDEX IX_RankingPointRules_CompetitionDisciplineId_Rank
-        ON dbo.RankingPointRules (CompetitionDisciplineId, [Rank]);
+    CREATE UNIQUE INDEX IX_RankingPointRules_AwardPointSystemId_Rank
+        ON dbo.RankingPointRules (AwardPointSystemId, [Rank]);
+END;
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_AwardPointSystems_Name' AND object_id = OBJECT_ID(N'dbo.AwardPointSystems'))
+BEGIN
+    CREATE UNIQUE INDEX IX_AwardPointSystems_Name ON dbo.AwardPointSystems (Name);
+END;
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_CompetitionDisciplines_AwardPointSystemId' AND object_id = OBJECT_ID(N'dbo.CompetitionDisciplines'))
+BEGIN
+    CREATE INDEX IX_CompetitionDisciplines_AwardPointSystemId ON dbo.CompetitionDisciplines (AwardPointSystemId);
 END;

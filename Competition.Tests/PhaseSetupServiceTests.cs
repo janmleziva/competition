@@ -35,6 +35,33 @@ public sealed class PhaseSetupServiceTests
     }
 
     [Fact]
+    public async Task GenerateRandomResults_CompletesEveryMatchWithConsistentSetScores()
+    {
+        await using var db = CreateDbContext();
+        var (editionId, disciplineId, _) = await SeedDisciplineAsync(db, 4, PlayingSystemType.RoundRobin);
+        var discipline = await db.CompetitionDisciplines.SingleAsync();
+        discipline.UsesSetScores = true;
+        discipline.SetsToWin = 2;
+        await db.SaveChangesAsync();
+        var service = new PhaseSetupService(db);
+        await service.GetSetupAsync(editionId, disciplineId);
+        await service.GeneratePresetMatchesAsync(editionId, disciplineId);
+
+        Assert.Equal(6, await service.GenerateRandomResultsAsync(editionId, disciplineId));
+
+        var matches = await db.Matches.Include(x => x.SetScores).ToListAsync();
+        Assert.All(matches, match =>
+        {
+            Assert.Equal(MatchStatus.Completed, match.Status);
+            Assert.True(match.HomeScore == 2 || match.AwayScore == 2);
+            Assert.NotEqual(match.HomeScore, match.AwayScore);
+            Assert.Equal(match.HomeScore + match.AwayScore, match.SetScores.Count);
+            Assert.Equal(match.HomeScore, match.SetScores.Count(x => x.HomeScore > x.AwayScore));
+            Assert.Equal(match.AwayScore, match.SetScores.Count(x => x.AwayScore > x.HomeScore));
+        });
+    }
+
+    [Fact]
     public async Task TwoGroupPreset_GeneratesBergerFixturesAndClassificationSlots()
     {
         await using var db = CreateDbContext();
@@ -896,6 +923,12 @@ public sealed class PhaseSetupServiceTests
         Assert.Equal(expectedMatches, matches.Count);
         Assert.Equal(expectedMatches, matches.Select(x => new[] { x.HomeTeamId!.Value, x.AwayTeamId!.Value }.Order().ToArray()).Distinct(new PairComparer()).Count());
         Assert.All(teamIds, teamId => Assert.Equal(teamCount - 1, matches.Count(x => x.HomeTeamId == teamId || x.AwayTeamId == teamId)));
+        Assert.All(teamIds, teamId =>
+        {
+            var homeMatches = matches.Count(x => x.HomeTeamId == teamId);
+            var awayMatches = matches.Count(x => x.AwayTeamId == teamId);
+            Assert.InRange(Math.Abs(homeMatches - awayMatches), 0, 1);
+        });
     }
 
     [Fact]

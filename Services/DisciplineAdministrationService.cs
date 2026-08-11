@@ -103,8 +103,55 @@ public sealed class DisciplineAdministrationService(CompetitionDbContext dbConte
                 x.IsScheduleLocked,
                 x.Phases.SelectMany(p => p.Matches).Any(),
                 x.Phases.Any(),
-                x.Phases.SelectMany(p => p.Groups).SelectMany(g => g.Teams).Any()))
+                x.Phases.SelectMany(p => p.Groups).SelectMany(g => g.Teams).Any(),
+                x.IsClosed,
+                x.AwardPointSystemId,
+                x.AwardPointSystem == null ? null : x.AwardPointSystem.Name,
+                x.FinalStandings.OrderBy(s => s.Rank).Select(s => new DisciplineAwardedStanding(
+                    s.Rank,
+                    s.DisciplineTeamId,
+                    string.Join("/", s.DisciplineTeam.Members.OrderBy(m => m.Order)
+                        .Select(m => m.CompetitionEntry.Competitor.LastName)),
+                    s.PointsAwarded)).ToList(),
+                x.Phases.SelectMany(p => p.Matches).Any() &&
+                    !x.Phases.SelectMany(p => p.Matches).Any(m =>
+                        m.Status != MatchStatus.Completed || m.HomeScore == null || m.AwayScore == null),
+                x.AwardPointSystem == null
+                    ? null
+                    : x.AwardPointSystem.Rules.OrderBy(rule => rule.Rank)
+                        .Select(rule => new AwardPointRuleItem(rule.Rank, rule.Points))
+                        .ToList()))
             .ToListAsync(cancellationToken);
+
+        var teams = await dbContext.DisciplineTeams.AsNoTrackingWithIdentityResolution()
+            .Where(team => team.CompetitionDiscipline.CompetitionEditionId == editionId)
+            .Include(team => team.Members).ThenInclude(member => member.CompetitionEntry)
+                .ThenInclude(entry => entry.Competitor)
+            .ToListAsync(cancellationToken);
+        var teamsByDiscipline = teams.GroupBy(team => team.CompetitionDisciplineId)
+            .ToDictionary(group => group.Key, group => group.ToList());
+        var editionEntries = await dbContext.CompetitionEntries.AsNoTracking()
+            .Where(entry => entry.CompetitionEditionId == editionId)
+            .Include(entry => entry.Competitor)
+            .ToListAsync(cancellationToken);
+        var entryLabels = TeamNameFormatter.CreateEntryLabels(editionEntries);
+        configured = configured.Select(item =>
+        {
+            if (item.FinalStandings is not { Count: > 0 } ||
+                !teamsByDiscipline.TryGetValue(item.Id, out var disciplineTeams))
+            {
+                return item;
+            }
+
+            var teamById = disciplineTeams.ToDictionary(team => team.Id);
+            return item with
+            {
+                FinalStandings = item.FinalStandings.Select(standing =>
+                    teamById.TryGetValue(standing.TeamId, out var team)
+                        ? standing with { TeamName = TeamNameFormatter.Format(team, entryLabels) }
+                        : standing).ToList()
+            };
+        }).ToList();
 
         var usedIds = configured.Select(x => x.DisciplineId).ToHashSet();
         var catalog = (await ListCatalogAsync(cancellationToken)).Where(x => !usedIds.Contains(x.Id)).ToList();
@@ -287,6 +334,7 @@ public sealed class DisciplineAdministrationService(CompetitionDbContext dbConte
             return false;
         }
 
+        EnsureOpen(item);
         if (item.IsLocked)
         {
             throw new ValidationException("Nastavení disciplíny je uzamčené. Nejprve disciplínu odemkněte.");
@@ -390,9 +438,6 @@ public sealed class DisciplineAdministrationService(CompetitionDbContext dbConte
         dbContext.DisciplineStandings.RemoveRange(await dbContext.DisciplineStandings
             .Where(x => x.CompetitionDisciplineId == competitionDisciplineId)
             .ToListAsync(cancellationToken));
-        dbContext.RankingPointRules.RemoveRange(await dbContext.RankingPointRules
-            .Where(x => x.CompetitionDisciplineId == competitionDisciplineId)
-            .ToListAsync(cancellationToken));
     }
 
     public async Task<bool> SetLockAsync(long editionId, long competitionDisciplineId, bool isLocked, CancellationToken cancellationToken = default)
@@ -403,6 +448,7 @@ public sealed class DisciplineAdministrationService(CompetitionDbContext dbConte
         {
             return false;
         }
+        EnsureOpen(item);
 
         item.IsLocked = isLocked;
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -420,6 +466,8 @@ public sealed class DisciplineAdministrationService(CompetitionDbContext dbConte
         {
             return false;
         }
+
+        EnsureOpen(item);
 
         var hasResults = await dbContext.Matches.AnyAsync(x =>
             x.DisciplinePhase.CompetitionDisciplineId == item.Id &&
@@ -445,7 +493,6 @@ public sealed class DisciplineAdministrationService(CompetitionDbContext dbConte
         dbContext.PhaseGroups.RemoveRange(phases.SelectMany(x => x.Groups));
         dbContext.DisciplinePhases.RemoveRange(phases);
         dbContext.DisciplineStandings.RemoveRange(await dbContext.DisciplineStandings.Where(x => x.CompetitionDisciplineId == item.Id).ToListAsync(cancellationToken));
-        dbContext.RankingPointRules.RemoveRange(await dbContext.RankingPointRules.Where(x => x.CompetitionDisciplineId == item.Id).ToListAsync(cancellationToken));
         dbContext.DisciplineParticipantAssignments.RemoveRange(item.ParticipantAssignments);
         dbContext.DisciplineTeamMembers.RemoveRange(item.Teams.SelectMany(x => x.Members));
         dbContext.DisciplineTeams.RemoveRange(item.Teams);
@@ -660,6 +707,8 @@ public sealed class DisciplineAdministrationService(CompetitionDbContext dbConte
             return null;
         }
 
+        EnsureOpen(item);
+
         if (item.IsScheduleLocked)
         {
             throw new ValidationException("Účastníky a týmy nelze měnit, dokud je rozpis uzamčený.");
@@ -790,6 +839,14 @@ public sealed class DisciplineAdministrationService(CompetitionDbContext dbConte
         if (!Validator.TryValidateObject(input, new ValidationContext(input), results, true))
         {
             throw new ValidationException(results[0].ErrorMessage);
+        }
+    }
+
+    private static void EnsureOpen(CompetitionDiscipline discipline)
+    {
+        if (discipline.IsClosed)
+        {
+            throw new ValidationException("Uzavřenou disciplínu už nelze měnit.");
         }
     }
 }

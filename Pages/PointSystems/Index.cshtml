@@ -1,0 +1,187 @@
+@page "/PointSystems"
+@model Competition.Pages.PointSystems.IndexModel
+@{
+    ViewData["Title"] = "Bodovací systémy";
+    var isAdmin = User.Identity?.IsAuthenticated == true;
+}
+
+<main class="shell shell-wide">
+    <section class="panel admin point-systems-page">
+        <div class="page-heading">
+            <div>
+                <h1>Bodovací systémy</h1>
+                <p class="lead">Pravidla pro udílení bodů za konečné pořadí v disciplínách</p>
+            </div>
+            @if (isAdmin && Model.Systems.Count > 0 && !Model.ShowCreate)
+            {
+                <a class="button" asp-page="/PointSystems/Index" asp-route-showCreate="true">Vytvořit nový</a>
+            }
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+        {
+            <div class="status-message" role="status">@Model.StatusMessage</div>
+        }
+        <div asp-validation-summary="ModelOnly" class="error validation-panel"></div>
+
+        @if (isAdmin && Model.ShowCreate)
+        {
+            <section class="registration-form point-system-create" aria-labelledby="new-point-system-title">
+                <h2 id="new-point-system-title">Nový systém</h2>
+                <form method="post" asp-page-handler="Create" class="point-system-form" data-point-system-form data-prefix="Input">
+                    <div>
+                        <label asp-for="Input.Name">Název</label>
+                        <input asp-for="Input.Name" class="point-system-name-input" maxlength="120" />
+                    </div>
+                    <div class="point-rule-list" data-rule-list>
+                        @for (var index = 0; index < Model.Input.Rules.Count; index++)
+                        {
+                            <div class="point-rule-row">
+                                <label>Pořadí <input asp-for="Input.Rules[index].Rank" type="number" min="1" readonly /></label>
+                                <label>Body <input asp-for="Input.Rules[index].Points" type="number" min="0" /></label>
+                            </div>
+                        }
+                    </div>
+                    <div class="form-actions">
+                        <button class="button button-ghost button-small" type="button" data-add-rule>Přidat pořadí</button>
+                        <button class="button button-ghost button-small" type="button" data-remove-rule>Odebrat poslední</button>
+                        <button class="button" type="submit">Vytvořit systém</button>
+                        @if (Model.Systems.Count > 0)
+                        {
+                            <a class="button button-ghost" asp-page="/PointSystems/Index">Zrušit</a>
+                        }
+                    </div>
+                </form>
+            </section>
+        }
+
+        @if (Model.Systems.Count > 0)
+        {
+            <section class="point-system-list" aria-labelledby="point-system-list-title">
+                <h2 id="point-system-list-title" class="visually-hidden">Existující bodovací systémy</h2>
+                @foreach (var system in Model.Systems)
+                {
+                    <article class="discipline-card point-system-summary-card">
+                        <div class="point-system-summary-heading">
+                            <div>
+                                <div class="point-system-title-row">
+                                    <h2>@system.Name</h2>
+                                    @if (system.IsInUse)
+                                    {
+                                        <span class="configuration-lock-badge">Používá se</span>
+                                    }
+                                </div>
+                                <div class="point-system-rules-summary" aria-label="Body za pořadí">
+                                    @foreach (var rule in system.Rules)
+                                    {
+                                        <span><strong>@rule.Rank.</strong> místo <strong>@rule.Points b.</strong></span>
+                                    }
+                                </div>
+                            </div>
+                            @if (isAdmin)
+                            {
+                                <div class="action-group point-system-summary-actions">
+                                    @if (!system.IsInUse)
+                                    {
+                                        <a class="button button-ghost button-small"
+                                           asp-page="/PointSystems/Index"
+                                           asp-route-editId="@system.Id">Upravit</a>
+                                        <button class="button button-danger button-small"
+                                                type="button"
+                                                data-open-modal="delete-point-system-modal-@system.Id">Smazat</button>
+                                    }
+                                </div>
+                            }
+                        </div>
+
+                        @if (isAdmin && !system.IsInUse && Model.EditId == system.Id)
+                        {
+                            <section class="point-system-edit-panel" aria-labelledby="edit-point-system-title-@system.Id">
+                                <h3 id="edit-point-system-title-@system.Id">Upravit systém</h3>
+                                <form method="post" asp-page-handler="Update" class="point-system-form" data-point-system-form data-prefix="EditInput">
+                                    <input type="hidden" name="systemId" value="@system.Id" />
+                                    <div>
+                                        <label asp-for="EditInput.Name">Název</label>
+                                        <input asp-for="EditInput.Name" class="point-system-name-input" maxlength="120" />
+                                    </div>
+                                    <div class="point-rule-list" data-rule-list>
+                                        @for (var index = 0; index < Model.EditInput.Rules.Count; index++)
+                                        {
+                                            <div class="point-rule-row">
+                                                <label>Pořadí <input asp-for="EditInput.Rules[index].Rank" type="number" min="1" readonly /></label>
+                                                <label>Body <input asp-for="EditInput.Rules[index].Points" type="number" min="0" /></label>
+                                            </div>
+                                        }
+                                    </div>
+                                    <div class="form-actions">
+                                        <button class="button button-ghost button-small" type="button" data-add-rule>Přidat pořadí</button>
+                                        <button class="button button-ghost button-small" type="button" data-remove-rule>Odebrat poslední</button>
+                                        <button class="button" type="submit">Uložit systém</button>
+                                        <a class="button button-ghost" asp-page="/PointSystems/Index">Zrušit</a>
+                                    </div>
+                                </form>
+                            </section>
+                        }
+
+                        @if (isAdmin && !system.IsInUse)
+                        {
+                            <div id="delete-point-system-modal-@system.Id" class="modal-backdrop" role="presentation" hidden>
+                                <section class="modal destructive-confirmation-modal" role="dialog" aria-modal="true" aria-labelledby="delete-point-system-title-@system.Id">
+                                    <h2 id="delete-point-system-title-@system.Id">Smazat bodovací systém @system.Name?</h2>
+                                    <div class="destructive-warning">
+                                        <strong>Tento krok nelze vrátit zpět.</strong>
+                                        <p>Systém a všechna jeho pravidla bodování budou trvale odstraněny.</p>
+                                    </div>
+                                    <div class="modal-actions">
+                                        <form method="post" asp-page-handler="Delete">
+                                            <input type="hidden" name="systemId" value="@system.Id" />
+                                            <button class="button button-danger" type="submit">Ano, smazat systém</button>
+                                        </form>
+                                        <button class="button button-ghost" type="button" data-close-modal>Zrušit</button>
+                                    </div>
+                                </section>
+                            </div>
+                        }
+                    </article>
+                }
+            </section>
+        }
+    </section>
+</main>
+
+@section Scripts {
+    <script>
+        document.querySelectorAll("[data-point-system-form]").forEach(form => {
+            const list = form.querySelector("[data-rule-list]");
+            const prefix = form.dataset.prefix;
+            form.querySelector("[data-add-rule]")?.addEventListener("click", () => {
+                const index = list.children.length;
+                const row = document.createElement("div");
+                row.className = "point-rule-row";
+                row.innerHTML = `<label>Pořadí <input name="${prefix}.Rules[${index}].Rank" value="${index + 1}" type="number" min="1" readonly></label><label>Body <input name="${prefix}.Rules[${index}].Points" value="0" type="number" min="0"></label>`;
+                list.appendChild(row);
+            });
+            form.querySelector("[data-remove-rule]")?.addEventListener("click", () => {
+                if (list.children.length > 1) list.lastElementChild.remove();
+            });
+        });
+
+        document.querySelectorAll("[data-open-modal]").forEach(button => {
+            button.addEventListener("click", () => {
+                const modal = document.getElementById(button.dataset.openModal);
+                if (modal) {
+                    modal.hidden = false;
+                    modal.querySelector("button")?.focus();
+                }
+            });
+        });
+        document.querySelectorAll("[data-close-modal]").forEach(button => {
+            button.addEventListener("click", () => button.closest(".modal-backdrop").hidden = true);
+        });
+        document.querySelectorAll(".modal-backdrop").forEach(backdrop => {
+            backdrop.addEventListener("click", event => {
+                if (event.target === backdrop) backdrop.hidden = true;
+            });
+        });
+    </script>
+}

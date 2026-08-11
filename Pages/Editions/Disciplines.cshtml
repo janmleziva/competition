@@ -14,7 +14,10 @@
                 <p class="lead">@Model.Setup.EditionName</p>
             </div>
 
-            <a class="button button-ghost" asp-page="/Editions/Details" asp-route-id="@Model.Setup.EditionId">Zpět</a>
+            <div class="action-group">
+                <a class="button" asp-page="/Editions/OverallStandings" asp-route-id="@Model.Setup.EditionId">Celkové pořadí</a>
+                <a class="button button-ghost" asp-page="/Editions/Details" asp-route-id="@Model.Setup.EditionId">Zpět</a>
+            </div>
         </div>
 
         @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
@@ -168,6 +171,10 @@
                                     {
                                         <span class="configuration-lock-badge">Uzamčeno</span>
                                     }
+                                    @if (item.IsClosed)
+                                    {
+                                        <span class="configuration-lock-badge results-lock-badge">Uzavřeno</span>
+                                    }
                                 </div>
                                 <p class="meta-inline">@item.ParticipantCount účastníků · @item.TeamCount týmů</p>
                                 @if (User.Identity?.IsAuthenticated == true && !item.CanRemove)
@@ -219,12 +226,22 @@
                                             title="@item.RemoveBlockReason">
                                         Odebrat
                                     </button>
-                                    <form method="post" asp-page-handler="@(item.IsLocked ? "UnlockDiscipline" : "LockDiscipline")">
-                                        <input type="hidden" name="disciplineId" value="@item.Id" />
-                                        <button class="button button-small" type="submit">
-                                            @(item.IsLocked ? "Odemknout" : "Uzamknout")
+                                    @if (!item.IsClosed)
+                                    {
+                                        <form method="post" asp-page-handler="@(item.IsLocked ? "UnlockDiscipline" : "LockDiscipline")">
+                                            <input type="hidden" name="disciplineId" value="@item.Id" />
+                                            <button class="button button-small" type="submit">
+                                                @(item.IsLocked ? "Odemknout" : "Uzamknout")
+                                            </button>
+                                        </form>
+                                        <button class="button button-small"
+                                                type="button"
+                                                data-open-modal="finalize-discipline-modal-@item.Id"
+                                                disabled="@(!item.CanFinalize)"
+                                                title="@(item.AwardPointSystemId is null ? "Nejprve vyberte bodovací systém na detailu disciplíny." : !item.AreAllMatchesCompleted ? "Nejprve odehrajte všechny zápasy." : null)">
+                                            Přidělit body a uzavřít
                                         </button>
-                                    </form>
+                                    }
                                 </div>
                             }
                             else
@@ -351,6 +368,26 @@
                             </p>
                         }
 
+                        @if (item.IsClosed && item.FinalStandings is { Count: > 0 })
+                        {
+                            <p class="discipline-final-inline">
+                                <strong>Konečné umístění:</strong>
+                                @string.Join(", ", item.FinalStandings.Take(4).Select(row => $"{row.Rank}. {row.TeamName} ({row.Points} b.)"))
+                            </p>
+                        }
+                        else if (!item.IsClosed && item.AwardPointRules is { Count: > 0 })
+                        {
+                            <section class="discipline-scoring-inline" aria-label="Body za pořadí">
+                                <strong>Bodování:</strong>
+                                <div class="point-system-rules-summary">
+                                    @foreach (var rule in item.AwardPointRules)
+                                    {
+                                        <span><strong>@rule.Rank.</strong> místo <strong>@rule.Points b.</strong></span>
+                                    }
+                                </div>
+                            </section>
+                        }
+
                         @if (User.Identity?.IsAuthenticated == true && item.CanRemove)
                         {
                             <div id="remove-discipline-modal-@item.Id" class="modal-backdrop" role="presentation" hidden>
@@ -367,6 +404,25 @@
                                         <form method="post" asp-page-handler="Remove">
                                             <input type="hidden" name="disciplineId" value="@item.Id" />
                                             <button class="button button-danger" type="submit">Ano, odebrat disciplínu</button>
+                                        </form>
+                                        <button class="button button-ghost" type="button" data-close-modal>Zrušit</button>
+                                    </div>
+                                </section>
+                            </div>
+                        }
+                        @if (User.Identity?.IsAuthenticated == true && !item.IsClosed)
+                        {
+                            <div id="finalize-discipline-modal-@item.Id" class="modal-backdrop" role="presentation" hidden>
+                                <section class="modal destructive-confirmation-modal" role="dialog" aria-modal="true" aria-labelledby="finalize-discipline-title-@item.Id">
+                                    <h2 id="finalize-discipline-title-@item.Id">Přidělit body a uzavřít @item.Name?</h2>
+                                    <div class="destructive-warning">
+                                        <strong>Uzavření je trvalé.</strong>
+                                        <p>Body podle systému „@item.AwardPointSystemName“ dostane v plné výši každý člen týmu. Po potvrzení už nepůjde měnit nastavení, účastníky, týmy, rozpis ani výsledky disciplíny.</p>
+                                    </div>
+                                    <div class="modal-actions">
+                                        <form method="post" asp-page-handler="Finalize" data-close-modal-after-post="true">
+                                            <input type="hidden" name="disciplineId" value="@item.Id" />
+                                            <button class="button button-danger" type="submit">Ano, přidělit body a uzavřít</button>
                                         </form>
                                         <button class="button button-ghost" type="button" data-close-modal>Zrušit</button>
                                     </div>

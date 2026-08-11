@@ -1,0 +1,68 @@
+@page "/Editions/{id:long}/Standings"
+@model Competition.Pages.Editions.OverallStandingsModel
+@{
+    ViewData["Title"] = $"Celkové pořadí – {Model.Standing.EditionName}";
+}
+
+<main class="shell shell-wide">
+    <section class="panel admin overall-standings-page">
+        <div class="page-heading">
+            <div>
+                <h1>Celkové pořadí</h1>
+                <p class="lead">@Model.Standing.EditionName</p>
+            </div>
+            <a class="button button-ghost" asp-page="/Editions/Details" asp-route-id="@Model.Standing.EditionId">Zpět</a>
+        </div>
+
+        <p class="meta-inline">
+            Rozhodují celkové body, poté počet nejlepších umístění (nejprve vítězství, potom druhá místa atd.).
+            Body týmové disciplíny získává v plné výši každý člen týmu.
+        </p>
+
+        <div class="standings-table-scroll">
+            <table class="standings-table overall-standings-table">
+                <thead>
+                    <tr>
+                        <th scope="col">#</th>
+                        <th scope="col">Soutěžící</th>
+                        @foreach (var discipline in Model.Standing.Disciplines)
+                        {
+                            <th scope="col">
+                                @discipline.Name
+                                @if (!discipline.IsClosed)
+                                {
+                                    <span class="standing-pending">neuzavřeno</span>
+                                }
+                            </th>
+                        }
+                        <th scope="col">Celkem</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in Model.Standing.Rows)
+                    {
+                        <tr>
+                            <td class="standing-position">@row.Place.</td>
+                            <th scope="row">@row.FirstName @row.LastName</th>
+                            @foreach (var discipline in Model.Standing.Disciplines)
+                            {
+                                if (row.Disciplines.TryGetValue(discipline.Id, out var cell))
+                                {
+                                    <td>
+                                        <strong>@cell.Points b.</strong>
+                                        <small>@cell.Rank. místo · @cell.TeamName</small>
+                                    </td>
+                                }
+                                else
+                                {
+                                    <td class="standing-empty">—</td>
+                                }
+                            }
+                            <td class="standing-points"><strong>@row.TotalPoints b.</strong></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+</main>

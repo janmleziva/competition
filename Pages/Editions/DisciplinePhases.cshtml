@@ -4,7 +4,8 @@
 
 @{
     ViewData["Title"] = $"Fáze a zápasy – {Model.Setup.DisciplineName}";
-    var isAdmin = User.Identity?.IsAuthenticated == true;
+    var isAuthenticated = User.Identity?.IsAuthenticated == true;
+    var isAdmin = isAuthenticated && !Model.Setup.IsClosed;
 }
 
 <main class="shell shell-wide">
@@ -15,6 +16,22 @@
                 <p class="lead">Fáze a zápasy · @Model.Setup.EditionName</p>
             </div>
             <div class="action-group phase-heading-actions">
+                @if (isAuthenticated && Model.Setup.IsClosed)
+                {
+                    <form method="post" asp-page-handler="Reopen">
+                        <button class="button" type="submit">Znovu otevřít disciplínu</button>
+                    </form>
+                }
+                @if (isAuthenticated && !Model.Setup.IsClosed)
+                {
+                    <button class="button"
+                            type="button"
+                            data-open-modal="finalize-discipline-modal"
+                            disabled="@(!Model.Scoring.CanFinalize)"
+                            title="@Model.Scoring.FinalizeBlockReason">
+                        Přidělit body a uzavřít
+                    </button>
+                }
                 @if (isAdmin && Model.HasMatches)
                 {
                     @if (Model.Setup.IsScheduleLocked)
@@ -44,6 +61,21 @@
                 }
                 @if (isAdmin && Model.HasMatches)
                 {
+                    <button class="button button-ghost"
+                            type="button"
+                            data-open-modal="random-results-modal"
+                            disabled="@(Model.Setup.AreResultsLocked || Model.Scoring.FinalStandings.Count > 0 || (Model.Setup.PlayingSystem == PlayingSystemType.Knockout && !Model.Setup.IsScheduleLocked))"
+                            title="@(Model.Scoring.FinalStandings.Count > 0 ? "Nejprve odeberte přidělené body." : Model.Setup.AreResultsLocked ? "Nejprve odemkněte výsledky." : Model.Setup.PlayingSystem == PlayingSystemType.Knockout && !Model.Setup.IsScheduleLocked ? "Nejprve uzamkněte rozpis." : null)">
+                        Náhodně vygenerovat výsledky
+                    </button>
+                    @if (Model.Scoring.FinalStandings.Count > 0)
+                    {
+                        <button class="button button-danger"
+                                type="button"
+                                data-open-modal="remove-awarded-points-modal">
+                            Odebrat přidělené body
+                        </button>
+                    }
                     <button class="button button-danger"
                             type="button"
                             data-open-modal="reset-schedule-modal"
@@ -91,6 +123,10 @@
                 {
                     <span class="schedule-lock-badge results-lock-badge">Výsledky uzamčeny</span>
                 }
+                @if (Model.Setup.IsClosed)
+                {
+                    <span class="schedule-lock-badge discipline-closed-badge">Disciplína uzavřena</span>
+                }
             </div>
         </section>
 
@@ -107,6 +143,14 @@
             <div class="schedule-lock-notice results-lock-notice" role="status">
                 <strong>Výsledky jsou uzamčené.</strong>
                 Hlavní skóre ani výsledky setů nyní nemůže měnit veřejnost ani administrátor.
+            </div>
+        }
+
+        @if (Model.Setup.IsClosed)
+        {
+            <div class="schedule-lock-notice results-lock-notice" role="status">
+                <strong>Disciplína je uzavřená.</strong>
+                Konečné pořadí a body byly přiděleny. Rozpis ani výsledky už nelze měnit.
             </div>
         }
 
@@ -483,6 +527,63 @@
         }
     </section>
 </main>
+
+@if (isAuthenticated && !Model.Setup.IsClosed)
+{
+    <div id="finalize-discipline-modal" class="modal-backdrop" role="presentation" hidden>
+        <section class="modal destructive-confirmation-modal" role="dialog" aria-modal="true" aria-labelledby="finalize-discipline-title">
+            <h2 id="finalize-discipline-title">Přidělit body a uzavřít disciplínu?</h2>
+            <div class="destructive-warning">
+                <strong>Uzavření je trvalé.</strong>
+                <p>Body podle systému „@Model.Scoring.AwardPointSystemName“ dostane v plné výši každý člen týmu. Po potvrzení už nepůjde měnit nastavení, účastníky, týmy, rozpis ani výsledky disciplíny.</p>
+            </div>
+            <div class="modal-actions">
+                <form method="post" asp-page-handler="Finalize" data-close-modal-after-post="true">
+                    <button class="button button-danger" type="submit">Ano, přidělit body a uzavřít</button>
+                </form>
+                <button class="button button-ghost" type="button" data-close-modal>Zrušit</button>
+            </div>
+        </section>
+    </div>
+}
+
+@if (isAdmin && Model.HasMatches)
+{
+    <div id="random-results-modal" class="modal-backdrop" role="presentation" hidden>
+        <section class="modal destructive-confirmation-modal" role="dialog" aria-modal="true" aria-labelledby="random-results-title">
+            <h2 id="random-results-title">Náhodně vygenerovat všechny výsledky?</h2>
+            <div class="destructive-warning">
+                <strong>Současné výsledky budou nahrazeny.</strong>
+                <p>Všechny zápasy disciplíny dostanou náhodné platné výsledky včetně setů. Akce je určena pro testování.</p>
+            </div>
+            <div class="modal-actions">
+                <form method="post" asp-page-handler="GenerateRandomResults" data-close-modal-after-post="true">
+                    <button class="button button-danger" type="submit">Ano, vygenerovat výsledky</button>
+                </form>
+                <button class="button button-ghost" type="button" data-close-modal>Zrušit</button>
+            </div>
+        </section>
+    </div>
+}
+
+@if (isAdmin && Model.Scoring.FinalStandings.Count > 0)
+{
+    <div id="remove-awarded-points-modal" class="modal-backdrop" role="presentation" hidden>
+        <section class="modal destructive-confirmation-modal" role="dialog" aria-modal="true" aria-labelledby="remove-awarded-points-title">
+            <h2 id="remove-awarded-points-title">Odebrat přidělené body?</h2>
+            <div class="destructive-warning">
+                <strong>Celkové pořadí ročníku se přepočítá.</strong>
+                <p>Uložené konečné pořadí a body této disciplíny budou odstraněny. Výsledky zápasů zůstanou zachovány.</p>
+            </div>
+            <div class="modal-actions">
+                <form method="post" asp-page-handler="RemoveAwardedPoints" data-close-modal-after-post="true">
+                    <button class="button button-danger" type="submit">Ano, odebrat body</button>
+                </form>
+                <button class="button button-ghost" type="button" data-close-modal>Zrušit</button>
+            </div>
+        </section>
+    </div>
+}
 
 @if (isAdmin && Model.HasMatches)
 {

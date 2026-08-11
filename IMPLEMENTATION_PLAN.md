@@ -10,7 +10,7 @@
 - Group membership is explicit at team level, so a standings table can show a team before it plays a match.
 - A match stores its primary score. `MatchSetScore` stores optional ordered component scores, such as beach-volleyball set results.
 - Group standings are calculated from completed matches, not persisted. This avoids stale wins, draws, losses, table points, scores for/against, and score difference after anonymous result edits.
-- Final discipline team rankings are persisted in `DisciplineStanding`. `PointsAwarded` is a per-member snapshot of the applicable `RankingPointRule`, preserving historical totals if rules are later edited. Every member receives the full value; points are not divided by team size.
+- Final discipline team rankings are persisted in `DisciplineStanding`. Reusable global `AwardPointSystem` records own the `RankingPointRule` values selected by each edition discipline. `PointsAwarded` is a per-member snapshot, preserving historical totals if a global system is later edited. Every member receives the full value; points are not divided by team size.
 - Overall edition standings are individual. They are calculated by joining each finalized team standing to all team members and summing that team's full `PointsAwarded` value per `CompetitionEntry`.
 - Match `Version` is an optimistic-concurrency token. Result forms must submit it and handle `DbUpdateConcurrencyException`, preventing one anonymous editor from silently overwriting another.
 
@@ -27,8 +27,8 @@
 9. `PhaseGroups` and `PhaseGroupTeams` -> named groups and explicit team assignments.
 10. `Matches` -> phase/group, two nullable teams (to allow an undecided bracket), label, order, state, primary score, and concurrency metadata.
 11. `MatchSetScores` -> ordered subscores belonging to a match.
-12. `RankingPointRules` -> edition-discipline mapping from final team rank to full points awarded to each member.
-13. `DisciplineStandings` -> finalized team rank and per-member awarded-points snapshot.
+12. `AwardPointSystems` and `RankingPointRules` -> reusable global mappings from final team rank to full points awarded to each member.
+13. `DisciplineStandings` -> finalized team rank and per-member awarded-points snapshot; `CompetitionDisciplines.IsClosed` makes the source discipline immutable after finalization.
 
 Database checks cover valid date ranges, positive ordering/seeding/ranks, nonnegative points and scores, paired match scores, completed matches requiring a score, and a team not playing itself. Unique indexes protect registrations, team membership (one team per person per discipline), member order, assignments, ordering, and point-rule positions. Cross-aggregate rules such as “both match teams belong to the match discipline” and “all team members are registered in the discipline's edition” remain service-level validation where enforcing them would require further duplicated parent keys.
 
@@ -102,14 +102,14 @@ Acceptance: any visitor can edit an allowed match result without signing in, but
 
 - Implement a query service over completed group matches.
 - Return played, wins, draws, losses, table points, score for, score against, and score difference for every assigned group team.
-- Use this deterministic tie-break order: table points; points, score difference, and (when applicable) subscore difference in a mini-table among every team tied on table points; overall score difference; applicable overall subscore difference; score ratio; competition seed; then team ID as a stable final fallback.
+- Use this deterministic tie-break order: table points; points, score difference, and (when applicable) subscore difference in a mini-table among every team tied on table points; overall score difference; applicable overall subscore difference; total score (and applicable set score) scored; competition seed; then team ID as a stable final fallback.
 - Show progressive final standings once completed group or knockout stages determine a team's final placement.
 - Recalculate on every read at this scale; add caching only if measurements justify it.
 - Test empty groups, draws, incomplete matches, tied tables, edits, and the default 2/1/0 calculation.
 
 Acceptance: standings immediately reflect every result edit and include teams with zero matches.
 
-### Step 8 - Progression and discipline finalization
+### Step 8 - Progression and discipline finalization (completed)
 
 - Add explicit advancement/placement commands that assign teams to playoff and classification slots.
 - Present a proposed final ranking, allow an admin to adjust it, then finalize it transactionally.
@@ -119,11 +119,11 @@ Acceptance: standings immediately reflect every result edit and include teams wi
 
 Acceptance: every discipline produces one durable final rank and full per-member awarded-points value per team.
 
-### Step 9 - Overall edition standings
+### Step 9 - Overall edition standings (completed with Step 8)
 
 - Expand each finalized team standing to its members and sum the full awarded points by edition entry with one projection query; never divide points by member count.
 - Show each individual's team and points per discipline plus total individual points, with a clear indicator for disciplines not yet finalized.
-- Agree on total-standing tie behavior; initially show equal totals as tied and use competitor name only for display ordering.
+- Break equal totals lexicographically by counts of best discipline placements: most first places, then most second places, and so on. Competitors with identical totals and placement profiles share a place; names only stabilize display order.
 - Test differently composed teams across disciplines, one-person teams, partially completed editions, nonparticipants, ties, and amended discipline results. Explicitly assert that both members of a two-person team receive the full points.
 
 Acceptance: every competitor's edition total reconciles exactly with the sum of that individual's full team points across disciplines.

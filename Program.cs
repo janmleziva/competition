@@ -109,6 +109,8 @@ builder.Services.AddScoped<ICompetitorAdministrationService, CompetitorAdministr
 builder.Services.AddScoped<IDisciplineAdministrationService, DisciplineAdministrationService>();
 builder.Services.AddScoped<IPhaseSetupService, PhaseSetupService>();
 builder.Services.AddScoped<IGroupStandingsService, GroupStandingsService>();
+builder.Services.AddScoped<IAwardPointSystemService, AwardPointSystemService>();
+builder.Services.AddScoped<ICompetitionScoringService, CompetitionScoringService>();
 
 var app = builder.Build();
 

@@ -5,9 +5,13 @@
 @{
     ViewData["Title"] = $"{Model.Setup.Discipline.Name} – {Model.Setup.EditionName}";
     var item = Model.Setup.Discipline;
-    var isAdmin = User.Identity?.IsAuthenticated == true;
+    var isAuthenticated = User.Identity?.IsAuthenticated == true;
+    var isAdmin = isAuthenticated && !item.IsClosed;
     var canChangePlayingSystem = !item.IsScheduleLocked;
     var setSettingsLocked = item.HasResults;
+    var selectedPointSystem = Model.Scoring.AwardPointSystemId is null
+        ? null
+        : Model.Scoring.AvailableSystems.SingleOrDefault(system => system.Id == Model.Scoring.AwardPointSystemId);
 }
 
 <main class="shell shell-wide">
@@ -46,6 +50,101 @@
                 Pro úpravy jej nejprve odemkněte.
             </div>
         }
+
+        @if (item.IsClosed)
+        {
+            <div class="schedule-lock-notice results-lock-notice" role="status">
+                <strong>Disciplína je uzavřená.</strong>
+                Konečné pořadí a body byly přiděleny; nastavení, účastníky, týmy, rozpis ani výsledky už nelze měnit.
+            </div>
+        }
+
+        <section class="registration-form discipline-scoring-section" aria-labelledby="discipline-scoring-title">
+            <h2 id="discipline-scoring-title">Bodování pořadí</h2>
+            @if (isAdmin && !item.IsLocked)
+            {
+                <form method="post"
+                      asp-page-handler="SetPointSystem"
+                      class="discipline-settings-grid"
+                      data-point-system-assignment
+                      data-initial-value="@(Model.Scoring.AwardPointSystemId?.ToString() ?? string.Empty)">
+                    <div>
+                        <label asp-for="AwardPointSystemId">Bodovací systém</label>
+                        <select asp-for="AwardPointSystemId" data-point-system-select>
+                            <option value="">Vyberte systém</option>
+                            @foreach (var system in Model.Scoring.AvailableSystems)
+                            {
+                                <option value="@system.Id">@system.Name -  @string.Join(", ", system.Rules.Select(rule => $"{rule.Rank}. {rule.Points}b."))</option>
+                            }
+                        </select>
+                    </div>
+                    <button class="button button-small" type="submit" data-point-system-submit disabled>Přiřadit</button>
+                </form>
+                @if (Model.Scoring.AwardPointSystemId is not null)
+                {
+                    <details class="point-system-inline-editor">
+                        <summary>Upravit bodování pro tuto disciplínu</summary>
+                        <form method="post" asp-page-handler="UpdatePointSystem" data-point-system-form data-prefix="EditPointSystem">
+                            <input type="hidden" name="systemId" value="@Model.Scoring.AwardPointSystemId" />
+                            <label asp-for="EditPointSystem.Name">Název</label>
+                            <input asp-for="EditPointSystem.Name" class="point-system-name-input" maxlength="120" />
+                            <small>Uložením vznikne samostatná kopie systému použitá pouze pro tuto disciplínu.</small>
+                            <div class="point-rule-list" data-rule-list>
+                                @for (var index = 0; index < Model.EditPointSystem.Rules.Count; index++)
+                                {
+                                    <div class="point-rule-row">
+                                        <label>Pořadí <input asp-for="EditPointSystem.Rules[index].Rank" type="number" min="1" readonly /></label>
+                                        <label>Body <input asp-for="EditPointSystem.Rules[index].Points" type="number" min="0" /></label>
+                                    </div>
+                                }
+                            </div>
+                            <div class="form-actions">
+                                <button class="button button-ghost button-small" type="button" data-add-rule>Přidat pořadí</button>
+                                <button class="button button-ghost button-small" type="button" data-remove-rule>Odebrat poslední</button>
+                                <button class="button button-small point-system-save-button" type="submit">Uložit bodování</button>
+                            </div>
+                        </form>
+                    </details>
+                }
+                <details class="point-system-inline-editor">
+                    <summary>Vytvořit nový systém a přiřadit jej</summary>
+                    <form method="post" asp-page-handler="CreatePointSystem" data-point-system-form data-prefix="NewPointSystem">
+                        <label asp-for="NewPointSystem.Name">Název</label>
+                        <input asp-for="NewPointSystem.Name" class="point-system-name-input" maxlength="120" />
+                        <div class="point-rule-list" data-rule-list>
+                            @for (var index = 0; index < Model.NewPointSystem.Rules.Count; index++)
+                            {
+                                <div class="point-rule-row">
+                                    <label>Pořadí <input asp-for="NewPointSystem.Rules[index].Rank" type="number" min="1" readonly /></label>
+                                    <label>Body <input asp-for="NewPointSystem.Rules[index].Points" type="number" min="0" /></label>
+                                </div>
+                            }
+                        </div>
+                        <div class="form-actions">
+                            <button class="button button-ghost button-small" type="button" data-add-rule>Přidat pořadí</button>
+                            <button class="button button-ghost button-small" type="button" data-remove-rule>Odebrat poslední</button>
+                            <button class="button button-small" type="submit">Vytvořit a přiřadit</button>
+                        </div>
+                    </form>
+                </details>
+            }
+            else
+            {
+                @if (selectedPointSystem is null)
+                {
+                    <p class="meta-inline">Bodovací systém zatím není vybraný.</p>
+                }
+                else
+                {
+                    <div class="point-system-rules-summary" aria-label="Body za pořadí">
+                        @foreach (var rule in selectedPointSystem.Rules)
+                        {
+                            <span><strong>@rule.Rank.</strong> místo <strong>@rule.Points b.</strong></span>
+                        }
+                    </div>
+                }
+            }
+        </section>
 
         @if (isAdmin && !item.IsLocked)
         {
@@ -165,5 +264,27 @@
             checkbox.addEventListener("change", update);
             update();
         })();
+        document.querySelectorAll("[data-point-system-form]").forEach(form => {
+            const list = form.querySelector("[data-rule-list]");
+            const prefix = form.dataset.prefix;
+            form.querySelector("[data-add-rule]")?.addEventListener("click", () => {
+                const index = list.children.length;
+                const row = document.createElement("div");
+                row.className = "point-rule-row";
+                row.innerHTML = `<label>Pořadí <input name="${prefix}.Rules[${index}].Rank" value="${index + 1}" type="number" min="1" readonly></label><label>Body <input name="${prefix}.Rules[${index}].Points" value="0" type="number" min="0"></label>`;
+                list.appendChild(row);
+            });
+            form.querySelector("[data-remove-rule]")?.addEventListener("click", () => {
+                if (list.children.length > 1) list.lastElementChild.remove();
+            });
+        });
+        document.querySelectorAll("[data-point-system-assignment]").forEach(form => {
+            const select = form.querySelector("[data-point-system-select]");
+            const submit = form.querySelector("[data-point-system-submit]");
+            if (!select || !submit) return;
+            const update = () => submit.disabled = select.value === form.dataset.initialValue;
+            select.addEventListener("change", update);
+            update();
+        });
     </script>
 }

@@ -164,9 +164,28 @@ aggregate values.
 
 Teams are ordered by table points; points, score difference, and applicable subscore difference
 in a head-to-head mini-table among teams tied on total points; overall score difference;
-applicable overall subscore difference; score ratio; competition seed; and finally team ID.
+applicable overall subscore difference; total score (and, where applicable, total set score)
+scored; competition seed; and finally team ID.
 The phase's configured win/draw/loss values are used (2/1/0 by default).
 
 When completed stages determine final placements, the page also exposes a progressive
 `Konečné umístění` view. Knockout teams eliminated in the same stage are ordered by total score
-difference, applicable subscore difference, score ratio, applicable subscore ratio, and seed.
+difference, applicable subscore difference, total score and set score scored, and seed.
+
+Generated round-robin schedules keep every team's home and away match counts equal, or at most
+one match apart. Team labels use `Surname F.`; when surnames and first-name initials collide, the
+first-name prefix is extended only as far as needed to distinguish the participants.
+
+## Award points and overall standings
+
+Reusable global point systems are managed at `/PointSystems` and can also be created or edited
+from an edition discipline detail. Each discipline selects its own system. After every match is
+completed, an authenticated administrator can confirm finalization from either the discipline
+list or phase page. Finalization snapshots each team's rank and points, gives the full point
+value to every team member, and permanently closes all discipline mutations.
+
+Finalized points appear in the discipline's `Konečné umístění` table and as a top-four inline
+summary on the edition discipline list. `/Editions/{id}/Standings` shows each competitor's
+points and team for every discipline plus the total. Equal totals are ordered by the number of
+best placements (first-place count, then second-place count, and so on); identical totals and
+placement profiles share the same displayed place.

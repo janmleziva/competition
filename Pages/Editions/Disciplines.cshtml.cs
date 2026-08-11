@@ -7,7 +7,9 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace Competition.Pages.Editions;
 
-public sealed class DisciplinesModel(IDisciplineAdministrationService disciplines) : PageModel
+public sealed class DisciplinesModel(
+    IDisciplineAdministrationService disciplines,
+    ICompetitionScoringService? scoring = null) : PageModel
 {
     private static readonly IReadOnlyDictionary<PlayingSystemType, string> PlayingSystemLabels =
         new Dictionary<PlayingSystemType, string>
@@ -144,6 +146,23 @@ public sealed class DisciplinesModel(IDisciplineAdministrationService discipline
 
     public async Task<IActionResult> OnPostUnlockDisciplineAsync(long id, long disciplineId, CancellationToken ct) =>
         await SetLockAsync(id, disciplineId, false, ct);
+
+    public async Task<IActionResult> OnPostFinalizeAsync(long id, long disciplineId, CancellationToken ct)
+    {
+        if (User.Identity?.IsAuthenticated != true) return Challenge();
+        if (scoring is null) throw new InvalidOperationException("Služba bodování není dostupná.");
+        try
+        {
+            if (!await scoring.FinalizeDisciplineAsync(id, disciplineId, ct)) return NotFound();
+        }
+        catch (ValidationException ex)
+        {
+            ModelState.AddModelError(string.Empty, ex.Message);
+            return await ReloadAsync(id, ct);
+        }
+        StatusMessage = "Body byly přiděleny a disciplína byla uzavřena.";
+        return RedirectToPage(new { id });
+    }
 
     public string GetPlayingSystemLabel(PlayingSystemType system) =>
         PlayingSystemLabels.TryGetValue(system, out var label) ? label : system.ToString();

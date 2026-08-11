@@ -31,9 +31,27 @@ public sealed class GroupStandingsService(CompetitionDbContext dbContext) : IGro
             .ThenBy(group => group.Order)
             .ToListAsync(cancellationToken);
 
-        return groups.Select(group => Calculate(
-            group,
-            group.DisciplinePhase.CompetitionDiscipline.UsesSetScores)).ToList();
+        var teams = groups.SelectMany(group => group.Teams)
+            .Select(assignment => assignment.DisciplineTeam)
+            .DistinctBy(team => team.Id)
+            .ToList();
+        var editionEntries = await dbContext.CompetitionEntries.AsNoTracking()
+            .Where(entry => entry.CompetitionEditionId == editionId)
+            .Include(entry => entry.Competitor)
+            .ToListAsync(cancellationToken);
+        var entryLabels = TeamNameFormatter.CreateEntryLabels(editionEntries);
+        return groups.Select(group =>
+        {
+            var table = Calculate(group, group.DisciplinePhase.CompetitionDiscipline.UsesSetScores);
+            return table with
+            {
+                Rows = table.Rows.Select(row => row with
+                {
+                    TeamName = TeamNameFormatter.Format(
+                        teams.Single(team => team.Id == row.TeamId), entryLabels)
+                }).ToList()
+            };
+        }).ToList();
     }
 
     public async Task<FinalStandingTable?> GetFinalStandingsAsync(
@@ -49,6 +67,7 @@ public sealed class GroupStandingsService(CompetitionDbContext dbContext) : IGro
                 .ThenInclude(team => team.Members)
                     .ThenInclude(member => member.CompetitionEntry)
                         .ThenInclude(entry => entry.Competitor)
+            .Include(item => item.FinalStandings)
             .Include(item => item.Phases)
                 .ThenInclude(phase => phase.Groups)
                     .ThenInclude(group => group.Teams)
@@ -61,16 +80,62 @@ public sealed class GroupStandingsService(CompetitionDbContext dbContext) : IGro
         {
             return null;
         }
+        var editionEntries = await dbContext.CompetitionEntries.AsNoTracking()
+            .Where(entry => entry.CompetitionEditionId == editionId)
+            .Include(entry => entry.Competitor)
+            .ToListAsync(cancellationToken);
+        var entryLabels = TeamNameFormatter.CreateEntryLabels(editionEntries);
 
         var rows = discipline.PlayingSystem switch
         {
             PlayingSystemType.RoundRobin => CalculateRoundRobinFinalStandings(discipline),
             PlayingSystemType.GroupsThenClassificationMatches => CalculateGroupClassificationFinalStandings(discipline),
             PlayingSystemType.Knockout => CalculateKnockoutFinalStandings(discipline),
+            PlayingSystemType.RoundRobinThenKnockout => CalculateCombinedFinalStandings(discipline),
+            PlayingSystemType.Custom => CalculateCustomFinalStandings(discipline),
             _ => []
         };
 
-        return rows.Count == 0 ? null : new FinalStandingTable(discipline.UsesSetScores, rows);
+        if (discipline.FinalStandings.Count != 0)
+        {
+            var teams = discipline.Teams.ToDictionary(x => x.Id);
+            var calculatedByTeam = rows.ToDictionary(x => x.TeamId);
+            var finalizedRows = discipline.FinalStandings.OrderBy(x => x.Rank)
+                .Where(x => teams.ContainsKey(x.DisciplineTeamId))
+                .Select(x => calculatedByTeam.TryGetValue(x.DisciplineTeamId, out var calculated)
+                    ? calculated with { Position = x.Rank, PointsAwarded = x.PointsAwarded }
+                    : new FinalStandingRow(
+                        x.Rank,
+                        x.DisciplineTeamId,
+                        TeamName(teams[x.DisciplineTeamId]),
+                        teams[x.DisciplineTeamId].Seed,
+                        "uzavřeno",
+                        0, 0, 0, 0,
+                        x.PointsAwarded))
+                .ToList();
+            return ApplyTeamNames(new FinalStandingTable(discipline.UsesSetScores, finalizedRows, true), discipline, entryLabels);
+        }
+
+        return rows.Count == 0
+            ? null
+            : ApplyTeamNames(new FinalStandingTable(discipline.UsesSetScores, rows), discipline, entryLabels);
+    }
+
+    private static FinalStandingTable ApplyTeamNames(
+        FinalStandingTable table,
+        CompetitionDiscipline discipline,
+        IReadOnlyDictionary<long, string> entryLabels)
+    {
+        var teams = discipline.Teams.ToDictionary(team => team.Id);
+        return table with
+        {
+            Rows = table.Rows.Select(row => row with
+            {
+                TeamName = teams.TryGetValue(row.TeamId, out var team)
+                    ? TeamNameFormatter.Format(team, entryLabels)
+                    : row.TeamName
+            }).ToList()
+        };
     }
 
     private static IReadOnlyList<FinalStandingRow> CalculateRoundRobinFinalStandings(CompetitionDiscipline discipline)
@@ -170,6 +235,11 @@ public sealed class GroupStandingsService(CompetitionDbContext dbContext) : IGro
 
         var teamById = discipline.Teams.ToDictionary(team => team.Id);
         var allKnockoutMatches = stages.SelectMany(stage => stage.Matches).Where(IsCompletedMatch).ToList();
+        var knockoutTeamCount = allKnockoutMatches
+            .SelectMany(match => new[] { match.HomeTeamId, match.AwayTeamId })
+            .OfType<long>()
+            .Distinct()
+            .Count();
         var aggregates = BuildMatchAggregates(teamById.Keys, allKnockoutMatches);
         var rows = new List<FinalStandingRow>();
 
@@ -205,7 +275,7 @@ public sealed class GroupStandingsService(CompetitionDbContext dbContext) : IGro
                 .OfType<long>()
                 .Distinct()
                 .Count();
-            var firstLoserPosition = discipline.Teams.Count - earlierLoserCount + 1;
+            var firstLoserPosition = knockoutTeamCount - earlierLoserCount + 1;
 
             var orderedLosers = losers
                 .Where(teamById.ContainsKey)
@@ -213,9 +283,9 @@ public sealed class GroupStandingsService(CompetitionDbContext dbContext) : IGro
                 .ThenByDescending(teamId => discipline.UsesSetScores
                     ? aggregates[teamId].SubscoreDifference
                     : 0)
-                .ThenByDescending(teamId => aggregates[teamId].ScoreRatio)
+                .ThenByDescending(teamId => aggregates[teamId].ScoreFor)
                 .ThenByDescending(teamId => discipline.UsesSetScores
-                    ? aggregates[teamId].SubscoreRatio
+                    ? aggregates[teamId].SubscoreFor
                     : 0)
                 .ThenBy(teamId => teamById[teamId].Seed)
                 .ThenBy(teamId => teamId)
@@ -234,6 +304,86 @@ public sealed class GroupStandingsService(CompetitionDbContext dbContext) : IGro
 
         return rows.OrderBy(row => row.Position).ToList();
     }
+
+    private static IReadOnlyList<FinalStandingRow> CalculateCombinedFinalStandings(CompetitionDiscipline discipline)
+    {
+        var knockoutRows = CalculateKnockoutFinalStandings(discipline).ToList();
+        if (knockoutRows.Count == 0)
+        {
+            return CalculateRoundRobinFinalStandings(discipline);
+        }
+
+        var placedTeamIds = knockoutRows.Select(x => x.TeamId).ToHashSet();
+        var groupRows = discipline.Phases
+            .Where(phase => phase.Type == PhaseType.Group)
+            .OrderByDescending(phase => phase.Order)
+            .SelectMany(phase => phase.Groups.OrderBy(group => group.Order))
+            .Where(IsGroupComplete)
+            .SelectMany(group => Calculate(group, discipline.UsesSetScores).Rows)
+            .Where(row => !placedTeamIds.Contains(row.TeamId))
+            .GroupBy(row => row.TeamId)
+            .Select(group => group.First())
+            .OrderBy(row => row.Position)
+            .ThenByDescending(row => row.TablePoints)
+            .ThenByDescending(row => row.ScoreDifference)
+            .ThenByDescending(row => discipline.UsesSetScores ? row.SubscoreDifference : 0)
+            .ThenByDescending(row => row.ScoreFor)
+            .ThenByDescending(row => discipline.UsesSetScores ? row.SubscoreFor : 0)
+            .ThenBy(row => row.Seed)
+            .ThenBy(row => row.TeamId)
+            .ToList();
+
+        var nextPosition = knockoutRows.Count + 1;
+        knockoutRows.AddRange(groupRows.Select(row =>
+            ToFinalRow(row, $"{row.Position}. místo ve skupině", nextPosition++)));
+        return knockoutRows.OrderBy(row => row.Position).ToList();
+    }
+
+    private static IReadOnlyList<FinalStandingRow> CalculateCustomFinalStandings(CompetitionDiscipline discipline)
+    {
+        if (discipline.Phases.Any(x => x.Type == PhaseType.Knockout))
+        {
+            return CalculateCombinedFinalStandings(discipline);
+        }
+
+        var placementMatches = discipline.Phases
+            .Where(x => x.Type == PhaseType.FinalStanding)
+            .OrderBy(x => x.Order)
+            .SelectMany(x => x.Matches.OrderBy(match => match.Order))
+            .ToList();
+        if (placementMatches.Count != 0 && placementMatches.All(IsCompletedMatch))
+        {
+            var teamById = discipline.Teams.ToDictionary(x => x.Id);
+            var rows = new List<FinalStandingRow>();
+            foreach (var match in placementMatches)
+            {
+                var winnerId = WinnerId(match);
+                var loserId = LoserId(match);
+                if (winnerId is null || loserId is null ||
+                    !teamById.TryGetValue(winnerId.Value, out var winner) ||
+                    !teamById.TryGetValue(loserId.Value, out var loser))
+                {
+                    return [];
+                }
+                var firstPosition = (match.Order - 1) * 2 + 1;
+                rows.Add(ToPlacementMatchRow(firstPosition, winner, match));
+                rows.Add(ToPlacementMatchRow(firstPosition + 1, loser, match));
+            }
+            if (rows.Select(x => x.TeamId).Distinct().Count() == discipline.Teams.Count)
+            {
+                return rows.OrderBy(x => x.Position).ToList();
+            }
+        }
+
+        return CalculateRoundRobinFinalStandings(discipline);
+    }
+
+    private static FinalStandingRow ToPlacementMatchRow(int position, DisciplineTeam team, Match match) =>
+        new(position, team.Id, TeamName(team), team.Seed, match.Name,
+            team.Id == match.HomeTeamId ? match.HomeScore!.Value : match.AwayScore!.Value,
+            team.Id == match.HomeTeamId ? match.AwayScore!.Value : match.HomeScore!.Value,
+            team.Id == match.HomeTeamId ? match.SetScores.Sum(x => x.HomeScore) : match.SetScores.Sum(x => x.AwayScore),
+            team.Id == match.HomeTeamId ? match.SetScores.Sum(x => x.AwayScore) : match.SetScores.Sum(x => x.HomeScore));
 
     private static GroupStandingTable Calculate(PhaseGroup group, bool usesSetScores)
     {
@@ -284,7 +434,8 @@ public sealed class GroupStandingsService(CompetitionDbContext dbContext) : IGro
             .ThenByDescending(standing => usesSetScores ? standing.MiniSubscoreDifference : 0)
             .ThenByDescending(standing => standing.ScoreDifference)
             .ThenByDescending(standing => usesSetScores ? standing.SubscoreDifference : 0)
-            .ThenByDescending(standing => standing.ScoreRatio)
+            .ThenByDescending(standing => standing.ScoreFor)
+            .ThenByDescending(standing => usesSetScores ? standing.SubscoreFor : 0)
             .ThenBy(standing => standing.Seed)
             .ThenBy(standing => standing.TeamId)
             .ToList();
@@ -374,7 +525,8 @@ public sealed class GroupStandingsService(CompetitionDbContext dbContext) : IGro
         rows.OrderByDescending(row => row.TablePoints)
             .ThenByDescending(row => row.ScoreDifference)
             .ThenByDescending(row => usesSetScores ? row.SubscoreDifference : 0)
-            .ThenByDescending(row => row.ScoreRatio)
+            .ThenByDescending(row => row.ScoreFor)
+            .ThenByDescending(row => usesSetScores ? row.SubscoreFor : 0)
             .ThenBy(row => row.Seed)
             .ThenBy(row => row.TeamId);
 

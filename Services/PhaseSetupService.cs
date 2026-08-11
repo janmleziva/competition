@@ -33,12 +33,19 @@ public sealed class PhaseSetupService : IPhaseSetupService
         {
             return null;
         }
-        await ReconcileKnockoutAdvancementAsync(editionId, competitionDisciplineId, cancellationToken);
-        await ReconcileGroupStandingMatchesAsync(editionId, competitionDisciplineId, cancellationToken);
+        var isClosed = await dbContext.CompetitionDisciplines.AsNoTracking()
+            .Where(x => x.Id == competitionDisciplineId && x.CompetitionEditionId == editionId)
+            .Select(x => x.IsClosed)
+            .SingleAsync(cancellationToken);
+        if (!isClosed)
+        {
+            await ReconcileKnockoutAdvancementAsync(editionId, competitionDisciplineId, cancellationToken);
+            await ReconcileGroupStandingMatchesAsync(editionId, competitionDisciplineId, cancellationToken);
+        }
 
         var discipline = await dbContext.CompetitionDisciplines.AsNoTrackingWithIdentityResolution()
             .AsSplitQuery()
-            .Include(x => x.CompetitionEdition)
+            .Include(x => x.CompetitionEdition).ThenInclude(x => x.Entries).ThenInclude(x => x.Competitor)
             .Include(x => x.Discipline)
             .Include(x => x.Teams).ThenInclude(x => x.Members).ThenInclude(x => x.CompetitionEntry).ThenInclude(x => x.Competitor)
             .Include(x => x.Phases).ThenInclude(x => x.Groups).ThenInclude(x => x.Teams)
@@ -47,7 +54,8 @@ public sealed class PhaseSetupService : IPhaseSetupService
             .Include(x => x.Phases).ThenInclude(x => x.Matches).ThenInclude(x => x.AwayTeam).ThenInclude(x => x!.Members).ThenInclude(x => x.CompetitionEntry).ThenInclude(x => x.Competitor)
             .SingleAsync(x => x.Id == competitionDisciplineId && x.CompetitionEditionId == editionId, cancellationToken);
 
-        string TeamName(DisciplineTeam team) => string.Join("/", team.Members.OrderBy(x => x.Order).Select(x => x.CompetitionEntry.Competitor.LastName));
+        var entryLabels = TeamNameFormatter.CreateEntryLabels(discipline.CompetitionEdition.Entries);
+        string TeamName(DisciplineTeam team) => TeamNameFormatter.Format(team, entryLabels);
 
         var allGroups = discipline.Phases.SelectMany(x => x.Groups).ToDictionary(x => x.Id);
         var allMatches = discipline.Phases.SelectMany(x => x.Matches).ToDictionary(x => x.Id);
@@ -116,7 +124,7 @@ public sealed class PhaseSetupService : IPhaseSetupService
         return new DisciplinePhaseSetup(
             discipline.CompetitionEditionId, discipline.CompetitionEdition.Name, discipline.Id, discipline.Discipline.Name,
             discipline.PlayingSystem, discipline.UsesSetScores, discipline.SetsToWin, discipline.IsScheduleLocked,
-            discipline.AreResultsLocked, anonymousEditing.Enabled,
+            discipline.AreResultsLocked, discipline.IsClosed, anonymousEditing.Enabled,
             discipline.Phases.SelectMany(x => x.Matches).Any(x =>
                 x.HomeScore != null || x.AwayScore != null || x.SetScores.Count != 0 || x.Status != MatchStatus.Scheduled),
             discipline.Teams.OrderBy(x => x.Seed).Select(x => new PhaseSetupTeam(x.Id, x.Seed, TeamName(x))).ToList(), phases);
@@ -160,6 +168,7 @@ public sealed class PhaseSetupService : IPhaseSetupService
         {
             return false;
         }
+        EnsureOpen(discipline);
         if (discipline.Phases.SelectMany(x => x.Matches).Any())
         {
             throw new ValidationException("Herní systém nelze změnit po vytvoření zápasů.");
@@ -288,6 +297,7 @@ public sealed class PhaseSetupService : IPhaseSetupService
         {
             return false;
         }
+        EnsureOpen(group.DisciplinePhase.CompetitionDiscipline);
         if (group.Teams.Count != 0)
         {
             throw new ValidationException("Skupinu nebo etapu nelze smazat, dokud jsou do ní přiřazené týmy.");
@@ -315,6 +325,7 @@ public sealed class PhaseSetupService : IPhaseSetupService
         {
             return false;
         }
+        EnsureOpen(phase.CompetitionDiscipline);
         if (phase.CompetitionDiscipline.PlayingSystem is not PlayingSystemType.Custom and not PlayingSystemType.Knockout)
         {
             throw new ValidationException("Fáze tohoto herního systému je pevně daná a nelze ji smazat.");
@@ -419,6 +430,7 @@ public sealed class PhaseSetupService : IPhaseSetupService
 
     public async Task<int> GenerateKnockoutMatchesAsync(long editionId, long competitionDisciplineId, bool randomizeTeams, CancellationToken cancellationToken = default)
     {
+        await EnsureDisciplineAsync(editionId, competitionDisciplineId, cancellationToken);
         var isKnockout = await dbContext.CompetitionDisciplines.AnyAsync(x => x.Id == competitionDisciplineId &&
             x.CompetitionEditionId == editionId && x.PlayingSystem == PlayingSystemType.Knockout, cancellationToken);
         if (!isKnockout)
@@ -437,6 +449,7 @@ public sealed class PhaseSetupService : IPhaseSetupService
             .Include(x => x.Phases).ThenInclude(x => x.Groups).ThenInclude(x => x.Teams)
             .Include(x => x.Phases).ThenInclude(x => x.Matches)
             .SingleAsync(x => x.Id == competitionDisciplineId && x.CompetitionEditionId == editionId, cancellationToken);
+        EnsureOpen(discipline);
 
         if (discipline.Phases.SelectMany(x => x.Matches).Any())
         {
@@ -611,6 +624,7 @@ public sealed class PhaseSetupService : IPhaseSetupService
             ?? throw new ValidationException("Zápas neexistuje.");
 
         var discipline = match.DisciplinePhase.CompetitionDiscipline;
+        EnsureOpen(discipline);
         if (discipline.PlayingSystem != PlayingSystemType.Knockout || match.PhaseGroup is null)
         {
             throw new ValidationException("Ručně lze měnit pouze obsazení vyřazovacího zápasu.");
@@ -723,6 +737,7 @@ public sealed class PhaseSetupService : IPhaseSetupService
         {
             return false;
         }
+        EnsureOpen(discipline);
         if (discipline.IsScheduleLocked)
         {
             throw new ValidationException("Uzamčený rozpis nelze smazat. Nejprve jej odemkněte.");
@@ -752,6 +767,7 @@ public sealed class PhaseSetupService : IPhaseSetupService
         {
             return false;
         }
+        EnsureOpen(discipline);
         if (isLocked && !await dbContext.Matches.AnyAsync(
             x => x.DisciplinePhase.CompetitionDisciplineId == competitionDisciplineId, cancellationToken))
         {
@@ -788,6 +804,7 @@ public sealed class PhaseSetupService : IPhaseSetupService
         {
             return false;
         }
+        EnsureOpen(discipline);
 
         discipline.AreResultsLocked = isLocked;
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -820,6 +837,7 @@ public sealed class PhaseSetupService : IPhaseSetupService
         {
             return false;
         }
+        EnsureOpen(discipline);
         if (discipline.AreResultsLocked)
         {
             throw new ValidationException("Uzamčené výsledky nelze smazat.");
@@ -849,6 +867,129 @@ public sealed class PhaseSetupService : IPhaseSetupService
         }
 
         return true;
+    }
+
+    public async Task<int> GenerateRandomResultsAsync(
+        long editionId, long competitionDisciplineId, CancellationToken cancellationToken = default)
+    {
+        if (!dbContext.Database.IsRelational())
+        {
+            return await GenerateRandomResultsCoreAsync(editionId, competitionDisciplineId, cancellationToken);
+        }
+
+        var strategy = dbContext.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+            var result = await GenerateRandomResultsCoreAsync(editionId, competitionDisciplineId, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return result;
+        });
+    }
+
+    private async Task<int> GenerateRandomResultsCoreAsync(
+        long editionId, long competitionDisciplineId, CancellationToken cancellationToken)
+    {
+        if (!await DeleteResultsCoreAsync(editionId, competitionDisciplineId, cancellationToken))
+        {
+            throw new ValidationException("Disciplína neexistuje.");
+        }
+
+        var generatedCount = 0;
+        while (true)
+        {
+            var match = await dbContext.Matches.AsNoTracking()
+                .Where(x => x.DisciplinePhase.CompetitionDisciplineId == competitionDisciplineId &&
+                    x.DisciplinePhase.CompetitionDiscipline.CompetitionEditionId == editionId &&
+                    x.HomeTeamId != null && x.AwayTeamId != null &&
+                    (x.HomeScore == null || x.AwayScore == null))
+                .OrderBy(x => x.DisciplinePhase.Order)
+                .ThenBy(x => x.Order)
+                .ThenBy(x => x.Id)
+                .Select(x => new RandomResultMatch(
+                    x.Id,
+                    x.Version,
+                    x.DisciplinePhase.CompetitionDiscipline.UsesSetScores,
+                    x.DisciplinePhase.CompetitionDiscipline.SetsToWin))
+                .FirstOrDefaultAsync(cancellationToken);
+            if (match is null)
+            {
+                break;
+            }
+
+            var result = CreateRandomResult(match.UsesSetScores, match.SetsToWin);
+            var version = match.Version;
+            if (match.UsesSetScores)
+            {
+                await UpdateMatchSetScoresAsync(editionId, competitionDisciplineId, new MatchSetScoresInput
+                {
+                    MatchId = match.Id,
+                    Version = version,
+                    Sets = result.Sets
+                }, true, cancellationToken);
+                version = await dbContext.Matches.AsNoTracking()
+                    .Where(x => x.Id == match.Id)
+                    .Select(x => x.Version)
+                    .SingleAsync(cancellationToken);
+            }
+
+            await UpdateMatchResultAsync(editionId, competitionDisciplineId, new MatchResultInput
+            {
+                MatchId = match.Id,
+                HomeScore = result.HomeScore,
+                AwayScore = result.AwayScore,
+                Version = version
+            }, true, cancellationToken);
+            generatedCount++;
+        }
+
+        var unresolvedMatches = await dbContext.Matches.AsNoTracking().AnyAsync(x =>
+            x.DisciplinePhase.CompetitionDisciplineId == competitionDisciplineId &&
+            x.DisciplinePhase.CompetitionDiscipline.CompetitionEditionId == editionId &&
+            (x.HomeScore == null || x.AwayScore == null), cancellationToken);
+        if (unresolvedMatches)
+        {
+            throw new ValidationException("Některé zápasy nemají přiřazené oba týmy, proto nelze vygenerovat všechny výsledky.");
+        }
+
+        return generatedCount;
+    }
+
+    private static RandomMatchResult CreateRandomResult(bool usesSetScores, int? configuredSetsToWin)
+    {
+        var homeWins = Random.Shared.Next(2) == 0;
+        if (!usesSetScores)
+        {
+            var winningScore = Random.Shared.Next(1, 6);
+            var losingScore = Random.Shared.Next(0, winningScore);
+            return new RandomMatchResult(
+                homeWins ? winningScore : losingScore,
+                homeWins ? losingScore : winningScore,
+                []);
+        }
+
+        var setsToWin = configuredSetsToWin
+            ?? throw new ValidationException("U disciplíny není nastaven počet vítězných setů.");
+        var losingSetWins = Random.Shared.Next(setsToWin);
+        var setWinners = Enumerable.Repeat(homeWins, setsToWin - 1)
+            .Concat(Enumerable.Repeat(!homeWins, losingSetWins))
+            .OrderBy(_ => Random.Shared.Next())
+            .Append(homeWins)
+            .ToList();
+        var sets = setWinners.Select((isHomeWinner, index) =>
+        {
+            var losingScore = Random.Shared.Next(0, 10);
+            return new MatchSetScoreInput
+            {
+                SetNumber = index + 1,
+                HomeScore = isHomeWinner ? 10 : losingScore,
+                AwayScore = isHomeWinner ? losingScore : 10
+            };
+        }).ToList();
+        return new RandomMatchResult(
+            homeWins ? setsToWin : losingSetWins,
+            homeWins ? losingSetWins : setsToWin,
+            sets);
     }
 
     public async Task<bool> UpdateMatchResultAsync(long editionId, long competitionDisciplineId, MatchResultInput input, bool isAdmin, CancellationToken cancellationToken = default)
@@ -989,6 +1130,7 @@ public sealed class PhaseSetupService : IPhaseSetupService
             throw new ValidationException("Výsledek mezitím změnil někdo jiný. Obnovte stránku a zkuste to znovu.");
         }
         var discipline = match.DisciplinePhase.CompetitionDiscipline;
+        EnsureOpen(discipline);
         if (!isAdmin && !anonymousEditing.Enabled)
         {
             throw new ValidationException("Veřejná editace výsledků je momentálně uzavřená.");
@@ -1051,6 +1193,8 @@ public sealed class PhaseSetupService : IPhaseSetupService
     }
 
     private sealed record SetResult(int SetNumber, int HomeScore, int AwayScore);
+    private sealed record RandomResultMatch(long Id, int Version, bool UsesSetScores, int? SetsToWin);
+    private sealed record RandomMatchResult(int HomeScore, int AwayScore, List<MatchSetScoreInput> Sets);
 
     private async Task SaveMatchEditAsync(CancellationToken cancellationToken)
     {
@@ -1298,6 +1442,10 @@ public sealed class PhaseSetupService : IPhaseSetupService
 
     internal static IReadOnlyList<(int Round, long HomeTeamId, long AwayTeamId)> CreateBergerPairings(IReadOnlyList<long> teamIds)
     {
+        var originalIndex = teamIds.Select((teamId, index) => (teamId, index))
+            .ToDictionary(item => item.teamId, item => item.index);
+        var orientationModulus = teamIds.Count % 2 == 0 ? teamIds.Count + 1 : teamIds.Count;
+        var homeHalf = (orientationModulus - 1) / 2;
         var rotation = teamIds.Cast<long?>().ToList();
         if (rotation.Count % 2 != 0)
         {
@@ -1316,8 +1464,13 @@ public sealed class PhaseSetupService : IPhaseSetupService
                     continue;
                 }
 
-                var swap = (round + index) % 2 != 0;
-                result.Add((round + 1, swap ? second.Value : first.Value, swap ? first.Value : second.Value));
+                var firstIndex = originalIndex[first.Value];
+                var secondIndex = originalIndex[second.Value];
+                var distance = (secondIndex - firstIndex + orientationModulus) % orientationModulus;
+                var firstIsHome = distance <= homeHalf;
+                result.Add((round + 1,
+                    firstIsHome ? first.Value : second.Value,
+                    firstIsHome ? second.Value : first.Value));
             }
 
             var last = rotation[^1];
@@ -1367,6 +1520,11 @@ public sealed class PhaseSetupService : IPhaseSetupService
         if (discipline is null)
         {
             return false;
+        }
+
+        if (discipline.IsClosed)
+        {
+            return true;
         }
 
         var canRebuildPreset = !await dbContext.Matches.AnyAsync(
@@ -1469,25 +1627,43 @@ public sealed class PhaseSetupService : IPhaseSetupService
 
     private async Task EnsureDisciplineAsync(long editionId, long competitionDisciplineId, CancellationToken cancellationToken)
     {
-        if (!await dbContext.CompetitionDisciplines.AnyAsync(
-            x => x.Id == competitionDisciplineId && x.CompetitionEditionId == editionId, cancellationToken))
+        var discipline = await dbContext.CompetitionDisciplines.AsNoTracking().SingleOrDefaultAsync(
+            x => x.Id == competitionDisciplineId && x.CompetitionEditionId == editionId, cancellationToken);
+        if (discipline is null)
         {
             throw new ValidationException("Disciplína neexistuje.");
         }
+        EnsureOpen(discipline);
     }
 
-    private async Task<DisciplinePhase> GetPhaseAsync(long editionId, long competitionDisciplineId, long phaseId, CancellationToken cancellationToken) =>
-        await dbContext.DisciplinePhases.Include(x => x.CompetitionDiscipline)
+    private async Task<DisciplinePhase> GetPhaseAsync(long editionId, long competitionDisciplineId, long phaseId, CancellationToken cancellationToken)
+    {
+        var phase = await dbContext.DisciplinePhases.Include(x => x.CompetitionDiscipline)
             .SingleOrDefaultAsync(x => x.Id == phaseId && x.CompetitionDisciplineId == competitionDisciplineId &&
                 x.CompetitionDiscipline.CompetitionEditionId == editionId, cancellationToken)
-        ?? throw new ValidationException("Fáze neexistuje.");
+            ?? throw new ValidationException("Fáze neexistuje.");
+        EnsureOpen(phase.CompetitionDiscipline);
+        return phase;
+    }
 
-    private async Task<PhaseGroup> GetGroupAsync(long editionId, long competitionDisciplineId, long phaseId, long groupId, CancellationToken cancellationToken) =>
-        await dbContext.PhaseGroups.Include(x => x.DisciplinePhase).ThenInclude(x => x.CompetitionDiscipline)
+    private async Task<PhaseGroup> GetGroupAsync(long editionId, long competitionDisciplineId, long phaseId, long groupId, CancellationToken cancellationToken)
+    {
+        var group = await dbContext.PhaseGroups.Include(x => x.DisciplinePhase).ThenInclude(x => x.CompetitionDiscipline)
             .SingleOrDefaultAsync(x => x.Id == groupId && x.DisciplinePhaseId == phaseId &&
                 x.DisciplinePhase.CompetitionDisciplineId == competitionDisciplineId &&
                 x.DisciplinePhase.CompetitionDiscipline.CompetitionEditionId == editionId, cancellationToken)
-        ?? throw new ValidationException("Skupina nebo etapa neexistuje.");
+            ?? throw new ValidationException("Skupina nebo etapa neexistuje.");
+        EnsureOpen(group.DisciplinePhase.CompetitionDiscipline);
+        return group;
+    }
+
+    private static void EnsureOpen(CompetitionDiscipline discipline)
+    {
+        if (discipline.IsClosed)
+        {
+            throw new ValidationException("Uzavřenou disciplínu už nelze měnit.");
+        }
+    }
 
     private static void Validate(object input)
     {
