@@ -2,11 +2,16 @@ param(
     [string]$ProjectPath = (Join-Path $PSScriptRoot "..\Competition.csproj"),
     [string]$PublishDir = (Join-Path $PSScriptRoot "..\artifacts\publish"),
     [string]$FtpHost = "d113wh.forpsi.com",
-    [string]$RemoteDir = "/www",
+    [string]$RemoteDir = "/subdoms/pohoda-cup",
     [string]$LogDir = (Join-Path $PSScriptRoot "..\deployment\logs"),
     [string]$CredsPath = (Join-Path $PSScriptRoot "..\deployment\ftp-creds.json"),
     [string]$RollbackCacheDir = (Join-Path $PSScriptRoot "..\deployment\rollback-cache"),
-    [string]$DatabaseBackupDir = (Join-Path $PSScriptRoot "..\deployment\database-backups")
+    [string]$DatabaseBackupDir = (Join-Path $PSScriptRoot "..\deployment\database-backups"),
+    [string]$RuntimeIdentifier = "win-x64",
+    [switch]$SelfContained,
+    [switch]$Backup,
+    [switch]$InspectRemoteDependencies,
+    [switch]$NoPause
 )
 
 $ErrorActionPreference = "Stop"
@@ -18,6 +23,7 @@ $script:Credential = $null
 $script:RollbackMap = @()
 $script:OfflineMarkerUploaded = $false
 $script:OfflineMarkerUri = $null
+$script:DeploymentStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 
 function Write-Log {
     param(
@@ -25,21 +31,37 @@ function Write-Log {
         [string]$Message,
 
         [ValidateSet("INFO", "WARN", "ERROR", "SUCCESS")]
-        [string]$Level = "INFO"
+        [string]$Level = "INFO",
+
+        [switch]$Console
     )
 
     $line = "[{0}] {1}" -f $Level, $Message
-    Write-Host $line
+    if ($Console -or $Level -in @("WARN", "ERROR")) {
+        Write-Host $line
+    }
     Add-Content -Path $script:LogFile -Value $line
 }
 
 function Write-Banner {
     param([Parameter(Mandatory = $true)][string]$Text)
 
-    $separator = ("=" * 72)
-    Write-Log $separator
-    Write-Log $Text
-    Write-Log $separator
+    Write-Log $Text -Console
+}
+
+function Wait-ForExitAcknowledgement {
+    if ($NoPause -or [Console]::IsInputRedirected) {
+        return
+    }
+
+    Write-Host ""
+    Write-Host "Press any key to close this window..."
+    try {
+        $null = [Console]::ReadKey($true)
+    }
+    catch {
+        $null = Read-Host "Press Enter to close this window"
+    }
 }
 
 function Get-FtpCredentials {
@@ -84,6 +106,39 @@ function Get-FtpErrorResponse {
     }
 
     return $null
+}
+
+function Test-IsRetryableFtpException {
+    param([Parameter(Mandatory = $true)][System.Exception]$Exception)
+
+    $ftpResponse = Get-FtpErrorResponse -Exception $Exception
+    if ($null -ne $ftpResponse -and
+        $ftpResponse.StatusCode -eq [System.Net.FtpStatusCode]::ActionNotTakenFileUnavailable) {
+        return $false
+    }
+
+    return $Exception.Message -match 'Unable to connect|timed out|connection|closed|forcibly'
+}
+
+function Invoke-FtpWithRetry {
+    param(
+        [Parameter(Mandatory = $true)][scriptblock]$Operation,
+        [Parameter(Mandatory = $true)][string]$Description
+    )
+
+    for ($attempt = 1; $attempt -le 4; $attempt++) {
+        try {
+            return & $Operation
+        }
+        catch {
+            if ($attempt -eq 4 -or -not (Test-IsRetryableFtpException -Exception $_.Exception)) {
+                throw
+            }
+
+            Write-Log "$Description failed on attempt ${attempt}; retrying." -Level WARN
+            Start-Sleep -Seconds (2 * $attempt)
+        }
+    }
 }
 
 function Test-RemoteDirectory {
@@ -189,33 +244,35 @@ function Download-RemoteFile {
         [Parameter(Mandatory = $true)][System.Net.NetworkCredential]$Credential
     )
 
-    $request = [System.Net.FtpWebRequest]::Create($RemoteUri)
-    $request.Method = [System.Net.WebRequestMethods+Ftp]::DownloadFile
-    $request.Credentials = $Credential
-    $request.UseBinary = $true
-    $request.UsePassive = $true
-    $request.KeepAlive = $false
+    Invoke-FtpWithRetry -Description "Download $RemoteUri" -Operation {
+        $request = [System.Net.FtpWebRequest]::Create($RemoteUri)
+        $request.Method = [System.Net.WebRequestMethods+Ftp]::DownloadFile
+        $request.Credentials = $Credential
+        $request.UseBinary = $true
+        $request.UsePassive = $true
+        $request.KeepAlive = $false
 
-    $response = $request.GetResponse()
-    try {
-        $responseStream = $response.GetResponseStream()
+        $response = $request.GetResponse()
         try {
-            $fileStream = [System.IO.File]::Create($LocalPath)
+            $responseStream = $response.GetResponseStream()
             try {
-                $responseStream.CopyTo($fileStream)
+                $fileStream = [System.IO.File]::Create($LocalPath)
+                try {
+                    $responseStream.CopyTo($fileStream)
+                }
+                finally {
+                    $fileStream.Dispose()
+                }
             }
             finally {
-                $fileStream.Dispose()
+                $responseStream.Dispose()
             }
+
+            Write-Log "Downloaded remote file to $LocalPath"
         }
         finally {
-            $responseStream.Dispose()
+            $response.Dispose()
         }
-
-        Write-Log "Backed up remote file to $LocalPath"
-    }
-    finally {
-        $response.Dispose()
     }
 }
 
@@ -247,6 +304,98 @@ function Delete-RemoteFile {
     }
 }
 
+function Test-RemoteFileExists {
+    param(
+        [Parameter(Mandatory = $true)][string]$RemoteUri,
+        [Parameter(Mandatory = $true)][System.Net.NetworkCredential]$Credential
+    )
+
+    try {
+        Invoke-FtpWithRetry -Description "Check $RemoteUri" -Operation {
+            $request = [System.Net.FtpWebRequest]::Create($RemoteUri)
+            $request.Method = [System.Net.WebRequestMethods+Ftp]::GetFileSize
+            $request.Credentials = $Credential
+            $request.UseBinary = $true
+            $request.UsePassive = $true
+            $request.KeepAlive = $false
+
+            $response = $request.GetResponse()
+            $response.Dispose()
+        }
+        return $true
+    }
+    catch {
+        $ftpResponse = Get-FtpErrorResponse -Exception $_.Exception
+        if ($null -ne $ftpResponse -and
+            $ftpResponse.StatusCode -eq [System.Net.FtpStatusCode]::ActionNotTakenFileUnavailable) {
+            return $false
+        }
+
+        throw
+    }
+}
+
+function Get-RemoteDirectoryFileNames {
+    param(
+        [Parameter(Mandatory = $true)][string]$RemoteUri,
+        [Parameter(Mandatory = $true)][System.Net.NetworkCredential]$Credential
+    )
+
+    return Invoke-FtpWithRetry -Description "List $RemoteUri" -Operation {
+        $request = [System.Net.FtpWebRequest]::Create($RemoteUri)
+        $request.Method = [System.Net.WebRequestMethods+Ftp]::ListDirectory
+        $request.Credentials = $Credential
+        $request.UsePassive = $true
+        $request.KeepAlive = $false
+
+        $response = $request.GetResponse()
+        try {
+            $reader = [System.IO.StreamReader]::new($response.GetResponseStream())
+            try {
+                $names = @{}
+                while (-not $reader.EndOfStream) {
+                    $listedPath = $reader.ReadLine().Trim().Replace('\\', '/').TrimEnd('/')
+                    if (-not [string]::IsNullOrWhiteSpace($listedPath)) {
+                        $names[[System.IO.Path]::GetFileName($listedPath)] = $true
+                    }
+                }
+                return $names
+            }
+            finally {
+                $reader.Dispose()
+            }
+        }
+        finally {
+            $response.Dispose()
+        }
+    }
+}
+
+function Rename-RemoteFile {
+    param(
+        [Parameter(Mandatory = $true)][string]$RemoteUri,
+        [Parameter(Mandatory = $true)][string]$NewFileName,
+        [Parameter(Mandatory = $true)][System.Net.NetworkCredential]$Credential
+    )
+
+    Invoke-FtpWithRetry -Description "Rename $RemoteUri" -Operation {
+        $request = [System.Net.FtpWebRequest]::Create($RemoteUri)
+        $request.Method = [System.Net.WebRequestMethods+Ftp]::Rename
+        $request.RenameTo = $NewFileName
+        $request.Credentials = $Credential
+        $request.UsePassive = $true
+        $request.KeepAlive = $false
+
+        $response = $request.GetResponse()
+        try {
+            Write-Log "Renamed remote file: $RemoteUri -> $NewFileName"
+        }
+        finally {
+            $response.Dispose()
+        }
+    }
+}
+
 function Upload-File {
     param(
         [Parameter(Mandatory = $true)][string]$LocalPath,
@@ -254,43 +403,268 @@ function Upload-File {
         [Parameter(Mandatory = $true)][System.Net.NetworkCredential]$Credential
     )
 
-    $request = [System.Net.FtpWebRequest]::Create($RemoteUri)
-    $request.Method = [System.Net.WebRequestMethods+Ftp]::UploadFile
-    $request.Credentials = $Credential
-    $request.UseBinary = $true
-    $request.UsePassive = $true
-    $request.KeepAlive = $false
-
     Write-Log "Uploading to: $RemoteUri"
-    $bytes = [System.IO.File]::ReadAllBytes($LocalPath)
-    $request.ContentLength = $bytes.Length
+    Invoke-FtpWithRetry -Description "Upload $RemoteUri" -Operation {
+        $request = [System.Net.FtpWebRequest]::Create($RemoteUri)
+        $request.Method = [System.Net.WebRequestMethods+Ftp]::UploadFile
+        $request.Credentials = $Credential
+        $request.UseBinary = $true
+        $request.UsePassive = $true
+        $request.KeepAlive = $false
 
-    $stream = $request.GetRequestStream()
-    try {
-        $stream.Write($bytes, 0, $bytes.Length)
+        $bytes = [System.IO.File]::ReadAllBytes($LocalPath)
+        $request.ContentLength = $bytes.Length
+
+        $stream = $request.GetRequestStream()
+        try {
+            $stream.Write($bytes, 0, $bytes.Length)
+        }
+        finally {
+            $stream.Dispose()
+        }
+
+        $response = $request.GetResponse()
+        try {
+            Write-Log "Uploaded $LocalPath"
+        }
+        finally {
+            $response.Dispose()
+        }
     }
-    finally {
-        $stream.Dispose()
+}
+
+function Replace-RemoteFile {
+    param(
+        [Parameter(Mandatory = $true)][string]$LocalPath,
+        [Parameter(Mandatory = $true)][string]$RemoteUri,
+        [Parameter(Mandatory = $true)][System.Net.NetworkCredential]$Credential
+    )
+
+    $remoteFileName = [System.IO.Path]::GetFileName(([Uri]$RemoteUri).AbsolutePath)
+    $temporaryFileName = "$remoteFileName.deploytmp-$([Guid]::NewGuid().ToString('N'))"
+    $swapFileName = "$remoteFileName.deploybak-$([Guid]::NewGuid().ToString('N'))"
+    $remoteDirectoryUri = $RemoteUri.Substring(0, $RemoteUri.Length - $remoteFileName.Length)
+    $temporaryUri = $remoteDirectoryUri + $temporaryFileName
+    $swapUri = $remoteDirectoryUri + $swapFileName
+    $swapCreated = $false
+    $replacementCompleted = $false
+
+    try {
+        Upload-File -LocalPath $LocalPath -RemoteUri $temporaryUri -Credential $Credential
+        Rename-RemoteFile -RemoteUri $RemoteUri -NewFileName $swapFileName -Credential $Credential
+        $swapCreated = $true
+        for ($attempt = 1; $attempt -le 3 -and -not $replacementCompleted; $attempt++) {
+            try {
+                Rename-RemoteFile -RemoteUri $temporaryUri -NewFileName $remoteFileName -Credential $Credential
+                $replacementCompleted = $true
+            }
+            catch {
+                $verifyPath = Join-Path ([System.IO.Path]::GetTempPath()) ("competition-verify-{0}.tmp" -f [Guid]::NewGuid().ToString('N'))
+                try {
+                    Download-RemoteFile -RemoteUri $RemoteUri -LocalPath $verifyPath -Credential $Credential
+                    if ((Get-FileSha256 -Path $LocalPath) -eq (Get-FileSha256 -Path $verifyPath)) {
+                        Write-Log "Remote file verified after interrupted rename: $RemoteUri"
+                        $replacementCompleted = $true
+                    }
+                }
+                catch {
+                    Write-Log "Remote replacement verification failed for $RemoteUri on attempt ${attempt}."
+                }
+                finally {
+                    Remove-Item -LiteralPath $verifyPath -Force -ErrorAction SilentlyContinue
+                }
+
+                if (-not $replacementCompleted -and $attempt -eq 3) {
+                    throw
+                }
+
+                if (-not $replacementCompleted) {
+                    Start-Sleep -Seconds (2 * $attempt)
+                }
+            }
+        }
+        $replacementCompleted = $true
+    }
+    catch {
+        if ($swapCreated -and -not $replacementCompleted) {
+            try {
+                Rename-RemoteFile -RemoteUri $swapUri -NewFileName $remoteFileName -Credential $Credential
+            }
+            catch {
+                Write-Log "Failed to restore swapped remote file: $RemoteUri" -Level ERROR
+            }
+        }
+
+        try {
+            Delete-RemoteFile -RemoteUri $temporaryUri -Credential $Credential
+        }
+        catch {
+            Write-Log "Failed to delete temporary remote file: $temporaryUri" -Level WARN
+        }
+
+        throw
     }
 
-    $response = $request.GetResponse()
     try {
-        Write-Host "Uploaded $LocalPath"
+        Delete-RemoteFile -RemoteUri $swapUri -Credential $Credential
     }
-    finally {
-        $response.Dispose()
+    catch {
+        Write-Log "Could not delete remote swap backup: $swapUri" -Level WARN
+    }
+}
+
+function Format-ElapsedTime {
+    param([Parameter(Mandatory = $true)][TimeSpan]$Elapsed)
+
+    if ($Elapsed.TotalMinutes -ge 1) {
+        return ("{0}m {1}s" -f [math]::Floor($Elapsed.TotalMinutes), $Elapsed.Seconds)
+    }
+
+    return ("{0:N1}s" -f $Elapsed.TotalSeconds)
+}
+
+function Get-FileSha256 {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash
+}
+
+function Get-ComparableFileVersion {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $versionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($Path)
+    if ([string]::IsNullOrWhiteSpace($versionInfo.FileVersion)) {
+        return $null
+    }
+
+    $match = [regex]::Match($versionInfo.FileVersion, '^\s*(\d+(?:\.\d+){1,3})')
+    if (-not $match.Success) {
+        return $null
+    }
+
+    try {
+        return [version]::Parse($match.Groups[1].Value)
+    }
+    catch {
+        return $null
+    }
+}
+
+function Get-DeploymentFileMetadata {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$RelativePath
+    )
+
+    $version = Get-ComparableFileVersion -Path $Path
+    return [pscustomobject]@{
+        Path    = ($RelativePath -replace '\\', '/')
+        Sha256  = Get-FileSha256 -Path $Path
+        Version = if ($null -eq $version) { $null } else { $version.ToString() }
+        Length  = (Get-Item -LiteralPath $Path).Length
+        Unknown = $false
+    }
+}
+
+function Test-IsThirdPartyOrRuntimeFile {
+    param([Parameter(Mandatory = $true)][string]$RelativePath)
+
+    $normalizedPath = $RelativePath -replace '\\', '/'
+    if ($normalizedPath.StartsWith('runtimes/', [StringComparison]::OrdinalIgnoreCase)) {
+        return $true
+    }
+
+    $fileName = [System.IO.Path]::GetFileName($normalizedPath)
+    $extension = [System.IO.Path]::GetExtension($normalizedPath)
+    return $extension -in @('.dll', '.exe') -and
+        $fileName -notin @('Competition.dll', 'Competition.exe')
+}
+
+function Get-RemoteReplacementDecision {
+    param(
+        [Parameter(Mandatory = $true)]$LocalMetadata,
+        [Parameter(Mandatory = $true)]$RemoteMetadata,
+        [Parameter(Mandatory = $true)][string]$RelativePath
+    )
+
+    if ($LocalMetadata.Sha256 -eq $RemoteMetadata.Sha256) {
+        return [pscustomobject]@{
+            ShouldUpload = $false
+            Reason = 'content is unchanged'
+        }
+    }
+
+    if (-not (Test-IsThirdPartyOrRuntimeFile -RelativePath $RelativePath)) {
+        return [pscustomobject]@{
+            ShouldUpload = $true
+            Reason = 'application file content changed'
+        }
+    }
+
+    $localVersion = if ([string]::IsNullOrWhiteSpace($LocalMetadata.Version)) { $null } else { [version]$LocalMetadata.Version }
+    $remoteVersion = if ([string]::IsNullOrWhiteSpace($RemoteMetadata.Version)) { $null } else { [version]$RemoteMetadata.Version }
+    if ($null -eq $localVersion -or $null -eq $remoteVersion) {
+        return [pscustomobject]@{
+            ShouldUpload = $false
+            Reason = 'third-party/runtime version could not be compared'
+        }
+    }
+
+    if ($localVersion -le $remoteVersion) {
+        return [pscustomobject]@{
+            ShouldUpload = $false
+            Reason = "local version $localVersion is not newer than remote version $remoteVersion"
+        }
+    }
+
+    return [pscustomobject]@{
+        ShouldUpload = $true
+        Reason = "local version $localVersion is newer than remote version $remoteVersion"
     }
 }
 
 function Publish-App {
-    param([string]$ResolvedProjectPath, [string]$OutputPath)
+    param(
+        [string]$ResolvedProjectPath,
+        [string]$OutputPath,
+        [string]$RuntimeIdentifier,
+        [bool]$SelfContained
+    )
 
     if (Test-Path $OutputPath) {
         Remove-Item -Recurse -Force $OutputPath
     }
 
     New-Item -ItemType Directory -Force -Path $OutputPath | Out-Null
-    dotnet publish $ResolvedProjectPath -c Release -o $OutputPath
+    $publishArguments = @(
+        'publish',
+        $ResolvedProjectPath,
+        '-c',
+        'Release',
+        '-o',
+        $OutputPath
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($RuntimeIdentifier)) {
+        $publishArguments += @('-r', $RuntimeIdentifier)
+    }
+
+    $publishArguments += @('--self-contained', $SelfContained.ToString().ToLowerInvariant())
+    if (-not $SelfContained) {
+        $publishArguments += '-p:UseAppHost=false'
+    }
+
+    Write-Log ("dotnet {0}" -f ($publishArguments -join ' '))
+    $publishOutput = & dotnet @publishArguments 2>&1
+    foreach ($outputLine in $publishOutput) {
+        Write-Log "dotnet publish: $outputLine"
+    }
+    if ($LASTEXITCODE -ne 0) {
+        foreach ($outputLine in $publishOutput) {
+            Write-Host $outputLine
+        }
+        throw "dotnet publish failed with exit code $LASTEXITCODE."
+    }
 }
 
 function New-LocalRollbackEntry {
@@ -334,11 +708,31 @@ try {
     $resolvedPublishDir = [System.IO.Path]::GetFullPath($PublishDir)
     $resolvedRollbackCacheDir = [System.IO.Path]::GetFullPath($RollbackCacheDir)
     $resolvedDatabaseBackupDir = [System.IO.Path]::GetFullPath($DatabaseBackupDir)
-    $null = New-Item -ItemType Directory -Force -Path $resolvedRollbackCacheDir
-    $null = New-Item -ItemType Directory -Force -Path $resolvedDatabaseBackupDir
+    if ($Backup) {
+        $null = New-Item -ItemType Directory -Force -Path $resolvedRollbackCacheDir
+        $null = New-Item -ItemType Directory -Force -Path $resolvedDatabaseBackupDir
+        Write-Log "Backups and rollback are enabled." -Console
+    }
+    else {
+        Write-Log "Backups are disabled. Pass -Backup to enable them." -Console
+    }
 
+    Write-Log "Publishing application..." -Console
     Write-Log "Publishing project: $resolvedProjectPath"
-    Publish-App -ResolvedProjectPath $resolvedProjectPath -OutputPath $resolvedPublishDir
+    $selfContainedBuild = [bool]$SelfContained
+    $publishRuntimeIdentifier = $RuntimeIdentifier
+    if ($selfContainedBuild) {
+        Write-Log "Publishing self-contained app for $RuntimeIdentifier." -Console
+    }
+    else {
+        Write-Log "Publishing framework-dependent app for the FORPSI .NET runtime." -Console
+    }
+
+    Publish-App `
+        -ResolvedProjectPath $resolvedProjectPath `
+        -OutputPath $resolvedPublishDir `
+        -RuntimeIdentifier $publishRuntimeIdentifier `
+        -SelfContained $selfContainedBuild
 
     $remoteBaseUri = Get-FtpBaseUri -FtpHost $FtpHost -Path $RemoteDir
     $ensuredRemoteDirectories = [System.Collections.Generic.HashSet[string]]::new(
@@ -347,29 +741,65 @@ try {
     Write-Log "Ensuring remote folder: $remoteBaseUri"
     Ensure-RemoteDirectory -RemoteUri $remoteBaseUri -Credential $script:Credential -KnownDirectories $ensuredRemoteDirectories
 
+    $manifestFileName = 'competition-deploy-manifest.json'
+    $remoteManifestUri = $remoteBaseUri + $manifestFileName
+    $remoteManifestByPath = @{}
+    $manifestDownloadPath = Join-Path ([System.IO.Path]::GetTempPath()) ("competition-manifest-{0}.json" -f [Guid]::NewGuid().ToString('N'))
+    try {
+        Download-RemoteFile -RemoteUri $remoteManifestUri -LocalPath $manifestDownloadPath -Credential $script:Credential
+        $remoteManifest = Get-Content -LiteralPath $manifestDownloadPath -Raw | ConvertFrom-Json
+        foreach ($entry in @($remoteManifest.Files)) {
+            if (-not [string]::IsNullOrWhiteSpace($entry.Path)) {
+                $remoteManifestByPath[$entry.Path] = $entry
+            }
+        }
+        Write-Log ("Loaded deployment manifest with {0} file(s)." -f $remoteManifestByPath.Count)
+    }
+    catch {
+        $ftpResponse = Get-FtpErrorResponse -Exception $_.Exception
+        if ($null -ne $ftpResponse -and
+            $ftpResponse.StatusCode -eq [System.Net.FtpStatusCode]::ActionNotTakenFileUnavailable) {
+            Write-Log "No remote deployment manifest exists; protected dependencies will be inventoried once." -Level WARN
+        }
+        elseif ($_.Exception -is [System.Management.Automation.RuntimeException]) {
+            Write-Log "The remote deployment manifest is invalid; protected dependencies will be inventoried once." -Level WARN
+        }
+        else {
+            throw
+        }
+    }
+    finally {
+        Remove-Item -LiteralPath $manifestDownloadPath -Force -ErrorAction SilentlyContinue
+    }
+
     $offlineMarkerPath = Join-Path $resolvedPublishDir 'app_offline.htm'
     $script:OfflineMarkerUri = $remoteBaseUri + 'app_offline.htm'
     [System.IO.File]::WriteAllText(
         $offlineMarkerPath,
         '<!doctype html><title>Deployment in progress</title><p>The application will be back shortly.</p>'
     )
-    Write-Log "Taking the application offline for a consistent database backup and file deployment."
+    Write-Log "Taking the application offline for deployment..." -Console
     Upload-File -LocalPath $offlineMarkerPath -RemoteUri $script:OfflineMarkerUri -Credential $script:Credential
     $script:OfflineMarkerUploaded = $true
     Start-Sleep -Seconds 2
+    Write-Log "Site is offline." -Console
 
     $files = @(Get-ChildItem -Path $resolvedPublishDir -File -Recurse | Where-Object {
         $_.Name -ne 'appsettings.Development.json' -and
         $_.Name -ne 'ftp-creds.json' -and
-        $_.Name -ne 'app_offline.htm'
+        $_.Name -ne 'app_offline.htm' -and
+        $_.Name -ne $manifestFileName
     } | Sort-Object `
         @{ Expression = { if ($_.FullName.EndsWith('App_Data\competition.db', [StringComparison]::OrdinalIgnoreCase)) { 0 } else { 1 } } }, `
         FullName)
-    Write-Log ("Uploading {0} file(s)." -f $files.Count)
+    $uploadedFileCount = 0
+    $skippedFileCount = 0
+    $finalManifestEntries = [System.Collections.Generic.List[object]]::new()
+    $remoteDirectoryListings = @{}
+    Write-Log ("Evaluating {0} published file(s)." -f $files.Count)
     foreach ($file in $files) {
         $relativePath = $file.FullName.Substring($resolvedPublishDir.Length).TrimStart('\')
         $remoteFileUri = ($remoteBaseUri + ($relativePath -replace '\\', '/'))
-        $localBackupPath = Join-Path $resolvedRollbackCacheDir ($relativePath -replace '[\\/:*?"<>|]', '_')
         $relativeDirectory = [System.IO.Path]::GetDirectoryName($relativePath)
 
         if (-not [string]::IsNullOrWhiteSpace($relativeDirectory)) {
@@ -383,56 +813,164 @@ try {
 
         $normalizedRelativePath = $relativePath -replace '\\', '/'
         if ($normalizedRelativePath -ieq 'App_Data/competition.db') {
-            $databaseBackupPath = Join-Path $resolvedDatabaseBackupDir (
-                "competition-{0}.db" -f (Get-Date -Format "yyyyMMdd-HHmmss")
-            )
-
-            try {
-                Download-RemoteFile `
-                    -RemoteUri $remoteFileUri `
-                    -LocalPath $databaseBackupPath `
-                    -Credential $script:Credential
-                Write-Log "Preserving the existing production database; local seed was not uploaded." -Level SUCCESS
+            if (Test-RemoteFileExists -RemoteUri $remoteFileUri -Credential $script:Credential) {
+                if ($Backup) {
+                    $databaseBackupPath = Join-Path $resolvedDatabaseBackupDir (
+                        "competition-{0}.db" -f (Get-Date -Format "yyyyMMdd-HHmmss")
+                    )
+                    Download-RemoteFile `
+                        -RemoteUri $remoteFileUri `
+                        -LocalPath $databaseBackupPath `
+                        -Credential $script:Credential
+                    Write-Log "Production database backup saved to $databaseBackupPath" -Console
+                }
+                Write-Log "Preserving the existing production database; local seed was not uploaded." -Console
             }
-            catch {
-                $ftpResponse = Get-FtpErrorResponse -Exception $_.Exception
-                if ($null -ne $ftpResponse -and
-                    $ftpResponse.StatusCode -eq [System.Net.FtpStatusCode]::ActionNotTakenFileUnavailable) {
-                    Write-Log "No production database exists; uploading the converted local database as the initial seed." -Level WARN
-                    Upload-File -LocalPath $file.FullName -RemoteUri $remoteFileUri -Credential $script:Credential
-                }
-                else {
-                    throw
-                }
+            else {
+                Write-Log "No production database exists; uploading the converted local database as the initial seed." -Level WARN
+                Upload-File -LocalPath $file.FullName -RemoteUri $remoteFileUri -Credential $script:Credential
+                $uploadedFileCount++
+                Write-Log "Uploaded App_Data/competition.db (initial database seed)." -Console
             }
 
             continue
         }
 
-        try {
-            Download-RemoteFile -RemoteUri $remoteFileUri -LocalPath $localBackupPath -Credential $script:Credential
-            New-LocalRollbackEntry -RemoteUri $remoteFileUri -BackupPath $localBackupPath
-            Delete-RemoteFile -RemoteUri $remoteFileUri -Credential $script:Credential
+        $localMetadata = Get-DeploymentFileMetadata -Path $file.FullName -RelativePath $normalizedRelativePath
+        $remoteContainingDirectoryUri = $remoteBaseUri
+        if (-not [string]::IsNullOrWhiteSpace($relativeDirectory)) {
+            $remoteContainingDirectoryUri += (($relativeDirectory -replace '\\', '/').Trim('/')) + '/'
         }
-        catch {
-            $ftpResponse = Get-FtpErrorResponse -Exception $_.Exception
-            if ($null -ne $ftpResponse -and
-                $ftpResponse.StatusCode -eq [System.Net.FtpStatusCode]::ActionNotTakenFileUnavailable) {
-                Write-Log "No existing remote file to back up: $remoteFileUri" -Level WARN
+        if (-not $remoteDirectoryListings.ContainsKey($remoteContainingDirectoryUri)) {
+            $remoteDirectoryListings[$remoteContainingDirectoryUri] = Get-RemoteDirectoryFileNames `
+                -RemoteUri $remoteContainingDirectoryUri `
+                -Credential $script:Credential
+        }
+        $remoteFileListed = $remoteDirectoryListings[$remoteContainingDirectoryUri].ContainsKey($file.Name)
+        $remoteMetadata = $remoteManifestByPath[$normalizedRelativePath]
+        if ($null -ne $remoteMetadata -and -not $remoteFileListed) {
+            Write-Log "Manifest entry is stale because the remote file is missing: $normalizedRelativePath" -Level WARN
+            $remoteMetadata = $null
+        }
+        $comparisonPath = $null
+        $remoteFileExists = $remoteFileListed
+
+        $isProtectedDependency = Test-IsThirdPartyOrRuntimeFile -RelativePath $normalizedRelativePath
+        $requiresDependencyInspection = $isProtectedDependency -and (
+            $null -eq $remoteMetadata -or
+            ($InspectRemoteDependencies -and $remoteMetadata.Unknown -eq $true)
+        )
+        if ($requiresDependencyInspection -and $InspectRemoteDependencies) {
+            $comparisonExtension = [System.IO.Path]::GetExtension($file.Name)
+            $comparisonPath = Join-Path ([System.IO.Path]::GetTempPath()) ("competition-compare-{0}{1}" -f [Guid]::NewGuid().ToString('N'), $comparisonExtension)
+            try {
+                Download-RemoteFile -RemoteUri $remoteFileUri -LocalPath $comparisonPath -Credential $script:Credential
+                $remoteFileExists = $true
+                $remoteMetadata = Get-DeploymentFileMetadata -Path $comparisonPath -RelativePath $normalizedRelativePath
             }
-            else {
-                throw
+            catch {
+                $ftpResponse = Get-FtpErrorResponse -Exception $_.Exception
+                if ($null -eq $ftpResponse -or
+                    $ftpResponse.StatusCode -ne [System.Net.FtpStatusCode]::ActionNotTakenFileUnavailable) {
+                    throw
+                }
+            }
+        }
+        elseif ($requiresDependencyInspection) {
+            if ($remoteFileListed) {
+                $remoteFileExists = $true
+                $remoteMetadata = [pscustomobject]@{
+                    Path = $normalizedRelativePath
+                    Sha256 = $null
+                    Version = $null
+                    Length = $null
+                    Unknown = $true
+                }
+                Write-Log "Preserving untracked protected dependency ${relativePath}; pass -InspectRemoteDependencies for a one-time version comparison."
             }
         }
 
-        Upload-File -LocalPath $file.FullName -RemoteUri $remoteFileUri -Credential $script:Credential
+        if ($null -eq $remoteMetadata) {
+            $replacementDecision = [pscustomobject]@{
+                ShouldUpload = $true
+                Reason = 'file is new or has no manifest entry'
+            }
+        }
+        else {
+            $replacementDecision = Get-RemoteReplacementDecision `
+                -LocalMetadata $localMetadata `
+                -RemoteMetadata $remoteMetadata `
+                -RelativePath $normalizedRelativePath
+        }
+
+        if (-not $replacementDecision.ShouldUpload) {
+            Write-Log "Skipping ${relativePath}: $($replacementDecision.Reason)."
+            $skippedFileCount++
+            $finalManifestEntries.Add($remoteMetadata)
+            if ($null -ne $comparisonPath) {
+                Remove-Item -LiteralPath $comparisonPath -Force -ErrorAction SilentlyContinue
+            }
+            continue
+        }
+
+        Write-Log "Replacing ${relativePath}: $($replacementDecision.Reason)."
+        $backedUpExistingFile = $false
+        if ($Backup) {
+            $localBackupPath = Join-Path $resolvedRollbackCacheDir ($relativePath -replace '[\\/:*?"<>|]', '_')
+            if ($null -ne $comparisonPath -and $remoteFileExists) {
+                Copy-Item -LiteralPath $comparisonPath -Destination $localBackupPath -Force
+                $backedUpExistingFile = $true
+            }
+            elseif ($remoteFileExists -or (Test-RemoteFileExists -RemoteUri $remoteFileUri -Credential $script:Credential)) {
+                Download-RemoteFile -RemoteUri $remoteFileUri -LocalPath $localBackupPath -Credential $script:Credential
+                $backedUpExistingFile = $true
+            }
+
+            if ($backedUpExistingFile) {
+                New-LocalRollbackEntry -RemoteUri $remoteFileUri -BackupPath $localBackupPath
+                Replace-RemoteFile -LocalPath $file.FullName -RemoteUri $remoteFileUri -Credential $script:Credential
+            }
+            else {
+                Upload-File -LocalPath $file.FullName -RemoteUri $remoteFileUri -Credential $script:Credential
+            }
+        }
+        else {
+            Upload-File -LocalPath $file.FullName -RemoteUri $remoteFileUri -Credential $script:Credential
+        }
+
+        if ($null -ne $comparisonPath) {
+            Remove-Item -LiteralPath $comparisonPath -Force -ErrorAction SilentlyContinue
+        }
+        $uploadedFileCount++
+        $finalManifestEntries.Add($localMetadata)
+        Write-Log "Uploaded $normalizedRelativePath" -Console
+    }
+
+    $localManifestPath = Join-Path ([System.IO.Path]::GetTempPath()) ("competition-manifest-{0}.json" -f [Guid]::NewGuid().ToString('N'))
+    try {
+        $deploymentManifest = [ordered]@{
+            SchemaVersion = 1
+            GeneratedUtc = [DateTime]::UtcNow.ToString('o')
+            Files = $finalManifestEntries
+        }
+        $deploymentManifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $localManifestPath -Encoding UTF8
+        Upload-File -LocalPath $localManifestPath -RemoteUri $remoteManifestUri -Credential $script:Credential
+        Write-Log "Updated remote deployment manifest."
+    }
+    finally {
+        Remove-Item -LiteralPath $localManifestPath -Force -ErrorAction SilentlyContinue
     }
 
     Delete-RemoteFile -RemoteUri $script:OfflineMarkerUri -Credential $script:Credential
     $script:OfflineMarkerUploaded = $false
+    Write-Log "Site is back online." -Console
+    $script:DeploymentStopwatch.Stop()
+    $elapsedText = Format-ElapsedTime -Elapsed $script:DeploymentStopwatch.Elapsed
 
     Write-Banner "DEPLOYMENT SUCCESS"
-    Write-Log ("Deployment complete. Log saved to {0}" -f $script:LogFile) -Level SUCCESS
+    Write-Log ("Uploaded {0} new or newer file(s); skipped {1} unchanged or non-newer file(s)." -f $uploadedFileCount, $skippedFileCount) -Level SUCCESS -Console
+    Write-Log "Deployment completed in $elapsedText." -Level SUCCESS -Console
+    Write-Log ("Deployment complete. Log saved to {0}" -f $script:LogFile)
 }
 catch {
     $script:HadError = $true
@@ -446,15 +984,14 @@ catch {
         Write-Log "Bringing the application back online after deployment failure." -Level WARN
         Delete-RemoteFile -RemoteUri $script:OfflineMarkerUri -Credential $script:Credential
         $script:OfflineMarkerUploaded = $false
+        Write-Log "Site is back online after rollback." -Console
     }
+    $script:DeploymentStopwatch.Stop()
+    $elapsedText = Format-ElapsedTime -Elapsed $script:DeploymentStopwatch.Elapsed
+    Write-Log "Deployment and rollback ended after $elapsedText." -Level ERROR
     Write-Log ("See log file: {0}" -f $script:LogFile) -Level ERROR
     throw
 }
 finally {
-    if ($script:HadError) {
-        Write-Log "Result: FAILED" -Level ERROR
-    }
-    else {
-        Write-Log "Result: SUCCESS" -Level SUCCESS
-    }
+    Wait-ForExitAcknowledgement
 }
