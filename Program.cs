@@ -108,6 +108,7 @@ builder.Services.AddScoped<IEditionAdministrationService, EditionAdministrationS
 builder.Services.AddScoped<ICompetitorAdministrationService, CompetitorAdministrationService>();
 builder.Services.AddScoped<IDisciplineAdministrationService, DisciplineAdministrationService>();
 builder.Services.AddScoped<IPhaseSetupService, PhaseSetupService>();
+builder.Services.AddScoped<IGroupStandingsService, GroupStandingsService>();
 
 var app = builder.Build();
 

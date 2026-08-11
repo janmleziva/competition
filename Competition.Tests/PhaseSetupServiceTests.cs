@@ -55,6 +55,60 @@ public sealed class PhaseSetupServiceTests
     }
 
     [Fact]
+    public async Task TwoGroupClassification_FillsFinalStandingTeamsAfterBothGroupsAreComplete()
+    {
+        await using var db = CreateDbContext();
+        var (editionId, disciplineId, teamIds) = await SeedDisciplineAsync(db, 4, PlayingSystemType.GroupsThenClassificationMatches);
+        var service = new PhaseSetupService(db);
+        var setup = await service.GetSetupAsync(editionId, disciplineId);
+        var groupPhases = setup!.Phases.Where(x => x.Type == PhaseType.Group).OrderBy(x => x.Order).ToList();
+
+        await service.AssignGroupTeamsAsync(editionId, disciplineId, groupPhases[0].Id, groupPhases[0].Groups[0].Id, teamIds.Take(2).ToList());
+        await service.AssignGroupTeamsAsync(editionId, disciplineId, groupPhases[1].Id, groupPhases[1].Groups[0].Id, teamIds.Skip(2).ToList());
+        await service.GeneratePresetMatchesAsync(editionId, disciplineId);
+
+        setup = await service.GetSetupAsync(editionId, disciplineId);
+        var finalMatches = setup!.Phases.Single(x => x.Type == PhaseType.FinalStanding).Matches.OrderBy(x => x.Order).ToList();
+        Assert.All(finalMatches, match =>
+        {
+            Assert.Null(match.HomeTeamId);
+            Assert.Null(match.AwayTeamId);
+        });
+
+        var groupMatches = db.Matches.Where(x => x.PhaseGroupId != null).OrderBy(x => x.PhaseGroupId).ToList();
+        await service.UpdateMatchResultAsync(editionId, disciplineId, new MatchResultInput
+        {
+            MatchId = groupMatches[0].Id,
+            HomeScore = 2,
+            AwayScore = 0,
+            Version = groupMatches[0].Version
+        }, false);
+
+        setup = await service.GetSetupAsync(editionId, disciplineId);
+        finalMatches = setup!.Phases.Single(x => x.Type == PhaseType.FinalStanding).Matches.OrderBy(x => x.Order).ToList();
+        Assert.Null(finalMatches[0].AwayTeamId);
+        Assert.Null(finalMatches[1].AwayTeamId);
+
+        groupMatches = db.Matches.Where(x => x.PhaseGroupId != null).OrderBy(x => x.PhaseGroupId).ToList();
+        await service.UpdateMatchResultAsync(editionId, disciplineId, new MatchResultInput
+        {
+            MatchId = groupMatches[1].Id,
+            HomeScore = 0,
+            AwayScore = 2,
+            Version = groupMatches[1].Version
+        }, false);
+
+        setup = await service.GetSetupAsync(editionId, disciplineId);
+        finalMatches = setup!.Phases.Single(x => x.Type == PhaseType.FinalStanding).Matches.OrderBy(x => x.Order).ToList();
+        Assert.Equal((teamIds[0], teamIds[3]), (finalMatches[0].HomeTeamId, finalMatches[0].AwayTeamId));
+        Assert.Equal((teamIds[1], teamIds[2]), (finalMatches[1].HomeTeamId, finalMatches[1].AwayTeamId));
+        Assert.Equal("1. místo – Skupina A", finalMatches[0].HomeSource);
+        Assert.Equal("1. místo – Skupina B", finalMatches[0].AwaySource);
+        Assert.Equal("2. místo – Skupina A", finalMatches[1].HomeSource);
+        Assert.Equal("2. místo – Skupina B", finalMatches[1].AwaySource);
+    }
+
+    [Fact]
     public async Task KnockoutStages_FeedWinnersIntoNextStage()
     {
         await using var db = CreateDbContext();
@@ -177,7 +231,7 @@ public sealed class PhaseSetupServiceTests
         var service = new PhaseSetupService(db);
         await service.GetSetupAsync(editionId, disciplineId);
         await service.GeneratePresetMatchesAsync(editionId, disciplineId);
-        var page = new DisciplinePhasesModel(service)
+        var page = new DisciplinePhasesModel(service, new GroupStandingsService(db))
         {
             PageContext = new PageContext
             {
@@ -231,7 +285,7 @@ public sealed class PhaseSetupServiceTests
         await service.GetSetupAsync(editionId, disciplineId);
         await service.GeneratePresetMatchesAsync(editionId, disciplineId);
         var match = await db.Matches.SingleAsync();
-        var page = new DisciplinePhasesModel(service)
+        var page = new DisciplinePhasesModel(service, new GroupStandingsService(db))
         {
             PageContext = new PageContext { HttpContext = new DefaultHttpContext() },
             ResultInput = new MatchResultInput
@@ -532,7 +586,7 @@ public sealed class PhaseSetupServiceTests
             Sets = [new MatchSetScoreInput { SetNumber = 1, HomeScore = 6, AwayScore = 3 }]
         }, false);
         var savedMatch = await db.Matches.SingleAsync();
-        var page = new DisciplinePhasesModel(service)
+        var page = new DisciplinePhasesModel(service, new GroupStandingsService(db))
         {
             PageContext = new PageContext { HttpContext = new DefaultHttpContext() },
             SetScoresInput = new MatchSetScoresInput { MatchId = savedMatch.Id, Version = savedMatch.Version }
@@ -557,7 +611,10 @@ public sealed class PhaseSetupServiceTests
         var match = await db.Matches.SingleAsync();
         var input = new MatchResultInput
         {
-            MatchId = match.Id, HomeScore = 2, AwayScore = 1, Version = match.Version
+            MatchId = match.Id,
+            HomeScore = 2,
+            AwayScore = 1,
+            Version = match.Version
         };
 
         var error = await Assert.ThrowsAsync<ValidationException>(() =>
@@ -580,14 +637,20 @@ public sealed class PhaseSetupServiceTests
         var staleVersion = match.Version;
         await service.UpdateMatchResultAsync(editionId, disciplineId, new MatchResultInput
         {
-            MatchId = match.Id, HomeScore = 2, AwayScore = 0, Version = staleVersion
+            MatchId = match.Id,
+            HomeScore = 2,
+            AwayScore = 0,
+            Version = staleVersion
         }, false);
-        var page = new DisciplinePhasesModel(service)
+        var page = new DisciplinePhasesModel(service, new GroupStandingsService(db))
         {
             PageContext = new PageContext { HttpContext = new DefaultHttpContext() },
             ResultInput = new MatchResultInput
             {
-                MatchId = match.Id, HomeScore = 0, AwayScore = 2, Version = staleVersion
+                MatchId = match.Id,
+                HomeScore = 0,
+                AwayScore = 2,
+                Version = staleVersion
             }
         };
 
@@ -612,7 +675,10 @@ public sealed class PhaseSetupServiceTests
 
         await service.UpdateMatchResultAsync(editionId, disciplineId, new MatchResultInput
         {
-            MatchId = match.Id, HomeScore = 4, AwayScore = 3, Version = match.Version
+            MatchId = match.Id,
+            HomeScore = 4,
+            AwayScore = 3,
+            Version = match.Version
         }, false);
 
         var saved = await db.Matches.SingleAsync();
@@ -663,12 +729,15 @@ public sealed class PhaseSetupServiceTests
         await service.GetSetupAsync(editionId, disciplineId);
         await service.GeneratePresetMatchesAsync(editionId, disciplineId);
         var match = await db.Matches.SingleAsync();
-        var page = new DisciplinePhasesModel(service)
+        var page = new DisciplinePhasesModel(service, new GroupStandingsService(db))
         {
             PageContext = new PageContext { HttpContext = new DefaultHttpContext() },
             ResultInput = new MatchResultInput
             {
-                MatchId = match.Id, HomeScore = 1, AwayScore = 0, Version = match.Version
+                MatchId = match.Id,
+                HomeScore = 1,
+                AwayScore = 0,
+                Version = match.Version
             }
         };
 
@@ -689,7 +758,9 @@ public sealed class PhaseSetupServiceTests
         await Assert.ThrowsAsync<ValidationException>(() => service.UpdateMatchResultAsync(
             editionId, disciplineId, new MatchResultInput
             {
-                MatchId = match.Id, HomeScore = 1, AwayScore = 0
+                MatchId = match.Id,
+                HomeScore = 1,
+                AwayScore = 0
             }, false));
 
         match.AwayTeamId = match.HomeTeamId;
@@ -697,7 +768,10 @@ public sealed class PhaseSetupServiceTests
         await Assert.ThrowsAsync<ValidationException>(() => service.UpdateMatchResultAsync(
             editionId, disciplineId, new MatchResultInput
             {
-                MatchId = match.Id, HomeScore = 1, AwayScore = 0, Version = match.Version
+                MatchId = match.Id,
+                HomeScore = 1,
+                AwayScore = 0,
+                Version = match.Version
             }, false));
     }
 
@@ -904,7 +978,7 @@ public sealed class PhaseSetupServiceTests
             new PhaseInput { Name = "Skupina", Type = PhaseType.Group, Order = 1 });
         var groupId = await service.CreateGroupAsync(editionId, disciplineId, phaseId,
             new PhaseGroupInput { Name = "A", Order = 1 });
-        var page = new DisciplinePhasesModel(service)
+        var page = new DisciplinePhasesModel(service, new GroupStandingsService(db))
         {
             PageContext = new PageContext
             {

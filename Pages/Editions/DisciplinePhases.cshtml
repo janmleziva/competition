@@ -127,32 +127,33 @@
             <div asp-validation-summary="ModelOnly" class="error validation-panel"></div>
         }
 
+        @if (Model.ShouldShowPhaseFilter)
+        {
+            <nav class="phase-switcher" aria-label="Zobrazení fáze nebo skupiny" data-phase-switcher>
+                <button class="phase-switch-button is-active" type="button" data-phase-switch-target="all" aria-pressed="true">Vše</button>
+                @foreach (var item in Model.GetPhaseFilterItems())
+                {
+                    <button class="phase-switch-button" type="button" data-phase-switch-target="@item.Key" aria-pressed="false">@item.Label</button>
+                }
+            </nav>
+        }
+
         @if (Model.Setup.PlayingSystem == PlayingSystemType.RoundRobin)
         {
             var phase = Model.Setup.Phases.Single(x => x.Type == PhaseType.Group);
             var group = phase.Groups.Single();
-            <article class="phase-card">
+            <article class="phase-card" data-phase-filter-card="group-@group.Id">
                 <div class="phase-card-heading">
                     <div>
-                        <span class="phase-eyebrow">Detaily</span>
                         <h2>Každý s každým</h2>
                     </div>
                     <span class="points-badge">Body @phase.PointsForWin / @phase.PointsForDraw / @phase.PointsForLoss</span>
                 </div>
 
-                <div class="phase-team-list" aria-label="Týmy v rozpisu">
-                    @foreach (var team in Model.Setup.Teams)
-                    {
-                        <div class="participant-option participant-option-content is-assigned phase-team-option">
-                            <span class="seed-badge">@team.Seed</span>
-                            <span class="participant-name">@team.Name</span>
-                            @if (isAdmin)
-                            {
-                                <span class="assignment-status">V rozpisu</span>
-                            }
-                        </div>
-                    }
-                </div>
+                @if (Model.GroupStandings.TryGetValue(group.Id, out var roundRobinStandings))
+                {
+                    <partial name="_GroupStandings" model="roundRobinStandings" />
+                }
 
                 @if (group.Matches.Count == 0 && isAdmin)
                 {
@@ -180,7 +181,7 @@
             {
                 var group = phase.Groups.Single();
                 var options = Model.GetAssignableTeams(group);
-                <article class="phase-card">
+                <article class="phase-card" data-phase-filter-card="group-@group.Id">
                     <div class="phase-card-heading">
                         <div class="phase-title-with-order">
                             <span class="seed-badge">@phase.Order</span>
@@ -229,28 +230,16 @@
                             </form>
                         }
                     }
-                    else
+
+                    @if (Model.GroupStandings.TryGetValue(group.Id, out var groupStandings))
                     {
-                        <div class="phase-team-list">
-                            @foreach (var teamId in group.TeamIds)
-                            {
-                                var team = Model.Setup.Teams.Single(x => x.Id == teamId);
-                                <div class="participant-option participant-option-content is-assigned phase-team-option">
-                                    <span class="seed-badge">@team.Seed</span>
-                                    <span class="participant-name">@team.Name</span>
-                                    @if (isAdmin)
-                                    {
-                                        <span class="assignment-status">Ve skupině</span>
-                                    }
-                                </div>
-                            }
-                        </div>
+                        <partial name="_GroupStandings" model="groupStandings" />
                     }
 
                     @if (group.Matches.Count > 0)
                     {
                         <section class="fixture-section">
-                            <h3>Rozpis @group.Name</h3>
+                            <h3>Rozpis</h3>
                             <partial name="_PhaseMatchList"
                                      model="new PhaseMatchListViewModel(group.Matches, Model.Setup.UsesSetScores, Model.Setup.SetsToWin, Model.CanEditResults(isAdmin), false, Model.MatchStatusMessage, Model.MatchStatusMatchId, ValidationMessage: Model.MatchValidationMessage, ValidationMatchId: Model.MatchValidationMatchId)" />
                         </section>
@@ -259,7 +248,7 @@
             }
 
             var finalPhase = Model.Setup.Phases.Single(x => x.Type == PhaseType.FinalStanding);
-            <article class="phase-card final-phase-card">
+            <article class="phase-card final-phase-card" data-phase-filter-card="phase-@finalPhase.Id">
                 <div class="phase-card-heading">
                     <div class="phase-title-with-order"><span class="seed-badge">@finalPhase.Order</span><div><span class="phase-eyebrow">Finálová fáze</span><h2>@finalPhase.Name</h2></div></div>
                 </div>
@@ -286,7 +275,7 @@
         else if (Model.Setup.PlayingSystem == PlayingSystemType.Knockout)
         {
             var phase = Model.Setup.Phases.Single(x => x.Type == PhaseType.Knockout);
-            <article class="phase-card">
+            <article class="phase-card" data-phase-filter-card="phase-@phase.Id">
                 <div class="phase-card-heading">
                     <div><span class="phase-eyebrow">Vyřazovací fáze</span><h2>@phase.Name</h2></div>
                 </div>
@@ -447,7 +436,7 @@
             {
                 var assignedCount = phase.Groups.SelectMany(x => x.TeamIds).Distinct().Count();
                 var phaseHasMatches = phase.Matches.Count != 0 || phase.Groups.Any(x => x.Matches.Count != 0);
-                <article class="phase-card">
+                <article class="phase-card" data-phase-filter-card="phase-@phase.Id">
                     <div class="phase-card-heading">
                         <div class="phase-title-with-order">
                             <span class="seed-badge">@phase.Order</span>
@@ -465,12 +454,32 @@
                         </div>
                     </div>
                     <p class="meta-inline">Body @phase.PointsForWin / @phase.PointsForDraw / @phase.PointsForLoss</p>
+                    @if (phase.Type == PhaseType.Group)
+                    {
+                        @foreach (var group in phase.Groups)
+                        {
+                            @if (Model.GroupStandings.TryGetValue(group.Id, out var customStandings))
+                            {
+                                <div data-phase-filter-card="group-@group.Id">
+                                    <partial name="_GroupStandings" model="customStandings" />
+                                </div>
+                            }
+                        }
+                    }
                 </article>
             }
         }
         else
         {
             <div class="empty-state">Automatické nastavení tohoto herního systému připravíme v dalším kroku.</div>
+        }
+
+
+        @if (Model.FinalStandings is not null)
+        {
+            <article class="phase-card final-standings-card" data-phase-filter-card="final-standings">
+                <partial name="_FinalStandings" model="Model.FinalStandings" />
+            </article>
         }
     </section>
 </main>
@@ -567,6 +576,29 @@
                 }
                 select.closest(".match-row")?.classList.add("is-saving");
                 form.requestSubmit();
+            });
+        });
+
+        document.querySelectorAll("[data-phase-switcher]").forEach(switcher => {
+            const buttons = Array.from(switcher.querySelectorAll("[data-phase-switch-target]"));
+            const cards = Array.from(document.querySelectorAll("[data-phase-filter-card]"));
+
+            buttons.forEach(button => {
+                button.addEventListener("click", () => {
+                    const target = button.dataset.phaseSwitchTarget;
+                    buttons.forEach(item => {
+                        const isActive = item === button;
+                        item.classList.toggle("is-active", isActive);
+                        item.setAttribute("aria-pressed", isActive ? "true" : "false");
+                    });
+
+                    cards.forEach(card => {
+                        const key = card.dataset.phaseFilterCard;
+                        const containsTarget = target !== "all" &&
+                            card.querySelector(`[data-phase-filter-card="${CSS.escape(target)}"]`);
+                        card.hidden = target !== "all" && key !== target && !containsTarget;
+                    });
+                });
             });
         });
 

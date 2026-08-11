@@ -21,9 +21,16 @@ public sealed record PhaseMatchListViewModel(
     string? ValidationMessage = null,
     long? ValidationMatchId = null);
 
-public sealed class DisciplinePhasesModel(IPhaseSetupService phases) : PageModel
+public sealed record PhaseFilterItem(string Key, string Label);
+
+public sealed class DisciplinePhasesModel(
+    IPhaseSetupService phases,
+    IGroupStandingsService groupStandings) : PageModel
 {
     public DisciplinePhaseSetup Setup { get; private set; } = null!;
+    public IReadOnlyDictionary<long, GroupStandingTable> GroupStandings { get; private set; } =
+        new Dictionary<long, GroupStandingTable>();
+    public FinalStandingTable? FinalStandings { get; private set; }
 
     [BindProperty]
     public PhaseInput NewPhase { get; set; } = new();
@@ -199,6 +206,34 @@ public sealed class DisciplinePhasesModel(IPhaseSetupService phases) : PageModel
 
     public bool HasMatches => Setup.Phases.SelectMany(x => x.Groups.SelectMany(g => g.Matches).Concat(x.Matches)).Any();
 
+    public bool ShouldShowPhaseFilter => FinalStandings is not null ||
+        (Setup.PlayingSystem != PlayingSystemType.Knockout &&
+         Setup.Phases.Where(x => x.Type == PhaseType.Group).SelectMany(x => x.Groups).Count() >= 2);
+
+    public IReadOnlyList<PhaseFilterItem> GetPhaseFilterItems()
+    {
+        var items = new List<PhaseFilterItem>();
+        foreach (var phase in Setup.Phases.OrderBy(x => x.Order))
+        {
+            if (phase.Type == PhaseType.Group)
+            {
+                items.AddRange(phase.Groups.OrderBy(x => x.Order).Select(group =>
+                    new PhaseFilterItem($"group-{group.Id}", group.Name)));
+            }
+            else if (phase.Type == PhaseType.FinalStanding && phase.Matches.Count > 0)
+            {
+                items.Add(new PhaseFilterItem($"phase-{phase.Id}", phase.Name));
+            }
+        }
+
+        if (FinalStandings is not null)
+        {
+            items.Add(new PhaseFilterItem("final-standings", "Konečné umístění"));
+        }
+
+        return items;
+    }
+
     public bool CanEditResults(bool isAdmin) => (isAdmin || Setup.IsAnonymousResultEditingEnabled) && !Setup.AreResultsLocked &&
         (Setup.PlayingSystem == PlayingSystemType.Knockout
             ? Setup.IsScheduleLocked
@@ -264,6 +299,10 @@ public sealed class DisciplinePhasesModel(IPhaseSetupService phases) : PageModel
         }
 
         Setup = setup;
+        GroupStandings = (await groupStandings.GetForDisciplineAsync(
+                editionId, disciplineId, ct))
+            .ToDictionary(standing => standing.GroupId);
+        FinalStandings = await groupStandings.GetFinalStandingsAsync(editionId, disciplineId, ct);
         SelectedPlayingSystem = setup.PlayingSystem;
         if (NewPhase.Order <= 0)
         {

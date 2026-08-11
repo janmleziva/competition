@@ -215,6 +215,10 @@ h1 { font-size: clamp(1.9rem, 4.5vw, 3.2rem); }
 .schedule-lock-notice { padding: 13px 16px; color: #78350f; background: #fffbeb; border: 1px solid #fbbf24; border-radius: 11px; }
 .playing-system-label { font-size: 0.78rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.82; }
 .phase-card { padding: 22px; background: #fff; border: 1px solid #d6e1f0; border-radius: calc(var(--radius) * 0.72); box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04); }
+.phase-switcher { display: flex; flex-wrap: wrap; gap: 8px; padding: 6px; background: #f8fafc; border: 1px solid #dbe3ef; border-radius: 999px; }
+.phase-switch-button { min-height: 36px; padding: 0 13px; color: var(--muted); background: transparent; border: 0; border-radius: 999px; cursor: pointer; font: inherit; font-size: .88rem; font-weight: 750; }
+.phase-switch-button:hover, .phase-switch-button:focus-visible { color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); outline: none; }
+.phase-switch-button.is-active { color: #fff; background: var(--accent); }
 .phase-card-heading, .stage-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
 .phase-card-heading h2, .stage-heading h3 { margin: 2px 0 0; }
 .phase-title-with-order, .stage-heading > div { display: flex; align-items: center; gap: 12px; }
@@ -226,6 +230,21 @@ h1 { font-size: clamp(1.9rem, 4.5vw, 3.2rem); }
 .phase-team-option { cursor: default; }
 .phase-assignment-option:focus-within { outline: 3px solid color-mix(in srgb, var(--accent) 18%, transparent); border-color: var(--accent); }
 .group-assignment-form { display: grid; gap: 14px; }
+.standings-section { margin-top: 22px; }
+.standings-section h3 { margin-bottom: 10px; }
+.standings-table-scroll { overflow-x: auto; }
+.standings-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.standings-table th, .standings-table td { padding: 10px 12px; border-bottom: 1px solid #cbd5e1; text-align: center; white-space: nowrap; }
+.standings-table thead th { color: #475569; font-size: .82rem; text-transform: uppercase; }
+.standings-table th:nth-child(2) { min-width: 150px; text-align: left; }
+.standings-table tbody tr:last-child th, .standings-table tbody tr:last-child td { border-bottom: 0; }
+.standings-table .standing-position { color: #64748b; font-weight: 700; }
+.standing-seed { color: #64748b; font-size: .86em; font-weight: 700; }
+.standings-table .standing-score { font-weight: 600; }
+.standings-table .standing-points { font-weight: 800; }
+.final-standings-card[hidden] { display: none; }
+.final-standings-section { margin-top: 0; }
+.final-standings-table .standing-decided-by { color: var(--muted); font-size: .88rem; text-align: left; }
 .random-assignment-form { display: flex; align-items: end; gap: 10px; margin-top: 14px; padding-top: 14px; border-top: 1px solid #e2e8f0; }
 .random-assignment-form label { margin: 0; }
 .random-assignment-form input { width: 92px; padding: 9px 10px; border: 1px solid #cbd5e1; border-radius: 9px; font: inherit; }
@@ -255,7 +274,7 @@ h1 { font-size: clamp(1.9rem, 4.5vw, 3.2rem); }
 .match-team-select { width: clamp(220px, 22vw, 320px); max-width: 100%; height: 42px; padding: 0 36px 0 11px; color: var(--text); background: #fff; border: 1px solid #93c5fd; border-radius: 10px; font: inherit; font-weight: 750; }
 .match-team-select:focus { outline: 3px solid color-mix(in srgb, var(--accent) 18%, transparent); border-color: var(--accent); }
 .matchup-save-button { justify-self: start; margin-top: 4px; }
-.advancement-source { color: #94a3b8; font-size: 0.7rem; font-weight: 500; line-height: 1.15; white-space: nowrap; }
+.advancement-source, .matchup-source { color: #94a3b8; font-size: 0.7rem; font-weight: 500; line-height: 1.15; white-space: nowrap; }
 .matchup b { display: inline-flex; align-items: center; height: 42px; color: var(--muted); line-height: 1; }
 .score-editor { display: grid; grid-template-columns: 58px 14px 58px minmax(70px, auto); align-items: center; gap: 6px; justify-content: start; }
 .score-editor input, .set-score-grid input { width: 58px; height: 39px; padding: 0 7px; text-align: center; border: 1px solid #cbd5e1; border-radius: 9px; font: inherit; font-weight: 750; }
