@@ -19,15 +19,18 @@ public sealed record PhaseMatchListViewModel(
     IReadOnlyList<PhaseSetupTeam>? TeamOptions = null,
     IReadOnlyList<PhaseSetupMatchSource>? SourceOptions = null,
     string? ValidationMessage = null,
-    long? ValidationMatchId = null);
+    long? ValidationMatchId = null,
+    bool ShowTeamSeed = false);
 
 public sealed record PhaseFilterItem(string Key, string Label);
 
-public sealed class DisciplinePhasesModel(
+public class DisciplinePhasesModel(
     IPhaseSetupService phases,
     IGroupStandingsService groupStandings,
     ICompetitionScoringService? scoring = null) : PageModel
 {
+    public virtual bool IsResultsPage => false;
+
     public DisciplinePhaseSetup Setup { get; private set; } = null!;
     public IReadOnlyDictionary<long, GroupStandingTable> GroupStandings { get; private set; } =
         new Dictionary<long, GroupStandingTable>();
@@ -75,8 +78,25 @@ public sealed class DisciplinePhasesModel(
 
     public long? MatchValidationMatchId { get; private set; }
 
-    public async Task<IActionResult> OnGetAsync(long id, long disciplineId, CancellationToken ct) =>
-        await LoadAsync(id, disciplineId, ct) ? Page() : NotFound();
+    public async Task<IActionResult> OnGetAsync(long id, long disciplineId, CancellationToken ct)
+    {
+        if (!await LoadAsync(id, disciplineId, ct))
+        {
+            return NotFound();
+        }
+
+        if (Setup.IsScheduleLocked && !IsResultsPage)
+        {
+            return RedirectToPage("/Editions/DisciplineResults", new { id, disciplineId });
+        }
+
+        if (!Setup.IsScheduleLocked && IsResultsPage)
+        {
+            return RedirectToPage("/Editions/DisciplinePhases", new { id, disciplineId });
+        }
+
+        return Page();
+    }
 
     public async Task<IActionResult> OnPostCreatePhaseAsync(long id, long disciplineId, CancellationToken ct) =>
         await ExecuteAsync(id, disciplineId, ct,
@@ -147,22 +167,14 @@ public sealed class DisciplinePhasesModel(
     public async Task<IActionResult> OnPostLockScheduleAsync(long id, long disciplineId, CancellationToken ct) =>
         await ExecuteAsync(id, disciplineId, ct,
             () => phases.SetScheduleLockAsync(id, disciplineId, true, ct),
-            "Rozpis byl uzamčen.");
+            "Rozpis byl uzamčen. Nyní můžete zapisovat výsledky.",
+            targetPage: "/Editions/DisciplineResults");
 
     public async Task<IActionResult> OnPostUnlockScheduleAsync(long id, long disciplineId, CancellationToken ct) =>
         await ExecuteAsync(id, disciplineId, ct,
             () => phases.SetScheduleLockAsync(id, disciplineId, false, ct),
-            "Rozpis byl odemčen.");
-
-    public async Task<IActionResult> OnPostLockResultsAsync(long id, long disciplineId, CancellationToken ct) =>
-        await ExecuteAsync(id, disciplineId, ct,
-            () => phases.SetResultsLockAsync(id, disciplineId, true, ct),
-            "Výsledky byly uzamčeny.");
-
-    public async Task<IActionResult> OnPostUnlockResultsAsync(long id, long disciplineId, CancellationToken ct) =>
-        await ExecuteAsync(id, disciplineId, ct,
-            () => phases.SetResultsLockAsync(id, disciplineId, false, ct),
-            "Výsledky byly odemčeny.");
+            "Rozpis byl odemčen.",
+            targetPage: "/Editions/DisciplinePhases");
 
     public async Task<IActionResult> OnPostDeleteResultsAsync(long id, long disciplineId, CancellationToken ct) =>
         await ExecuteAsync(id, disciplineId, ct,
@@ -179,6 +191,12 @@ public sealed class DisciplinePhasesModel(
             () => (scoring ?? throw new InvalidOperationException("Služba bodování není dostupná."))
                 .FinalizeDisciplineAsync(id, disciplineId, ct),
             "Body byly přiděleny a disciplína byla uzavřena.");
+
+    public async Task<IActionResult> OnPostCloseWithAwardedPointsAsync(long id, long disciplineId, CancellationToken ct) =>
+        await ExecuteAsync(id, disciplineId, ct,
+            () => (scoring ?? throw new InvalidOperationException("Služba bodování není dostupná."))
+                .CloseDisciplineWithAwardedPointsAsync(id, disciplineId, ct),
+            "Disciplína byla uzavřena. Dříve přidělené body zůstaly zachovány.");
 
     public async Task<IActionResult> OnPostReopenAsync(long id, long disciplineId, CancellationToken ct) =>
         await ExecuteAsync(id, disciplineId, ct,
@@ -259,10 +277,8 @@ public sealed class DisciplinePhasesModel(
         return items;
     }
 
-    public bool CanEditResults(bool isAdmin) => (isAdmin || Setup.IsAnonymousResultEditingEnabled) && !Setup.AreResultsLocked &&
-        (Setup.PlayingSystem == PlayingSystemType.Knockout
-            ? Setup.IsScheduleLocked
-            : true);
+    public bool CanEditResults(bool isAdmin) => Setup.IsScheduleLocked &&
+        (isAdmin || Setup.IsAnonymousResultEditingEnabled) && !Setup.IsClosed;
 
     public static string GetPhaseTypeLabel(PhaseType type) => type switch
     {
@@ -272,7 +288,7 @@ public sealed class DisciplinePhasesModel(
         _ => type.ToString()
     };
 
-    private async Task<IActionResult> ExecuteAsync<T>(long editionId, long disciplineId, CancellationToken ct, Func<Task<T>> action, string message, string? fragment = null, string? validationSection = null)
+    private async Task<IActionResult> ExecuteAsync<T>(long editionId, long disciplineId, CancellationToken ct, Func<Task<T>> action, string message, string? fragment = null, string? validationSection = null, string? targetPage = null)
     {
         if (User.Identity?.IsAuthenticated != true)
         {
@@ -292,8 +308,8 @@ public sealed class DisciplinePhasesModel(
 
         StatusMessage = message;
         return fragment is null
-            ? RedirectToPage(new { id = editionId, disciplineId })
-            : RedirectToPage(pageName: null, pageHandler: null,
+            ? RedirectToPage(targetPage, new { id = editionId, disciplineId })
+            : RedirectToPage(pageName: targetPage, pageHandler: null,
                 routeValues: new { id = editionId, disciplineId }, fragment: fragment);
     }
 

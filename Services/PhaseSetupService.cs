@@ -103,7 +103,9 @@ public sealed class PhaseSetupService : IPhaseSetupService
             return new PhaseSetupMatch(
                 match.Id, DisplayMatchName(match), match.Order,
                 match.HomeTeamId, match.HomeTeam is null ? null : TeamName(match.HomeTeam),
+                match.HomeTeam?.Seed,
                 match.AwayTeamId, match.AwayTeam is null ? null : TeamName(match.AwayTeam),
+                match.AwayTeam?.Seed,
                 match.HomeSourceMatchId, match.AwaySourceMatchId,
                 SourceLabel(match, true), SourceLabel(match, false),
                 AdvancementSource(match, true), AdvancementSource(match, false),
@@ -123,8 +125,8 @@ public sealed class PhaseSetupService : IPhaseSetupService
 
         return new DisciplinePhaseSetup(
             discipline.CompetitionEditionId, discipline.CompetitionEdition.Name, discipline.Id, discipline.Discipline.Name,
-            discipline.PlayingSystem, discipline.UsesSetScores, discipline.SetsToWin, discipline.IsScheduleLocked,
-            discipline.AreResultsLocked, discipline.IsClosed, anonymousEditing.Enabled,
+            discipline.PlayingSystem, discipline.TeamSize, discipline.UsesSetScores, discipline.SetsToWin, discipline.IsScheduleLocked,
+            discipline.IsClosed, anonymousEditing.Enabled,
             discipline.Phases.SelectMany(x => x.Matches).Any(x =>
                 x.HomeScore != null || x.AwayScore != null || x.SetScores.Count != 0 || x.Status != MatchStatus.Scheduled),
             discipline.Teams.OrderBy(x => x.Seed).Select(x => new PhaseSetupTeam(x.Id, x.Seed, TeamName(x))).ToList(), phases);
@@ -796,21 +798,6 @@ public sealed class PhaseSetupService : IPhaseSetupService
         return true;
     }
 
-    public async Task<bool> SetResultsLockAsync(long editionId, long competitionDisciplineId, bool isLocked, CancellationToken cancellationToken = default)
-    {
-        var discipline = await dbContext.CompetitionDisciplines
-            .SingleOrDefaultAsync(x => x.Id == competitionDisciplineId && x.CompetitionEditionId == editionId, cancellationToken);
-        if (discipline is null)
-        {
-            return false;
-        }
-        EnsureOpen(discipline);
-
-        discipline.AreResultsLocked = isLocked;
-        await dbContext.SaveChangesAsync(cancellationToken);
-        return true;
-    }
-
     public async Task<bool> DeleteResultsAsync(long editionId, long competitionDisciplineId, CancellationToken cancellationToken = default)
     {
         if (dbContext.Database.IsRelational())
@@ -838,11 +825,6 @@ public sealed class PhaseSetupService : IPhaseSetupService
             return false;
         }
         EnsureOpen(discipline);
-        if (discipline.AreResultsLocked)
-        {
-            throw new ValidationException("Uzamčené výsledky nelze smazat.");
-        }
-
         var matchesInReverseProgression = discipline.Phases
             .OrderByDescending(x => x.Order)
             .SelectMany(x => x.Matches.OrderByDescending(m => m.Order))
@@ -1134,10 +1116,6 @@ public sealed class PhaseSetupService : IPhaseSetupService
         if (!isAdmin && !anonymousEditing.Enabled)
         {
             throw new ValidationException("Veřejná editace výsledků je momentálně uzavřená.");
-        }
-        if (discipline.AreResultsLocked)
-        {
-            throw new ValidationException("Výsledky jsou uzamčené.");
         }
         if (discipline.PlayingSystem == PlayingSystemType.Knockout && !discipline.IsScheduleLocked)
         {

@@ -16,7 +16,6 @@ public sealed class CompetitionDiscipline
     public string? Description { get; set; }
     public bool IsLocked { get; set; }
     public bool IsScheduleLocked { get; set; }
-    public bool AreResultsLocked { get; set; }
     public bool IsClosed { get; set; }
     public DateTime? ClosedAtUtc { get; set; }
     public long? AwardPointSystemId { get; set; }

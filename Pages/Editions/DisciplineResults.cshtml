@@ -1,0 +1,8 @@
+@page "/Editions/{id:long}/Disciplines/{disciplineId:long}/Results"
+@model Competition.Pages.Editions.DisciplineResultsModel
+
+@{
+    ViewData["Title"] = $"Rozpis a výsledky – {Model.Setup.DisciplineName}";
+}
+
+<partial name="_DisciplinePhaseWorkflow" model="Model" />

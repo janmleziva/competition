@@ -263,6 +263,12 @@ public sealed class DisciplineAdministrationService(CompetitionDbContext dbConte
             throw new ValidationException("Disciplína neexistuje.");
         }
 
+        if (input.AwardPointSystemId is not null &&
+            !await dbContext.AwardPointSystems.AnyAsync(x => x.Id == input.AwardPointSystemId, cancellationToken))
+        {
+            throw new ValidationException("Vybraný bodovací systém neexistuje.");
+        }
+
         if (await dbContext.CompetitionDisciplines.AnyAsync(x => x.CompetitionEditionId == editionId && x.DisciplineId == input.DisciplineId, cancellationToken))
         {
             throw new ValidationException("Disciplína už je k tomuto ročníku přiřazena.");
@@ -292,6 +298,7 @@ public sealed class DisciplineAdministrationService(CompetitionDbContext dbConte
             PlayingSystem = input.PlayingSystem,
             UsesSetScores = input.UsesSetScores,
             SetsToWin = input.UsesSetScores ? input.SetsToWin : null,
+            AwardPointSystemId = input.AwardPointSystemId,
             Description = NormalizeDescription(input.Description),
             ScheduledAt = input.ScheduledAt
         };

@@ -117,6 +117,39 @@ public sealed class CompetitionScoringService(
         return true;
     }
 
+    public async Task<bool> CloseDisciplineWithAwardedPointsAsync(
+        long editionId, long competitionDisciplineId, CancellationToken cancellationToken = default)
+    {
+        var discipline = await dbContext.CompetitionDisciplines
+            .Include(x => x.Teams)
+            .Include(x => x.FinalStandings)
+            .SingleOrDefaultAsync(x => x.Id == competitionDisciplineId && x.CompetitionEditionId == editionId, cancellationToken);
+        if (discipline is null)
+        {
+            return false;
+        }
+        EnsureOpen(discipline);
+        if (discipline.FinalStandings.Count == 0)
+        {
+            throw new ValidationException("Disciplínu lze takto uzavřít jen tehdy, když už má přidělené body.");
+        }
+        if (discipline.Teams.Count == 0 ||
+            discipline.FinalStandings.Count != discipline.Teams.Count ||
+            !discipline.FinalStandings.Select(x => x.DisciplineTeamId).ToHashSet()
+                .SetEquals(discipline.Teams.Select(x => x.Id)) ||
+            discipline.FinalStandings.Any(x => x.Rank <= 0 || x.PointsAwarded < 0))
+        {
+            throw new ValidationException("Uložené pořadí disciplíny není úplné. Body nejprve odeberte a přidělte znovu.");
+        }
+
+        discipline.IsClosed = true;
+        discipline.ClosedAtUtc = DateTime.UtcNow;
+        discipline.IsLocked = true;
+        discipline.IsScheduleLocked = true;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     public async Task<bool> RemoveAwardedPointsAsync(
         long editionId, long competitionDisciplineId, CancellationToken cancellationToken = default)
     {
@@ -280,7 +313,6 @@ public sealed class CompetitionScoringService(
         discipline.ClosedAtUtc = DateTime.UtcNow;
         discipline.IsLocked = true;
         discipline.IsScheduleLocked = true;
-        discipline.AreResultsLocked = true;
         await dbContext.SaveChangesAsync(cancellationToken);
         return true;
     }

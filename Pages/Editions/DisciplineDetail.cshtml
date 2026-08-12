@@ -43,17 +43,17 @@
         }
         <div asp-validation-summary="ModelOnly" class="error validation-panel"></div>
 
-        @if (item.IsLocked)
+        @if (item.IsLocked && !item.IsClosed)
         {
             <div class="schedule-lock-notice" role="status">
                 <strong>Nastavení disciplíny je uzamčené.</strong>
-                Pro úpravy jej nejprve odemkněte.
+                Pro úpravy jej nejprve odemkněte. Toto nemá vliv na vytváření rozpisu nebo vkládání výsledků, ale jen na nastavení disciplíny na této stránce.
             </div>
         }
 
         @if (item.IsClosed)
         {
-            <div class="schedule-lock-notice results-lock-notice" role="status">
+            <div class="schedule-lock-notice closed-state-notice" role="status">
                 <strong>Disciplína je uzavřená.</strong>
                 Konečné pořadí a body byly přiděleny; nastavení, účastníky, týmy, rozpis ani výsledky už nelze měnit.
             </div>
@@ -228,9 +228,9 @@
                     @if (item.IsPhaseSetupAvailable)
                     {
                         <a class="button button-ghost"
-                           asp-page="/Editions/DisciplinePhases"
+                           asp-page="@(item.IsScheduleLocked ? "/Editions/DisciplineResults" : "/Editions/DisciplinePhases")"
                            asp-route-id="@Model.Setup.EditionId"
-                           asp-route-disciplineId="@item.Id">Rozpis a výsledky</a>
+                           asp-route-disciplineId="@item.Id">@(item.IsScheduleLocked ? "Rozpis a výsledky" : "Rozpis")</a>
                     }
                 </div>
             </form>

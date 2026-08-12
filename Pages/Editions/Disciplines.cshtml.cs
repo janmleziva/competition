@@ -9,7 +9,8 @@ namespace Competition.Pages.Editions;
 
 public sealed class DisciplinesModel(
     IDisciplineAdministrationService disciplines,
-    ICompetitionScoringService? scoring = null) : PageModel
+    ICompetitionScoringService? scoring = null,
+    IAwardPointSystemService? pointSystems = null) : PageModel
 {
     private static readonly IReadOnlyDictionary<PlayingSystemType, string> PlayingSystemLabels =
         new Dictionary<PlayingSystemType, string>
@@ -22,6 +23,7 @@ public sealed class DisciplinesModel(
         };
 
     public EditionDisciplineSetup Setup { get; private set; } = null!;
+    public IReadOnlyList<AwardPointSystemItem> AvailablePointSystems { get; private set; } = [];
 
     [BindProperty]
     public EditionDisciplineInput Input { get; set; } = new()
@@ -55,16 +57,15 @@ public sealed class DisciplinesModel(
 
         try
         {
-            await disciplines.AttachAsync(id, Input, ct);
+            var competitionDisciplineId = await disciplines.AttachAsync(id, Input, ct);
+            StatusMessage = "Disciplína byla přiřazena k ročníku.";
+            return RedirectToPage("/Editions/DisciplineDetail", new { id, disciplineId = competitionDisciplineId });
         }
         catch (ValidationException ex)
         {
             ModelState.AddModelError(string.Empty, ex.Message);
             return await ReloadAsync(id, ct);
         }
-
-        StatusMessage = "Disciplína byla přiřazena k ročníku.";
-        return RedirectToPage(new { id });
     }
 
     public async Task<IActionResult> OnPostCreateAndSelectAsync(long id, CancellationToken ct)
@@ -164,6 +165,23 @@ public sealed class DisciplinesModel(
         return RedirectToPage(new { id });
     }
 
+    public async Task<IActionResult> OnPostCloseWithAwardedPointsAsync(long id, long disciplineId, CancellationToken ct)
+    {
+        if (User.Identity?.IsAuthenticated != true) return Challenge();
+        if (scoring is null) throw new InvalidOperationException("Služba bodování není dostupná.");
+        try
+        {
+            if (!await scoring.CloseDisciplineWithAwardedPointsAsync(id, disciplineId, ct)) return NotFound();
+        }
+        catch (ValidationException ex)
+        {
+            ModelState.AddModelError(string.Empty, ex.Message);
+            return await ReloadAsync(id, ct);
+        }
+        StatusMessage = "Disciplína byla uzavřena. Dříve přidělené body zůstaly zachovány.";
+        return RedirectToPage(new { id });
+    }
+
     public string GetPlayingSystemLabel(PlayingSystemType system) =>
         PlayingSystemLabels.TryGetValue(system, out var label) ? label : system.ToString();
 
@@ -194,6 +212,9 @@ public sealed class DisciplinesModel(
         }
 
         Setup = setup;
+        AvailablePointSystems = pointSystems is null
+            ? []
+            : await pointSystems.ListAsync(ct);
 
         if (Input.Order <= 0)
         {

@@ -20,10 +20,10 @@
                     @if (Model.Setup.Discipline.IsPhaseSetupAvailable)
                     {
                         <a class="button button-ghost"
-                           asp-page="/Editions/DisciplinePhases"
+                           asp-page="@(Model.Setup.Discipline.IsScheduleLocked ? "/Editions/DisciplineResults" : "/Editions/DisciplinePhases")"
                            asp-route-id="@Model.Setup.EditionId"
                            asp-route-disciplineId="@Model.Setup.Discipline.Id">
-                            Rozpis a výsledky
+                            @(Model.Setup.Discipline.IsScheduleLocked ? "Rozpis a výsledky" : "Rozpis")
                         </a>
                     }
                     else
@@ -32,7 +32,7 @@
                                 type="button"
                                 disabled
                                 title="Nejprve přiřaďte účastníky a vytvořte všechny týmy.">
-                            Rozpis a výsledky
+                            @(Model.Setup.Discipline.IsScheduleLocked ? "Rozpis a výsledky" : "Rozpis")
                         </button>
                     }
                 }

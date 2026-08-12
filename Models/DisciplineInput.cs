@@ -26,6 +26,8 @@ public sealed class EditionDisciplineInput : IValidatableObject
 
     public bool UsesSetScores { get; set; }
 
+    public long? AwardPointSystemId { get; set; }
+
     [Range(1, 10, ErrorMessage = "Počet vítězných setů musí být mezi 1 a 10.")]
     public int? SetsToWin { get; set; }
 

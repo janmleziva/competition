@@ -38,7 +38,7 @@
                 {
                     <span class="match-name">@match.Name</span>
                 }
-                <strong class="matchup">
+                <strong class="matchup @(Model.ShowTeamSeed ? "has-team-seeds" : null)">
                     <span class="match-team">
                         @if (canEditHomeTeam)
                         {
@@ -78,6 +78,10 @@
                         else
                         {
                             <span class="match-team-name">@homeName</span>
+                            @if (Model.ShowTeamSeed && match.HomeTeamSeed is not null)
+                            {
+                                <small class="match-team-seed">(@match.HomeTeamSeed)</small>
+                            }
                         }
                         @if (match.HomeTeamName is not null && match.HomeSource is not null && match.HomeAdvancementSource is null)
                         {
@@ -128,6 +132,10 @@
                         else
                         {
                             <span class="match-team-name">@awayName</span>
+                            @if (Model.ShowTeamSeed && match.AwayTeamSeed is not null)
+                            {
+                                <small class="match-team-seed">(@match.AwayTeamSeed)</small>
+                            }
                         }
                         @if (match.AwayTeamName is not null && match.AwaySource is not null && match.AwayAdvancementSource is null)
                         {

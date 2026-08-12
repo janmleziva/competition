@@ -270,33 +270,48 @@ public sealed class PhaseSetupServiceTests
             }
         };
 
-        Assert.IsType<RedirectToPageResult>(await page.OnPostLockScheduleAsync(editionId, disciplineId, default));
+        var lockRedirect = Assert.IsType<RedirectToPageResult>(
+            await page.OnPostLockScheduleAsync(editionId, disciplineId, default));
+        Assert.Equal("/Editions/DisciplineResults", lockRedirect.PageName);
         Assert.True((await service.GetSetupAsync(editionId, disciplineId))!.IsScheduleLocked);
 
-        Assert.IsType<RedirectToPageResult>(await page.OnPostUnlockScheduleAsync(editionId, disciplineId, default));
+        var unlockRedirect = Assert.IsType<RedirectToPageResult>(
+            await page.OnPostUnlockScheduleAsync(editionId, disciplineId, default));
+        Assert.Equal("/Editions/DisciplinePhases", unlockRedirect.PageName);
         Assert.False((await service.GetSetupAsync(editionId, disciplineId))!.IsScheduleLocked);
     }
 
     [Fact]
-    public async Task ResultsLock_BlocksAdminScoreEditsUntilUnlocked()
+    public async Task ScheduleAndResultsPages_RouteAccordingToScheduleLock()
     {
         await using var db = CreateDbContext();
         var (editionId, disciplineId, _) = await SeedDisciplineAsync(db, 2, PlayingSystemType.RoundRobin);
         var service = new PhaseSetupService(db);
         await service.GetSetupAsync(editionId, disciplineId);
         await service.GeneratePresetMatchesAsync(editionId, disciplineId);
-        var match = await db.Matches.SingleAsync();
 
-        await service.SetResultsLockAsync(editionId, disciplineId, true);
-        Assert.True((await service.GetSetupAsync(editionId, disciplineId))!.AreResultsLocked);
-        await Assert.ThrowsAsync<ValidationException>(() => service.UpdateMatchResultAsync(
-            editionId, disciplineId,
-            new MatchResultInput { MatchId = match.Id, HomeScore = 1, AwayScore = 0, Version = match.Version }, true));
+        var schedulePage = new DisciplinePhasesModel(service, new GroupStandingsService(db))
+        {
+            PageContext = new PageContext { HttpContext = new DefaultHttpContext() }
+        };
+        var resultsPage = new DisciplineResultsModel(service, new GroupStandingsService(db))
+        {
+            PageContext = new PageContext { HttpContext = new DefaultHttpContext() }
+        };
 
-        await service.SetResultsLockAsync(editionId, disciplineId, false);
-        await service.UpdateMatchResultAsync(editionId, disciplineId,
-            new MatchResultInput { MatchId = match.Id, HomeScore = 1, AwayScore = 0, Version = match.Version }, true);
-        Assert.Equal(1, (await db.Matches.SingleAsync()).HomeScore);
+        Assert.IsType<PageResult>(await schedulePage.OnGetAsync(editionId, disciplineId, default));
+        Assert.False(schedulePage.CanEditResults(true));
+        var unlockedResultsRedirect = Assert.IsType<RedirectToPageResult>(
+            await resultsPage.OnGetAsync(editionId, disciplineId, default));
+        Assert.Equal("/Editions/DisciplinePhases", unlockedResultsRedirect.PageName);
+
+        await service.SetScheduleLockAsync(editionId, disciplineId, true);
+
+        var lockedScheduleRedirect = Assert.IsType<RedirectToPageResult>(
+            await schedulePage.OnGetAsync(editionId, disciplineId, default));
+        Assert.Equal("/Editions/DisciplineResults", lockedScheduleRedirect.PageName);
+        Assert.IsType<PageResult>(await resultsPage.OnGetAsync(editionId, disciplineId, default));
+        Assert.True(resultsPage.CanEditResults(true));
     }
 
     [Fact]
@@ -769,7 +784,6 @@ public sealed class PhaseSetupServiceTests
         };
 
         Assert.IsType<RedirectToPageResult>(await page.OnPostUpdateResultAsync(editionId, disciplineId, default));
-        Assert.IsType<ChallengeResult>(await page.OnPostLockResultsAsync(editionId, disciplineId, default));
     }
 
     [Fact]

@@ -89,7 +89,6 @@ BEGIN
         [Description] NVARCHAR(2000) NULL,
         IsLocked BIT NOT NULL CONSTRAINT DF_CompetitionDisciplines_IsLocked DEFAULT (0),
         IsScheduleLocked BIT NOT NULL CONSTRAINT DF_CompetitionDisciplines_IsScheduleLocked DEFAULT (0),
-        AreResultsLocked BIT NOT NULL CONSTRAINT DF_CompetitionDisciplines_AreResultsLocked DEFAULT (0),
         IsClosed BIT NOT NULL CONSTRAINT DF_CompetitionDisciplines_IsClosed DEFAULT (0),
         ClosedAtUtc DATETIME2 NULL,
         AwardPointSystemId BIGINT NULL,
@@ -115,12 +114,6 @@ IF COL_LENGTH(N'dbo.CompetitionDisciplines', N'IsScheduleLocked') IS NULL
 BEGIN
     ALTER TABLE dbo.CompetitionDisciplines
         ADD IsScheduleLocked BIT NOT NULL CONSTRAINT DF_CompetitionDisciplines_IsScheduleLocked DEFAULT (0);
-END;
-
-IF COL_LENGTH(N'dbo.CompetitionDisciplines', N'AreResultsLocked') IS NULL
-BEGIN
-    ALTER TABLE dbo.CompetitionDisciplines
-        ADD AreResultsLocked BIT NOT NULL CONSTRAINT DF_CompetitionDisciplines_AreResultsLocked DEFAULT (0);
 END;
 
 IF COL_LENGTH(N'dbo.CompetitionDisciplines', N'SetsToWin') IS NULL
