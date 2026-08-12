@@ -13,7 +13,6 @@ appsettings.Secrets.json
 deployment/logs/
 deployment/ftp-creds.json
 deployment/rollback-cache/
-deployment/database-backups/
 .config/dotnet-tools.json.user
 App_Data/
 artifacts/
