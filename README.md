@@ -4,23 +4,20 @@ Small ASP.NET Core countdown app for the competition landing page.
 
 ## Database
 
-The app uses Entity Framework Core with SQL Server for data access, but the initial schema is
-created from a rerunnable SQL script instead of EF migrations. This matches the Forpsi MSSQL
-hosting limitation where schema changes are applied through the web SQL interface.
+The app uses a SQLite database at `App_Data/competition.db` in both local development and
+production. It does not require a database server or a production connection string. On first
+startup, an empty database is created automatically if the file is missing.
 
-The initial schema script is:
-
-- `scripts/sql/001_initial_schema.sql`
-
-Run that script in the Forpsi MSSQL web interface. It is idempotent, so it can be rerun safely:
-existing tables, constraints, and indexes are skipped.
-
-For local development, keep the real connection string in user secrets instead of git-tracked
-files:
+The existing SQL Server LocalDB data can be converted with the included migration tool:
 
 ```powershell
-dotnet user-secrets set "ConnectionStrings:CompetitionDb" "Server=YOUR_SERVER;Database=Competition;User Id=YOUR_USER;Password=YOUR_PASSWORD;TrustServerCertificate=True;"
+dotnet run --project .\Tools\LocalDbToSqlite\LocalDbToSqlite.csproj -- --overwrite
 ```
+
+By default, the tool reads `(localdb)\MSSQLLocalDB` database `CompetitionDev`, writes
+`App_Data/competition.db`, verifies every table's row count, and creates a timestamped backup
+before replacing an existing SQLite file. Use `--source` or `--destination` to override those
+defaults.
 
 Restore packages with:
 
@@ -45,13 +42,9 @@ Access and appearance are configured in `appsettings.json`:
 - `Competition` contains the countdown title and target date.
 
 Configuration values can also be supplied as environment variables, for example
-`AdminAccess__Password` or `ConnectionStrings__CompetitionDb`, so production credentials do
-not need to be committed. Settings changes do not require recompilation; configuration-file
+`AdminAccess__Password`. Settings changes do not require recompilation; configuration-file
 changes are reloaded while the app is running, except cookie lifetime changes, which apply
 after an app restart.
-
-The application no longer runs `Database.Migrate()` on startup. The SQL schema must already be
-present before the app starts using the database.
 
 ## Azure publish
 
@@ -73,7 +66,7 @@ Required local file:
 Defaults used by the script:
 
 - `FTP_HOST = d113wh.forpsi.com`
-- `REMOTE_DIR = /www`
+- `REMOTE_DIR = /subdoms/pohoda-cup`
 
 ### Run it
 
@@ -98,15 +91,47 @@ If you prefer to call PowerShell directly:
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy.ps1
 ```
 
+Interactive deployments pause for a key press after displaying the final outcome, so a window
+opened through `deploy.cmd` does not close before the result can be read. Pass `-NoPause` for
+automation or when the pause is not wanted. Console output shows when the site goes offline and
+comes back online, every file that was uploaded, upload/skip totals, and total deployment time;
+the detailed per-file comparison trace remains in the timestamped log.
+
+Deployments publish a Windows x64 framework-dependent build by default, using the .NET runtime
+installed by FORPSI. This keeps the upload small, excludes native assets for other operating
+systems, and generates FORPSI's documented `dotnet`/DLL launch setup. Pass `-SelfContained` only
+for a host without the required .NET runtime; use `-RuntimeIdentifier` to override `win-x64`.
+
 You can also override the defaults if needed:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\deploy.ps1 `
   -FtpHost "d113wh.forpsi.com" `
-  -RemoteDir "/www"
+  -RemoteDir "/subdoms/pohoda-cup"
 ```
 
 Each deployment writes a timestamped log file to `deployment/logs/`. The folder is intentionally ignored by Git so local run logs stay on your machine.
+
+The first deployment uploads the converted `App_Data/competition.db` as the production seed.
+Later deployments leave the live production database untouched, so production data can keep
+evolving independently without being overwritten by a code deployment. Backups are disabled by
+default. Pass `-Backup` to download a timestamped database backup and local copies of files that
+will be replaced; those file copies are used for rollback if deployment fails:
+
+```powershell
+.\deployment\deploy.cmd -Backup
+```
+
+The deployment briefly takes the application offline and automatically brings it back online.
+It stores a small `competition-deploy-manifest.json` on the server, allowing later deployments
+to compare hashes and versions with one manifest download instead of downloading every remote
+file. Existing third-party DLLs and files under `runtimes/` are replaced only when the published
+file has a strictly newer file version. When a reliable version comparison is unavailable, the
+remote file is preserved and the reason is recorded in the deployment log. The first deployment
+after this feature is introduced inventories existing protected dependencies by directory name
+and preserves them without downloading them. Pass `-InspectRemoteDependencies` when a one-time
+full version comparison of those untracked dependencies is required. Files uploaded by the
+script have complete manifest metadata, so subsequent comparisons stay fast.
 
 ## Local run
 
@@ -124,10 +149,6 @@ The first edition is made active automatically. Later active-edition changes are
 the database permits at most one active edition. Creation forms use a unique submission token,
 so retrying the same form submission does not create a duplicate row.
 
-After updating an existing database from Step 1, rerun `scripts/sql/001_initial_schema.sql` in
-the Forpsi MSSQL web interface. It adds the Step 2 columns and indexes without recreating or
-deleting existing edition data.
-
 ## Competitors and registration
 
 The reusable competitor catalogue is available at `/Competitors`. Anonymous visitors can
@@ -143,11 +164,6 @@ authentication even when called directly.
 Step 3 uses the existing `Competitors` and `CompetitionEntries` tables, so it does not require
 a new schema migration. The unique database indexes remain the final safeguard for competitor
 and seed uniqueness within an edition.
-
-SQL connection behavior is configured under `Database` in `appsettings.json`. The defaults use
-a 5-second connection timeout, a 10-second command timeout, and one retry with at most a
-1-second delay. These values can be overridden with environment variables such as
-`Database__ConnectTimeoutSeconds`.
 
 Run the automated checks with:
 

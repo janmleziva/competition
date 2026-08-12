@@ -3,6 +3,7 @@
     <AssemblyName>Competition</AssemblyName>
     <RootNamespace>Competition</RootNamespace>
     <TargetFramework>net8.0</TargetFramework>
+    <AspNetCoreHostingModel>outofprocess</AspNetCoreHostingModel>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>Competition-8f1d11c4-3e6c-4c88-8862-f0bf4e8d7d39</UserSecretsId>
@@ -13,7 +14,7 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.29" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.29" />
   </ItemGroup>
 
   <ItemGroup>
@@ -28,5 +29,13 @@
     <Compile Remove="Competition.Tests\**" />
     <Content Remove="Competition.Tests\**" />
     <None Remove="Competition.Tests\**" />
+    <Compile Remove="Data\Migrations\**" />
+    <Compile Remove="Tools\**" />
+    <Content Remove="Tools\**" />
+    <None Remove="Tools\**" />
+  </ItemGroup>
+
+  <ItemGroup Condition="Exists('App_Data\competition.db')">
+    <Content Include="App_Data\competition.db" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

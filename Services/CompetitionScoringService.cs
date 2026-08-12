@@ -144,39 +144,67 @@ public sealed class CompetitionScoringService(
     public async Task<EditionOverallStanding?> GetEditionOverallStandingAsync(
         long editionId, CancellationToken cancellationToken = default)
     {
-        var edition = await dbContext.CompetitionEditions
-            .AsNoTrackingWithIdentityResolution()
-            .AsSplitQuery()
-            .Include(x => x.Entries).ThenInclude(x => x.Competitor)
-            .Include(x => x.Disciplines).ThenInclude(x => x.Discipline)
-            .Include(x => x.Disciplines).ThenInclude(x => x.FinalStandings)
-                .ThenInclude(x => x.DisciplineTeam).ThenInclude(x => x.Members)
-                    .ThenInclude(x => x.CompetitionEntry).ThenInclude(x => x.Competitor)
-            .SingleOrDefaultAsync(x => x.Id == editionId, cancellationToken);
+        var edition = await dbContext.CompetitionEditions.AsNoTracking()
+            .Where(x => x.Id == editionId)
+            .Select(x => new { x.Id, x.Name })
+            .SingleOrDefaultAsync(cancellationToken);
         if (edition is null)
         {
             return null;
         }
 
-        var disciplines = edition.Disciplines.OrderBy(x => x.Order)
-            .Select(x => new EditionStandingDiscipline(x.Id, x.Discipline.Name, x.IsClosed)).ToList();
-        var maxRank = edition.Disciplines.SelectMany(x => x.FinalStandings)
-            .Select(x => x.Rank).DefaultIfEmpty(0).Max();
-        var entryLabels = TeamNameFormatter.CreateEntryLabels(edition.Entries);
+        var disciplines = await dbContext.CompetitionDisciplines.AsNoTracking()
+            .Where(x => x.CompetitionEditionId == editionId)
+            .OrderBy(x => x.Order)
+            .Select(x => new EditionStandingDiscipline(x.Id, x.Discipline.Name, x.IsClosed))
+            .ToListAsync(cancellationToken);
+        var entries = await dbContext.CompetitionEntries.AsNoTracking()
+            .Where(x => x.CompetitionEditionId == editionId)
+            .OrderBy(x => x.Seed)
+            .ThenBy(x => x.Competitor.LastName)
+            .ThenBy(x => x.Competitor.FirstName)
+            .Select(x => new { x.Id, x.Competitor.FirstName, x.Competitor.LastName })
+            .ToListAsync(cancellationToken);
+        var awardedMemberships = await dbContext.DisciplineTeamMembers.AsNoTracking()
+            .Where(member => member.DisciplineTeam.CompetitionDiscipline.CompetitionEditionId == editionId &&
+                member.DisciplineTeam.FinalStandingEntries.Any())
+            .OrderBy(member => member.Order)
+            .Select(member => new
+            {
+                EntryId = member.CompetitionEntryId,
+                TeamId = member.DisciplineTeamId,
+                member.DisciplineTeam.CompetitionDisciplineId,
+                member.CompetitionEntry.Competitor.LastName,
+                Rank = member.DisciplineTeam.FinalStandingEntries
+                    .Where(standing => standing.CompetitionDisciplineId == member.DisciplineTeam.CompetitionDisciplineId)
+                    .Select(standing => standing.Rank)
+                    .Single(),
+                PointsAwarded = member.DisciplineTeam.FinalStandingEntries
+                    .Where(standing => standing.CompetitionDisciplineId == member.DisciplineTeam.CompetitionDisciplineId)
+                    .Select(standing => standing.PointsAwarded)
+                    .Single()
+            })
+            .ToListAsync(cancellationToken);
+        var teamNames = awardedMemberships.GroupBy(x => x.TeamId)
+            .ToDictionary(group => group.Key, group => string.Join("/", group.Select(x => x.LastName)));
+        var maxRank = awardedMemberships.Select(x => x.Rank).DefaultIfEmpty(0).Max();
 
-        var mutableRows = edition.Entries.Select(entry =>
+        var cellsByEntry = awardedMemberships.GroupBy(x => x.EntryId).ToDictionary(
+            group => group.Key,
+            group => group.Select(cell => new EditionStandingCell(
+                    cell.CompetitionDisciplineId,
+                    teamNames.GetValueOrDefault(cell.TeamId, string.Empty),
+                    cell.Rank,
+                    cell.PointsAwarded))
+                .ToDictionary(cell => cell.DisciplineId));
+
+        var mutableRows = entries.Select(entry =>
         {
-            var cells = edition.Disciplines.SelectMany(discipline => discipline.FinalStandings
-                    .Where(standing => standing.DisciplineTeam.Members.Any(member => member.CompetitionEntryId == entry.Id))
-                    .Select(standing => new EditionStandingCell(
-                        discipline.Id,
-                        TeamNameFormatter.Format(standing.DisciplineTeam, entryLabels),
-                        standing.Rank,
-                        standing.PointsAwarded)))
-                .ToDictionary(cell => cell.DisciplineId);
+            var cells = cellsByEntry.GetValueOrDefault(entry.Id) ??
+                new Dictionary<long, EditionStandingCell>();
             var rankCounts = Enumerable.Range(1, maxRank)
                 .Select(rank => cells.Values.Count(cell => cell.Rank == rank)).ToArray();
-            return new MutableOverallRow(entry.Id, entry.Competitor.FirstName, entry.Competitor.LastName,
+            return new MutableOverallRow(entry.Id, entry.FirstName, entry.LastName,
                 cells, cells.Values.Sum(x => x.Points), rankCounts);
         }).ToList();
 

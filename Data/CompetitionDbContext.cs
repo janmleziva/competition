@@ -39,6 +39,8 @@ public sealed class CompetitionDbContext(DbContextOptions<CompetitionDbContext> 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        var isSqlite = Database.IsSqlite();
+
         modelBuilder.Entity<CompetitionEdition>(entity =>
         {
             entity.Property(x => x.Name).HasMaxLength(200);
@@ -46,7 +48,7 @@ public sealed class CompetitionDbContext(DbContextOptions<CompetitionDbContext> 
             entity.HasIndex(x => x.CreationToken).IsUnique();
             entity.HasIndex(x => x.IsActive)
                 .IsUnique()
-                .HasFilter("[IsActive] = 1");
+                .HasFilter(isSqlite ? "\"IsActive\" = 1" : "[IsActive] = 1");
             entity.ToTable("CompetitionEditions", table =>
                 table.HasCheckConstraint("CK_CompetitionEditions_DateRange", "EndDate >= StartDate"));
         });
@@ -81,7 +83,10 @@ public sealed class CompetitionDbContext(DbContextOptions<CompetitionDbContext> 
         modelBuilder.Entity<CompetitionDiscipline>(entity =>
         {
             entity.Property(x => x.PlayingSystem).HasConversion<string>().HasMaxLength(40);
-            entity.Property(x => x.ScheduledAt).HasColumnType("datetime2");
+            if (!isSqlite)
+            {
+                entity.Property(x => x.ScheduledAt).HasColumnType("datetime2");
+            }
             entity.Property(x => x.Description).HasMaxLength(2000);
             entity.HasIndex(x => new { x.CompetitionEditionId, x.DisciplineId }).IsUnique();
             entity.HasIndex(x => new { x.CompetitionEditionId, x.Order }).IsUnique();
@@ -277,7 +282,11 @@ public sealed class CompetitionDbContext(DbContextOptions<CompetitionDbContext> 
         {
             if (entry.State == EntityState.Added)
             {
-                entry.Entity.UpdatedAtUtc = now;
+                if (entry.Entity.UpdatedAtUtc == default)
+                {
+                    entry.Entity.UpdatedAtUtc = now;
+                }
+
                 continue;
             }
 
