@@ -171,6 +171,82 @@ public sealed class CompetitionScoringServiceTests
     }
 
     [Fact]
+    public async Task OverallStanding_ShowsPartialEditionNonparticipantsAndSharedPlaces()
+    {
+        await using var db = CreateDbContext();
+        var edition = new CompetitionEdition
+        {
+            Name = "Partial", City = "Praha", StartDate = new DateOnly(2026, 8, 1),
+            EndDate = new DateOnly(2026, 8, 2), CreationToken = Guid.NewGuid()
+        };
+        var entries = new[] { "Anna", "Bara", "Cyril", "Dana" }.Select((name, index) =>
+            new CompetitionEntry
+            {
+                CompetitionEdition = edition,
+                Competitor = new Competitor { FirstName = name, LastName = $"Player{index + 1}" },
+                Seed = index + 1
+            }).ToArray();
+        db.AddRange(entries);
+        await db.SaveChangesAsync();
+
+        await AddClosedTeamResultAsync(db, edition.Id, "Doubles", 1, [entries[0], entries[1]], 1, 10);
+        await AddClosedTeamResultAsync(db, edition.Id, "Singles", 2, [entries[2]], 1, 10);
+        db.CompetitionDisciplines.Add(new CompetitionDiscipline
+        {
+            CompetitionEditionId = edition.Id,
+            Discipline = new Discipline { Name = "Pending" },
+            PlayingSystem = PlayingSystemType.RoundRobin,
+            TeamSize = 1,
+            Order = 3,
+            IsClosed = false
+        });
+        await db.SaveChangesAsync();
+
+        var overall = (await CreateService(db).GetEditionOverallStandingAsync(edition.Id))!;
+
+        Assert.Equal(new[] { false }, overall.Disciplines.Where(x => x.Name == "Pending").Select(x => x.IsClosed));
+        Assert.Equal(10, overall.Rows.Single(x => x.EntryId == entries[0].Id).TotalPoints);
+        Assert.Equal(10, overall.Rows.Single(x => x.EntryId == entries[1].Id).TotalPoints);
+        Assert.Equal(10, overall.Rows.Single(x => x.EntryId == entries[2].Id).TotalPoints);
+        Assert.Equal(0, overall.Rows.Single(x => x.EntryId == entries[3].Id).TotalPoints);
+        Assert.Equal(1, overall.Rows.Single(x => x.EntryId == entries[0].Id).Place);
+        Assert.Equal(1, overall.Rows.Single(x => x.EntryId == entries[1].Id).Place);
+        Assert.Equal(1, overall.Rows.Single(x => x.EntryId == entries[2].Id).Place);
+        Assert.Empty(overall.Rows.Single(x => x.EntryId == entries[3].Id).Disciplines);
+        Assert.Equal("Player1/Player2", overall.Rows.Single(x => x.EntryId == entries[0].Id)
+            .Disciplines.Single().Value.TeamName);
+    }
+
+    [Fact]
+    public async Task OverallStanding_RecalculatesAfterAwardedPointsAreAmended()
+    {
+        await using var db = CreateDbContext();
+        var edition = new CompetitionEdition
+        {
+            Name = "Amended", City = "Praha", StartDate = new DateOnly(2026, 8, 1),
+            EndDate = new DateOnly(2026, 8, 2), CreationToken = Guid.NewGuid()
+        };
+        var entries = new[] { "Anna", "Bara" }.Select((name, index) => new CompetitionEntry
+        {
+            CompetitionEdition = edition,
+            Competitor = new Competitor { FirstName = name, LastName = $"Player{index + 1}" },
+            Seed = index + 1
+        }).ToArray();
+        db.AddRange(entries);
+        await db.SaveChangesAsync();
+        await AddClosedTeamResultAsync(db, edition.Id, "Singles", 1, [entries[0]], 1, 5);
+
+        var standing = await db.DisciplineStandings.SingleAsync();
+        standing.PointsAwarded = 8;
+        await db.SaveChangesAsync();
+
+        var overall = (await CreateService(db).GetEditionOverallStandingAsync(edition.Id))!;
+
+        Assert.Equal(8, overall.Rows.Single(x => x.EntryId == entries[0].Id).TotalPoints);
+        Assert.Equal(0, overall.Rows.Single(x => x.EntryId == entries[1].Id).TotalPoints);
+    }
+
+    [Fact]
     public async Task AwardPointSystem_RequiresContinuousUniqueRanks()
     {
         await using var db = CreateDbContext();
@@ -290,13 +366,28 @@ public sealed class CompetitionScoringServiceTests
         CompetitionDbContext db, long editionId, string name, int order,
         CompetitionEntry entry, int rank, int points)
     {
+        await AddClosedTeamResultAsync(db, editionId, name, order, [entry], rank, points);
+    }
+
+    private static async Task AddClosedTeamResultAsync(
+        CompetitionDbContext db, long editionId, string name, int order,
+        IReadOnlyList<CompetitionEntry> entries, int rank, int points)
+    {
         var discipline = new CompetitionDiscipline
         {
             CompetitionEditionId = editionId, Discipline = new Discipline { Name = name },
-            PlayingSystem = PlayingSystemType.RoundRobin, TeamSize = 1, Order = order, IsClosed = true
+            PlayingSystem = PlayingSystemType.RoundRobin, TeamSize = entries.Count, Order = order, IsClosed = true
         };
         var team = new DisciplineTeam { CompetitionDiscipline = discipline, Seed = 1 };
-        team.Members.Add(new DisciplineTeamMember { CompetitionDisciplineId = discipline.Id, CompetitionEntry = entry, Order = 1 });
+        for (var index = 0; index < entries.Count; index++)
+        {
+            team.Members.Add(new DisciplineTeamMember
+            {
+                CompetitionDisciplineId = discipline.Id,
+                CompetitionEntry = entries[index],
+                Order = index + 1
+            });
+        }
         discipline.Teams.Add(team);
         discipline.FinalStandings.Add(new DisciplineStanding
         {
