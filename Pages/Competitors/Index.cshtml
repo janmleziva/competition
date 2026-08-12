@@ -48,9 +48,10 @@
                             <div class="edition-title">@competitor.LastName @competitor.FirstName</div>
                             <span class="meta-inline">Narozen/a: @Model.FormatDate(competitor.DateOfBirth) · Ročníky: @competitor.EditionCount</span>
                         </div>
-                        @if (User.Identity?.IsAuthenticated == true)
-                        {
-                            <div class="row-actions">
+                        <div class="row-actions">
+                            <a class="button button-ghost button-small" asp-page="/Competitors/Stats" asp-route-id="@competitor.Id">Statistiky</a>
+                            @if (User.Identity?.IsAuthenticated == true)
+                            {
                                 <a class="button button-ghost button-small" asp-page="/Competitors/Edit" asp-route-id="@competitor.Id">Upravit</a>
                                 @if (competitor.EditionCount == 0)
                                 {
@@ -64,8 +65,8 @@
                                         <button class="button button-danger button-small" type="button" disabled title="zaregistrovaný soutěžící nemůže být smazán">Smazat</button>
                                     </span>
                                 }
-                            </div>
-                        }
+                            }
+                        </div>
                     </article>
                 }
             </div>

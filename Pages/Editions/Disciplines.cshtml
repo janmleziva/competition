@@ -20,15 +20,17 @@
             </div>
         </div>
 
-        @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
-        {
-            <div class="status-message" role="status">@Model.StatusMessage</div>
-        }
-
-        <div asp-validation-summary="ModelOnly" class="error validation-panel"></div>
-
         @if (User.Identity?.IsAuthenticated == true)
         {
+            <div class="discipline-form-feedback">
+                @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+                {
+                    <div class="status-message" role="status">@Model.StatusMessage</div>
+                }
+
+                <div asp-validation-summary="ModelOnly" class="error validation-panel"></div>
+            </div>
+
             <section class="registration-form discipline-attach-section" aria-labelledby="attach-discipline-heading">
                 <h2 id="attach-discipline-heading">Přidat disciplínu</h2>
 
@@ -69,6 +71,17 @@
                                 @foreach (var system in Enum.GetValues<PlayingSystemType>())
                                 {
                                     <option value="@system">@Model.GetPlayingSystemLabel(system)</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div>
+                            <label asp-for="Input.AwardPointSystemId">Bodovací systém</label>
+                            <select asp-for="Input.AwardPointSystemId">
+                                <option value="">Vybrat později</option>
+                                @foreach (var system in Model.AvailablePointSystems)
+                                {
+                                    <option value="@system.Id">@system.Name</option>
                                 }
                             </select>
                         </div>
@@ -131,6 +144,10 @@
                            value="@Model.Input.PlayingSystem"
                            data-copy-value-from="Input_PlayingSystem" />
                     <input type="hidden"
+                           name="Input.AwardPointSystemId"
+                           value="@Model.Input.AwardPointSystemId"
+                           data-copy-value-from="Input_AwardPointSystemId" />
+                    <input type="hidden"
                            name="Input.UsesSetScores"
                            value="@Model.Input.UsesSetScores.ToString().ToLowerInvariant()"
                            data-copy-checked-from="Input_UsesSetScores" />
@@ -167,13 +184,13 @@
                                 <div class="edition-title">
                                     <span class="seed-badge">@item.Order</span>
                                     <h2>@item.Name</h2>
-                                    @if (item.IsLocked)
+                                    @if (item.IsLocked && !item.IsClosed)
                                     {
                                         <span class="configuration-lock-badge">Uzamčeno</span>
                                     }
                                     @if (item.IsClosed)
                                     {
-                                        <span class="configuration-lock-badge results-lock-badge">Uzavřeno</span>
+                                        <span class="configuration-lock-badge discipline-closed-badge">Uzavřeno</span>
                                     }
                                 </div>
                                 <p class="meta-inline">
@@ -214,10 +231,10 @@
                                     @if (item.IsPhaseSetupAvailable)
                                     {
                                         <a class="button button-ghost button-small"
-                                           asp-page="/Editions/DisciplinePhases"
+                                           asp-page="@(item.IsScheduleLocked ? "/Editions/DisciplineResults" : "/Editions/DisciplinePhases")"
                                            asp-route-id="@Model.Setup.EditionId"
                                            asp-route-disciplineId="@item.Id">
-                                            Rozpis a výsledky
+                                            @(item.IsScheduleLocked ? "Rozpis a výsledky" : "Rozpis")
                                         </a>
                                     }
                                     else
@@ -226,7 +243,7 @@
                                                 type="button"
                                                 disabled
                                                 title="Nejprve přiřaďte účastníky a vytvořte všechny týmy.">
-                                            Rozpis a výsledky
+                                            @(item.IsScheduleLocked ? "Rozpis a výsledky" : "Rozpis")
                                         </button>
                                     }
 
@@ -245,13 +262,20 @@
                                                 @(item.IsLocked ? "Odemknout" : "Uzamknout")
                                             </button>
                                         </form>
-                                        <button class="button button-small"
-                                                type="button"
-                                                data-open-modal="finalize-discipline-modal-@item.Id"
-                                                disabled="@(!item.CanFinalize)"
-                                                title="@(item.AwardPointSystemId is null ? "Nejprve vyberte bodovací systém na detailu disciplíny." : !item.AreAllMatchesCompleted ? "Nejprve odehrajte všechny zápasy." : null)">
-                                            Přidělit body a uzavřít
-                                        </button>
+                                        @if (item.FinalStandings is { Count: > 0 })
+                                        {
+                                            <button class="button button-small" type="button" data-open-modal="close-discipline-modal-@item.Id">Uzavřít</button>
+                                        }
+                                        else
+                                        {
+                                            <button class="button button-small"
+                                                    type="button"
+                                                    data-open-modal="finalize-discipline-modal-@item.Id"
+                                                    disabled="@(!item.CanFinalize)"
+                                                    title="@(item.AwardPointSystemId is null ? "Nejprve vyberte bodovací systém na detailu disciplíny." : !item.AreAllMatchesCompleted ? "Nejprve odehrajte všechny zápasy." : null)">
+                                                Přidělit body a uzavřít
+                                            </button>
+                                        }
                                     }
                                 </div>
                             }
@@ -267,10 +291,10 @@
                                     @if (item.IsPhaseSetupAvailable)
                                     {
                                         <a class="button button-ghost button-small"
-                                           asp-page="/Editions/DisciplinePhases"
+                                           asp-page="@(item.IsScheduleLocked ? "/Editions/DisciplineResults" : "/Editions/DisciplinePhases")"
                                            asp-route-id="@Model.Setup.EditionId"
                                            asp-route-disciplineId="@item.Id">
-                                            Výsledky
+                                            @(item.IsScheduleLocked ? "Rozpis a výsledky" : "Rozpis")
                                         </a>
                                     }
                                 </div>
@@ -420,7 +444,7 @@
                                 </section>
                             </div>
                         }
-                        @if (User.Identity?.IsAuthenticated == true && !item.IsClosed)
+                        @if (User.Identity?.IsAuthenticated == true && !item.IsClosed && item.FinalStandings is not { Count: > 0 })
                         {
                             <div id="finalize-discipline-modal-@item.Id" class="modal-backdrop" role="presentation" hidden>
                                 <section class="modal destructive-confirmation-modal" role="dialog" aria-modal="true" aria-labelledby="finalize-discipline-title-@item.Id">
@@ -433,6 +457,25 @@
                                         <form method="post" asp-page-handler="Finalize" data-close-modal-after-post="true">
                                             <input type="hidden" name="disciplineId" value="@item.Id" />
                                             <button class="button button-danger" type="submit">Ano, přidělit body a uzavřít</button>
+                                        </form>
+                                        <button class="button button-ghost" type="button" data-close-modal>Zrušit</button>
+                                    </div>
+                                </section>
+                            </div>
+                        }
+                        @if (User.Identity?.IsAuthenticated == true && !item.IsClosed && item.FinalStandings is { Count: > 0 })
+                        {
+                            <div id="close-discipline-modal-@item.Id" class="modal-backdrop" role="presentation" hidden>
+                                <section class="modal" role="dialog" aria-modal="true" aria-labelledby="close-discipline-title-@item.Id">
+                                    <h2 id="close-discipline-title-@item.Id">Uzavřít @item.Name?</h2>
+                                    <div class="schedule-lock-notice" role="note">
+                                        <strong>Přidělené body zůstanou beze změny.</strong>
+                                        <p>Disciplína bude znovu uzavřena se současným konečným pořadím a body.</p>
+                                    </div>
+                                    <div class="modal-actions">
+                                        <form method="post" asp-page-handler="CloseWithAwardedPoints" data-close-modal-after-post="true">
+                                            <input type="hidden" name="disciplineId" value="@item.Id" />
+                                            <button class="button" type="submit">Ano, uzavřít disciplínu</button>
                                         </form>
                                         <button class="button button-ghost" type="button" data-close-modal>Zrušit</button>
                                     </div>

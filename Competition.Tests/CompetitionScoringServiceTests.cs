@@ -29,7 +29,6 @@ public sealed class CompetitionScoringServiceTests
         Assert.True(discipline.IsClosed);
         Assert.True(discipline.IsLocked);
         Assert.True(discipline.IsScheduleLocked);
-        Assert.True(discipline.AreResultsLocked);
         Assert.NotNull(discipline.ClosedAtUtc);
         Assert.Equal(new[] { 6, 4 }, await db.DisciplineStandings.OrderBy(x => x.Rank)
             .Select(x => x.PointsAwarded).ToArrayAsync());
@@ -47,8 +46,6 @@ public sealed class CompetitionScoringServiceTests
         Assert.Equal((1, 0), (finalTable.Rows[0].ScoreFor, finalTable.Rows[0].ScoreAgainst));
         Assert.Equal((0, 1), (finalTable.Rows[1].ScoreFor, finalTable.Rows[1].ScoreAgainst));
 
-        await Assert.ThrowsAsync<ValidationException>(() => new PhaseSetupService(db)
-            .SetResultsLockAsync(seeded.EditionId, seeded.DisciplineId, false));
         await Assert.ThrowsAsync<ValidationException>(() => new DisciplineAdministrationService(db)
             .SetLockAsync(seeded.EditionId, seeded.DisciplineId, false));
     }
@@ -123,7 +120,6 @@ public sealed class CompetitionScoringServiceTests
         Assert.False(reopened.IsClosed);
         Assert.Null(reopened.ClosedAtUtc);
         Assert.True(reopened.IsLocked);
-        Assert.True(reopened.AreResultsLocked);
         Assert.Equal(2, reopened.FinalStandings.Count);
         Assert.False((await service.GetDisciplineSetupAsync(seeded.EditionId, seeded.DisciplineId))!.CanFinalize);
         await Assert.ThrowsAsync<ValidationException>(() =>
@@ -132,6 +128,48 @@ public sealed class CompetitionScoringServiceTests
         Assert.True(await service.RemoveAwardedPointsAsync(seeded.EditionId, seeded.DisciplineId));
         Assert.Empty(await db.DisciplineStandings.ToListAsync());
         Assert.True((await service.GetDisciplineSetupAsync(seeded.EditionId, seeded.DisciplineId))!.CanFinalize);
+    }
+
+    [Fact]
+    public async Task CloseWithAwardedPoints_ClosesReopenedDisciplineWithoutChangingPoints()
+    {
+        await using var db = CreateDbContext();
+        var seeded = await SeedCompletedRoundRobinAsync(db);
+        var pointService = new AwardPointSystemService(db);
+        var pointSystemId = await pointService.CreateAsync(new AwardPointSystemInput
+        {
+            Name = "Body pro opětovné uzavření",
+            Rules = [new() { Rank = 1, Points = 6 }, new() { Rank = 2, Points = 3 }]
+        });
+        var service = CreateService(db, pointService);
+        await service.SetPointSystemAsync(seeded.EditionId, seeded.DisciplineId, pointSystemId);
+        await service.FinalizeDisciplineAsync(seeded.EditionId, seeded.DisciplineId);
+        var originalPoints = await db.DisciplineStandings.OrderBy(x => x.Rank)
+            .Select(x => x.PointsAwarded).ToArrayAsync();
+        await service.ReopenDisciplineAsync(seeded.EditionId, seeded.DisciplineId);
+
+        Assert.True(await service.CloseDisciplineWithAwardedPointsAsync(seeded.EditionId, seeded.DisciplineId));
+
+        var discipline = await db.CompetitionDisciplines.SingleAsync();
+        Assert.True(discipline.IsClosed);
+        Assert.True(discipline.IsLocked);
+        Assert.True(discipline.IsScheduleLocked);
+        Assert.NotNull(discipline.ClosedAtUtc);
+        Assert.Equal(originalPoints, await db.DisciplineStandings.OrderBy(x => x.Rank)
+            .Select(x => x.PointsAwarded).ToArrayAsync());
+    }
+
+    [Fact]
+    public async Task CloseWithAwardedPoints_RejectsForgedRequestWithoutPoints()
+    {
+        await using var db = CreateDbContext();
+        var seeded = await SeedCompletedRoundRobinAsync(db);
+        var service = CreateService(db);
+
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            service.CloseDisciplineWithAwardedPointsAsync(seeded.EditionId, seeded.DisciplineId));
+
+        Assert.False((await db.CompetitionDisciplines.SingleAsync()).IsClosed);
     }
 
     [Fact]

@@ -1,0 +1,221 @@
+@page "/Competitors/{id:long}/Stats"
+@model Competition.Pages.Competitors.StatsModel
+@{
+    ViewData["Title"] = $"Statistiky – {Model.Statistics.FirstName} {Model.Statistics.LastName}";
+}
+
+<main class="shell shell-wide">
+    <section class="panel admin competitor-stats-page">
+        <div class="page-heading">
+            <div>
+                <h1>@Model.Statistics.FirstName @Model.Statistics.LastName</h1>
+                <p class="lead">Statistiky soutěžícího</p>
+            </div>
+            <a class="button button-ghost" asp-page="/Competitors/Index">Zpět</a>
+        </div>
+
+        <nav class="phase-switcher competitor-stats-tabs" aria-label="Zobrazení statistik" data-stats-tabs>
+            <button class="phase-switch-button is-active" type="button" data-stats-target="edition" aria-controls="stats-by-edition" aria-pressed="true">Podle ročníku</button>
+            <button class="phase-switch-button" type="button" data-stats-target="discipline" aria-controls="stats-by-discipline" aria-pressed="false">Podle disciplíny</button>
+            <button class="phase-switch-button" type="button" data-stats-target="team-member" aria-controls="stats-by-team-member" aria-pressed="false">Podle spoluhráče</button>
+        </nav>
+
+        <section id="stats-by-edition" class="competitor-stats-view" data-stats-view="edition">
+            <h2>Výsledky podle ročníku</h2>
+            @if (Model.Statistics.Editions.Count == 0)
+            {
+                <div class="empty-state">Soutěžící zatím nebyl zaregistrován v žádném ročníku.</div>
+            }
+            else
+            {
+                <div class="standings-table-scroll">
+                    <table class="standings-table overall-standings-table competitor-stats-table">
+                        <thead>
+                            <tr>
+                                <th scope="col" class="stats-label-column">Ročník</th>
+                                <th scope="col" class="stats-place-column">Celkové pořadí</th>
+                                <th scope="col" class="overall-total-column">Celkem</th>
+                                @foreach (var discipline in Model.Statistics.Disciplines)
+                                {
+                                    <th scope="col" class="overall-discipline-column">@discipline</th>
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var edition in Model.Statistics.Editions)
+                            {
+                                <tr>
+                                    <th scope="row" class="stats-label-column">
+                                        <a asp-page="/Editions/OverallStandings" asp-route-id="@edition.EditionId">@edition.EditionName</a>
+                                        <small>@edition.StartDate.ToString("yyyy")</small>
+                                    </th>
+                                    <td class="standing-position stats-place-column">@edition.OverallPlace.</td>
+                                    <td class="standing-points overall-total-column"><strong>@edition.TotalPoints b.</strong></td>
+                                    @foreach (var discipline in Model.Statistics.Disciplines)
+                                    {
+                                        if (edition.Disciplines.TryGetValue(discipline, out var cell))
+                                        {
+                                            <td class="overall-discipline-column">
+                                                <strong>@cell.Points b.</strong>
+                                                <small>@cell.Rank. místo</small>
+                                                <small class="standing-team">@cell.TeamName</small>
+                                            </td>
+                                        }
+                                        else
+                                        {
+                                            <td class="standing-empty overall-discipline-column">—</td>
+                                        }
+                                    }
+                                </tr>
+                            }
+                            <tr class="competitor-stats-summary-row">
+                                <th scope="row" class="stats-label-column">Celkem</th>
+                                <td class="standing-empty stats-place-column">—</td>
+                                <td class="standing-points overall-total-column"><strong>@Model.Statistics.TotalPoints b.</strong></td>
+                                @foreach (var discipline in Model.Statistics.Disciplines)
+                                {
+                                    <td class="standing-points overall-discipline-column"><strong>@Model.Statistics.TotalsByDiscipline[discipline] b.</strong></td>
+                                }
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+
+        <section id="stats-by-discipline" class="competitor-stats-view" data-stats-view="discipline" hidden>
+            <h2>Výsledky podle disciplíny</h2>
+            @if (Model.Statistics.ByDiscipline.Count == 0)
+            {
+                <div class="empty-state">Soutěžící zatím nemá žádné disciplíny.</div>
+            }
+            else
+            {
+                <div class="standings-table-scroll">
+                    <table class="standings-table overall-standings-table competitor-stats-table">
+                        <thead>
+                            <tr>
+                                <th scope="col" class="stats-label-column">Disciplína</th>
+                                <th scope="col" class="overall-total-column">Celkem</th>
+                                @foreach (var edition in Model.Statistics.Editions)
+                                {
+                                    <th scope="col" class="overall-discipline-column">@edition.EditionName</th>
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var discipline in Model.Statistics.ByDiscipline)
+                            {
+                                <tr>
+                                    <th scope="row" class="stats-label-column">@discipline.DisciplineName</th>
+                                    <td class="standing-points overall-total-column"><strong>@discipline.TotalPoints b.</strong></td>
+                                    @foreach (var edition in Model.Statistics.Editions)
+                                    {
+                                        if (discipline.Editions.TryGetValue(edition.EditionId, out var cell))
+                                        {
+                                            <td class="overall-discipline-column">
+                                                <strong>@cell.Points b.</strong>
+                                                <small>@cell.Rank. místo</small>
+                                                <small class="standing-team">@cell.TeamName</small>
+                                            </td>
+                                        }
+                                        else
+                                        {
+                                            <td class="standing-empty overall-discipline-column">—</td>
+                                        }
+                                    }
+                                </tr>
+                            }
+                            <tr class="competitor-stats-summary-row">
+                                <th scope="row" class="stats-label-column">Celkem</th>
+                                <td class="standing-points overall-total-column"><strong>@Model.Statistics.TotalPoints b.</strong></td>
+                                @foreach (var edition in Model.Statistics.Editions)
+                                {
+                                    <td class="standing-points overall-discipline-column"><strong>@edition.TotalPoints b.</strong></td>
+                                }
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+
+        <section id="stats-by-team-member" class="competitor-stats-view" data-stats-view="team-member" hidden>
+            <h2>Body podle spoluhráče</h2>
+            @if (Model.Statistics.ByTeamMember.Count == 0)
+            {
+                <div class="empty-state">Soutěžící zatím nemá žádného spoluhráče.</div>
+            }
+            else
+            {
+                <div class="standings-table-scroll">
+                    <table class="standings-table overall-standings-table competitor-stats-table">
+                        <thead>
+                            <tr>
+                                <th scope="col" class="stats-label-column">Spoluhráč</th>
+                                <th scope="col" class="overall-total-column">Celkem</th>
+                                @foreach (var discipline in Model.Statistics.Disciplines)
+                                {
+                                    <th scope="col" class="overall-discipline-column">@discipline</th>
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var teammate in Model.Statistics.ByTeamMember)
+                            {
+                                <tr>
+                                    <th scope="row" class="stats-label-column">
+                                        <a asp-page="/Competitors/Stats" asp-route-id="@teammate.CompetitorId">@teammate.FirstName @teammate.LastName</a>
+                                    </th>
+                                    <td class="standing-points overall-total-column"><strong>@teammate.TotalPoints b.</strong></td>
+                                    @foreach (var discipline in Model.Statistics.Disciplines)
+                                    {
+                                        if (teammate.Disciplines.TryGetValue(discipline, out var points))
+                                        {
+                                            <td class="standing-points overall-discipline-column"><strong>@points b.</strong></td>
+                                        }
+                                        else
+                                        {
+                                            <td class="standing-empty overall-discipline-column">—</td>
+                                        }
+                                    }
+                                </tr>
+                            }
+                            <tr class="competitor-stats-summary-row">
+                                <th scope="row" class="stats-label-column">Celkem</th>
+                                <td class="standing-points overall-total-column"><strong>@Model.Statistics.ByTeamMember.Sum(teammate => teammate.TotalPoints) b.</strong></td>
+                                @foreach (var discipline in Model.Statistics.Disciplines)
+                                {
+                                    <td class="standing-points overall-discipline-column">
+                                        <strong>@Model.Statistics.ByTeamMember.Sum(teammate => teammate.Disciplines.GetValueOrDefault(discipline)) b.</strong>
+                                    </td>
+                                }
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+    </section>
+</main>
+
+@section Scripts {
+    <script>
+        document.querySelectorAll("[data-stats-tabs]").forEach(tabList => {
+            const buttons = Array.from(tabList.querySelectorAll("[data-stats-target]"));
+            const views = Array.from(document.querySelectorAll("[data-stats-view]"));
+
+            buttons.forEach(button => {
+                button.addEventListener("click", () => {
+                    const target = button.dataset.statsTarget;
+                    buttons.forEach(item => {
+                        const active = item === button;
+                        item.classList.toggle("is-active", active);
+                        item.setAttribute("aria-pressed", active ? "true" : "false");
+                    });
+                    views.forEach(view => view.hidden = view.dataset.statsView !== target);
+                });
+            });
+        });
+    </script>
+}

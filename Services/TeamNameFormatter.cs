@@ -20,6 +20,12 @@ public static class TeamNameFormatter
             var members = surnameGroup.ToList();
             foreach (var entry in members)
             {
+                if (members.Count == 1)
+                {
+                    result[entry.Id] = entry.Competitor.LastName.Trim();
+                    continue;
+                }
+
                 var firstName = entry.Competitor.FirstName.Trim();
                 var prefixLength = FindUniquePrefixLength(entry, members);
                 var prefix = firstName.Length == 0
@@ -83,9 +89,6 @@ public static class TeamNameFormatter
             return $"#{member.CompetitionEntryId}";
         }
 
-        var firstName = competitor.FirstName.Trim();
-        return firstName.Length == 0
-            ? competitor.LastName.Trim()
-            : $"{competitor.LastName.Trim()} {firstName[0]}.";
+        return competitor.LastName.Trim();
     }
 }

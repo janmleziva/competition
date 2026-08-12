@@ -6,28 +6,39 @@ namespace Competition.Tests;
 public sealed class TeamNameFormatterTests
 {
     [Fact]
-    public void Format_UsesSurnameAndShortestUnambiguousFirstNamePrefix()
+    public void Format_UsesOnlySurnameWhenSurnameIsUnique()
     {
         var jan = Entry(1, "Jan", "Novák");
-        var jana = Entry(2, "Jana", "Novák");
-        var petr = Entry(3, "Petr", "Svoboda");
-        var team = Team((jan, 1), (jana, 2), (petr, 3));
+        var petr = Entry(2, "Petr", "Svoboda");
+        var team = Team((jan, 1), (petr, 2));
 
-        var labels = TeamNameFormatter.CreateEntryLabels([jan, jana, petr]);
+        var labels = TeamNameFormatter.CreateEntryLabels([jan, petr]);
 
-        Assert.Equal("Novák Jan./Novák Jana./Svoboda P.", TeamNameFormatter.Format(team, labels));
+        Assert.Equal("Novák/Svoboda", TeamNameFormatter.Format(team, labels));
     }
 
     [Fact]
     public void Format_KeepsOneLetterWhenDuplicateSurnamesHaveDifferentInitials()
     {
-        var jan = Entry(1, "Jan", "Novák");
-        var petr = Entry(2, "Petr", "Novák");
-        var team = Team((jan, 1), (petr, 2));
+        var petr = Entry(1, "Petr", "Marek");
+        var david = Entry(2, "David", "Marek");
+        var team = Team((petr, 1), (david, 2));
 
-        var labels = TeamNameFormatter.CreateEntryLabels([jan, petr]);
+        var labels = TeamNameFormatter.CreateEntryLabels([petr, david]);
 
-        Assert.Equal("Novák J./Novák P.", TeamNameFormatter.Format(team, labels));
+        Assert.Equal("Marek P./Marek D.", TeamNameFormatter.Format(team, labels));
+    }
+
+    [Fact]
+    public void Format_UsesShortestUnambiguousFirstNamePrefixWhenInitialsCollide()
+    {
+        var robert = Entry(1, "Robert", "Hynek");
+        var richard = Entry(2, "Richard", "Hynek");
+        var team = Team((robert, 1), (richard, 2));
+
+        var labels = TeamNameFormatter.CreateEntryLabels([robert, richard]);
+
+        Assert.Equal("Hynek Ro./Hynek Ri.", TeamNameFormatter.Format(team, labels));
     }
 
     private static CompetitionEntry Entry(long id, string firstName, string lastName) => new()

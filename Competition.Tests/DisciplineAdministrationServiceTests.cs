@@ -486,6 +486,30 @@ public sealed class DisciplineAdministrationServiceTests
     }
 
     [Fact]
+    public async Task Attach_PersistsAwardPointSystem()
+    {
+        await using var db = CreateDbContext();
+        var editionId = await SeedEditionWithCompetitors(db, 0);
+        var discipline = new Discipline { Name = "Basket" };
+        var pointSystem = new AwardPointSystem { Name = "Body" };
+        db.AddRange(discipline, pointSystem);
+        await db.SaveChangesAsync();
+        var service = new DisciplineAdministrationService(db);
+
+        var attachedId = await service.AttachAsync(editionId, new EditionDisciplineInput
+        {
+            DisciplineId = discipline.Id,
+            Order = 1,
+            TeamSize = 2,
+            AwardPointSystemId = pointSystem.Id
+        });
+
+        var attached = await db.CompetitionDisciplines.SingleAsync(x => x.Id == attachedId);
+        Assert.Equal(pointSystem.Id, attached.AwardPointSystemId);
+        Assert.Equal(pointSystem.Id, (await service.GetEditionSetupAsync(editionId))!.Disciplines.Single().AwardPointSystemId);
+    }
+
+    [Fact]
     public async Task Update_RejectsTeamSizeChangeAfterTeamsExist()
     {
         await using var db = CreateDbContext();
@@ -524,8 +548,11 @@ public sealed class DisciplineAdministrationServiceTests
 
         var result = await page.OnPostAttachAsync(editionId, default);
 
-        Assert.IsType<RedirectToPageResult>(result);
-        Assert.Single(await db.CompetitionDisciplines.ToListAsync());
+        var redirect = Assert.IsType<RedirectToPageResult>(result);
+        var assigned = Assert.Single(await db.CompetitionDisciplines.ToListAsync());
+        Assert.Equal("/Editions/DisciplineDetail", redirect.PageName);
+        Assert.Equal(editionId, redirect.RouteValues!["id"]);
+        Assert.Equal(assigned.Id, redirect.RouteValues["disciplineId"]);
     }
 
     [Fact]
@@ -569,6 +596,7 @@ public sealed class DisciplineAdministrationServiceTests
             Order = 7,
             TeamSize = 4,
             PlayingSystem = PlayingSystemType.Knockout,
+            AwardPointSystemId = 42,
             ScheduledAt = new DateTime(2026, 8, 22, 17, 30, 0)
         };
         page.NewDiscipline = new DisciplineCatalogInput { Name = "Basket" };
@@ -580,6 +608,7 @@ public sealed class DisciplineAdministrationServiceTests
         Assert.Equal(7, page.Input.Order);
         Assert.Equal(4, page.Input.TeamSize);
         Assert.Equal(PlayingSystemType.Knockout, page.Input.PlayingSystem);
+        Assert.Equal(42, page.Input.AwardPointSystemId);
         Assert.Equal(new DateTime(2026, 8, 22, 17, 30, 0), page.Input.ScheduledAt);
         Assert.True(page.Input.DisciplineId > 0);
         Assert.Empty(page.NewDiscipline.Name);

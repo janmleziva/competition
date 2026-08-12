@@ -8,6 +8,8 @@ public interface ICompetitionScoringService
         long editionId, long competitionDisciplineId, long? pointSystemId, CancellationToken cancellationToken = default);
     Task<bool> FinalizeDisciplineAsync(
         long editionId, long competitionDisciplineId, CancellationToken cancellationToken = default);
+    Task<bool> CloseDisciplineWithAwardedPointsAsync(
+        long editionId, long competitionDisciplineId, CancellationToken cancellationToken = default);
     Task<bool> ReopenDisciplineAsync(
         long editionId, long competitionDisciplineId, CancellationToken cancellationToken = default);
     Task<bool> RemoveAwardedPointsAsync(
