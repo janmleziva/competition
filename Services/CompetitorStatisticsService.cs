@@ -78,6 +78,7 @@ public sealed class CompetitorStatisticsService(
                 entry.StartDate,
                 competitorRow.Place,
                 competitorRow.TotalPoints,
+                BuildPlacementSummary(cells.Values.Select(cell => cell.Rank)),
                 cells));
         }
 
@@ -90,10 +91,13 @@ public sealed class CompetitorStatisticsService(
             .Select(name => new CompetitorDisciplineStatistics(
                 name,
                 totalsByDiscipline[name],
+                BuildPlacementSummary(editionRows
+                    .Where(row => row.Disciplines.ContainsKey(name))
+                    .Select(row => row.Disciplines[name].Rank)),
                 editionRows
                     .Where(row => row.Disciplines.ContainsKey(name))
                     .ToDictionary(row => row.EditionId, row => row.Disciplines[name])))
-            .OrderByDescending(row => row.TotalPoints)
+            .Order(new PlacementSummaryComparer<CompetitorDisciplineStatistics>(row => row.Placements))
             .ThenBy(row => row.DisciplineName)
             .ToList();
 
@@ -107,6 +111,13 @@ public sealed class CompetitorStatisticsService(
             editionRows,
             editionRows.Sum(row => row.TotalPoints),
             totalsByDiscipline,
+            BuildPlacementSummary(editionRows.SelectMany(row => row.Disciplines.Values.Select(cell => cell.Rank))),
+            disciplineNames.ToDictionary(
+                name => name,
+                name => BuildPlacementSummary(editionRows
+                    .Where(row => row.Disciplines.ContainsKey(name))
+                    .Select(row => row.Disciplines[name].Rank)),
+                StringComparer.OrdinalIgnoreCase),
             byDiscipline,
             byTeamMember);
     }
@@ -120,7 +131,6 @@ public sealed class CompetitorStatisticsService(
             .AsSplitQuery()
             .Include(team => team.CompetitionDiscipline).ThenInclude(discipline => discipline.Discipline)
             .Include(team => team.FinalStandingEntries)
-            .Include(team => team.BonusAwards)
             .Include(team => team.Members).ThenInclude(member => member.CompetitionEntry)
                 .ThenInclude(entry => entry.Competitor)
             .Where(team => team.Members.Any(member => member.CompetitionEntry.CompetitorId == competitorId) &&
@@ -131,8 +141,14 @@ public sealed class CompetitorStatisticsService(
         foreach (var team in sharedTeams)
         {
             var disciplineName = team.CompetitionDiscipline.Discipline.Name;
-            var points = (team.FinalStandingEntries.SingleOrDefault()?.PointsAwarded ?? 0) +
-                team.BonusAwards.Sum(award => award.PointsAwarded);
+            var finalStanding = team.FinalStandingEntries.SingleOrDefault();
+            if (finalStanding is null)
+            {
+                continue;
+            }
+
+            var points = finalStanding.PointsAwarded;
+            var rank = finalStanding.Rank;
             foreach (var member in team.Members.Where(member => member.CompetitionEntry.CompetitorId != competitorId))
             {
                 var teammate = member.CompetitionEntry.Competitor;
@@ -143,13 +159,19 @@ public sealed class CompetitorStatisticsService(
                 }
 
                 row.TotalPoints += points;
-                row.Disciplines[disciplineName] =
-                    row.Disciplines.GetValueOrDefault(disciplineName) + points;
+                row.Ranks.Add(rank);
+                if (!row.Disciplines.TryGetValue(disciplineName, out var ranks))
+                {
+                    ranks = [];
+                    row.Disciplines.Add(disciplineName, ranks);
+                }
+
+                ranks.Add(rank);
             }
         }
 
         return rows.Values
-            .OrderByDescending(row => row.TotalPoints)
+            .Order(new PlacementSummaryComparer<MutableTeamMemberStatistics>(row => BuildPlacementSummary(row.Ranks)))
             .ThenBy(row => row.LastName)
             .ThenBy(row => row.FirstName)
             .Select(row => new CompetitorTeamMemberStatistics(
@@ -157,9 +179,19 @@ public sealed class CompetitorStatisticsService(
                 row.FirstName,
                 row.LastName,
                 row.TotalPoints,
-                row.Disciplines))
+                BuildPlacementSummary(row.Ranks),
+                row.Disciplines.ToDictionary(
+                    item => item.Key,
+                    item => BuildPlacementSummary(item.Value),
+                    StringComparer.OrdinalIgnoreCase)))
             .ToList();
     }
+
+    private static PlacementSummary BuildPlacementSummary(IEnumerable<int> ranks) => new(
+        ranks
+            .GroupBy(rank => rank)
+            .OrderBy(group => group.Key)
+            .ToDictionary(group => group.Key, group => group.Count()));
 
     private sealed class MutableTeamMemberStatistics(long competitorId, string firstName, string lastName)
     {
@@ -167,6 +199,46 @@ public sealed class CompetitorStatisticsService(
         public string FirstName { get; } = firstName;
         public string LastName { get; } = lastName;
         public int TotalPoints { get; set; }
-        public Dictionary<string, int> Disciplines { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public List<int> Ranks { get; } = [];
+        public Dictionary<string, List<int>> Disciplines { get; } = new(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private sealed class PlacementSummaryComparer<T>(Func<T, PlacementSummary> selector) : IComparer<T>
+    {
+        public int Compare(T? left, T? right)
+        {
+            if (ReferenceEquals(left, right))
+            {
+                return 0;
+            }
+
+            if (left is null)
+            {
+                return 1;
+            }
+
+            if (right is null)
+            {
+                return -1;
+            }
+
+            var leftSummary = selector(left);
+            var rightSummary = selector(right);
+            var maxRank = Math.Max(
+                leftSummary.Counts.Count == 0 ? 0 : leftSummary.Counts.Keys.Max(),
+                rightSummary.Counts.Count == 0 ? 0 : rightSummary.Counts.Keys.Max());
+
+            for (var rank = 1; rank <= maxRank; rank++)
+            {
+                var comparison = rightSummary.Counts.GetValueOrDefault(rank)
+                    .CompareTo(leftSummary.Counts.GetValueOrDefault(rank));
+                if (comparison != 0)
+                {
+                    return comparison;
+                }
+            }
+
+            return rightSummary.TotalPlacements.CompareTo(leftSummary.TotalPlacements);
+        }
     }
 }

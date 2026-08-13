@@ -43,10 +43,15 @@ public sealed class CompetitorStatisticsServiceTests
         Assert.NotNull(statistics);
         Assert.Equal(new[] { "Cup 2024", "Cup 2025" }, statistics.Editions.Select(row => row.EditionName));
         Assert.Equal(new[] { 7, 7 }, statistics.Editions.Select(row => row.TotalPoints));
+        Assert.Equal(new[] { "1. místo 1x, 2. místo 1x", "1. místo 1x, 2. místo 1x" },
+            statistics.Editions.Select(row => row.Placements.Format()));
         Assert.All(statistics.Editions, row => Assert.Equal(1, row.OverallPlace));
         Assert.Equal(14, statistics.TotalPoints);
+        Assert.Equal("1. místo 2x, 2. místo 2x", statistics.Placements.Format());
         Assert.Equal(8, statistics.TotalsByDiscipline["Padel"]);
         Assert.Equal(6, statistics.TotalsByDiscipline["Tenis"]);
+        Assert.Equal("1. místo 2x", statistics.PlacementsByDiscipline["Padel"].Format());
+        Assert.Equal("2. místo 2x", statistics.PlacementsByDiscipline["Tenis"].Format());
         Assert.Equal(new[] { "Padel", "Tenis" }, statistics.ByDiscipline.Select(row => row.DisciplineName));
 
         Assert.Collection(statistics.ByTeamMember,
@@ -54,13 +59,15 @@ public sealed class CompetitorStatisticsServiceTests
             {
                 Assert.Equal(alice.Id, teammate.CompetitorId);
                 Assert.Equal(5, teammate.TotalPoints);
-                Assert.Equal(5, teammate.Disciplines["Padel"]);
+                Assert.Equal("1. místo 1x", teammate.Placements.Format());
+                Assert.Equal("1. místo 1x", teammate.Disciplines["Padel"].Format());
             },
             teammate =>
             {
                 Assert.Equal(bob.Id, teammate.CompetitorId);
                 Assert.Equal(3, teammate.TotalPoints);
-                Assert.Equal(3, teammate.Disciplines["Padel"]);
+                Assert.Equal("2. místo 1x", teammate.Placements.Format());
+                Assert.Equal("2. místo 1x", teammate.Disciplines["Padel"].Format());
             });
     }
 
