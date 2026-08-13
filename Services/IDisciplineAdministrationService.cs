@@ -34,7 +34,9 @@ public sealed record ConfiguredDisciplineItem(
     bool IsScheduleLocked = false, bool HasMatches = false, bool HasPhases = false, bool HasPhaseAssignments = false,
     bool IsClosed = false, long? AwardPointSystemId = null, string? AwardPointSystemName = null,
     IReadOnlyList<DisciplineAwardedStanding>? FinalStandings = null, bool AreAllMatchesCompleted = false,
-    IReadOnlyList<AwardPointRuleItem>? AwardPointRules = null)
+    IReadOnlyList<AwardPointRuleItem>? AwardPointRules = null,
+    IReadOnlyList<BonusPointRuleItem>? BonusPointRules = null,
+    IReadOnlyList<DisciplineBonusAwardItem>? BonusAwards = null)
 {
     public bool IsPhaseSetupAvailable =>
         ParticipantCount > 0 && TeamCount * TeamSize == ParticipantCount;

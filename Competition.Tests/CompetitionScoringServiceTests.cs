@@ -98,6 +98,73 @@ public sealed class CompetitionScoringServiceTests
     }
 
     [Fact]
+    public async Task Finalize_AwardsEveryTeamTiedForEachConfiguredBonus()
+    {
+        await using var db = CreateDbContext();
+        var seeded = await SeedCompletedRoundRobinAsync(db);
+        var discipline = await db.CompetitionDisciplines.SingleAsync();
+        discipline.UsesSetScores = true;
+        discipline.SetsToWin = 1;
+        var match = await db.Matches.SingleAsync();
+        match.HomeScore = 1;
+        match.AwayScore = 1;
+        match.SetScores.Add(new MatchSetScore { SetNumber = 1, HomeScore = 10, AwayScore = 10 });
+        var pointSystem = new AwardPointSystem { Name = "Body s bonusy" };
+        pointSystem.Rules.Add(new RankingPointRule { Rank = 1, Points = 6 });
+        pointSystem.Rules.Add(new RankingPointRule { Rank = 2, Points = 4 });
+        db.AwardPointSystems.Add(pointSystem);
+        await db.SaveChangesAsync();
+        var service = CreateService(db);
+        await service.SetPointSystemAsync(seeded.EditionId, seeded.DisciplineId, pointSystem.Id);
+        await service.SetBonusPointRulesAsync(seeded.EditionId, seeded.DisciplineId,
+        [
+            new() { Type = BonusPointType.LowestAverageSubscoreAgainst, Enabled = true, Points = 1 },
+            new() { Type = BonusPointType.HighestAverageScoreFor, Enabled = true, Points = 2 },
+            new() { Type = BonusPointType.HighestAverageScoreDifference, Enabled = true, Points = 3 }
+        ]);
+
+        Assert.True(await service.FinalizeDisciplineAsync(seeded.EditionId, seeded.DisciplineId));
+
+        var awards = await db.DisciplineBonusAwards.OrderBy(award => award.Type)
+            .ThenBy(award => award.DisciplineTeamId).ToListAsync();
+        Assert.Equal(6, awards.Count);
+        Assert.All(Enum.GetValues<BonusPointType>(), type =>
+            Assert.Equal(2, awards.Count(award => award.Type == type)));
+        Assert.Equal([1, 1, 2, 2, 3, 3], awards.Select(award => award.PointsAwarded).Order());
+
+        var setup = await service.GetDisciplineSetupAsync(seeded.EditionId, seeded.DisciplineId);
+        Assert.Equal(3, setup!.BonusRules!.Count);
+        Assert.Equal(6, setup.BonusAwards!.Count);
+        Assert.Equal(6, setup.BonusMetricStandings!.Count);
+        Assert.All(setup.BonusMetricStandings, standing => Assert.Equal(1, standing.Rank));
+        var overall = (await service.GetEditionOverallStandingAsync(seeded.EditionId))!;
+        Assert.Equal(12, overall.Rows.Single(row => row.EntryId == seeded.FirstWinnerEntryId).TotalPoints);
+        Assert.Equal(12, overall.Rows.Single(row => row.EntryId == seeded.SecondWinnerEntryId).TotalPoints);
+        Assert.Equal(10, overall.Rows.Single(row => row.EntryId == seeded.LoserEntryId).TotalPoints);
+
+        var withoutBonuses = (await service.GetEditionOverallStandingAsync(
+            seeded.EditionId, includeBonusPoints: false))!;
+        Assert.Equal(6, withoutBonuses.Rows.Single(row => row.EntryId == seeded.FirstWinnerEntryId).TotalPoints);
+        Assert.Equal(6, withoutBonuses.Rows.Single(row => row.EntryId == seeded.SecondWinnerEntryId).TotalPoints);
+        Assert.Equal(4, withoutBonuses.Rows.Single(row => row.EntryId == seeded.LoserEntryId).TotalPoints);
+    }
+
+    [Fact]
+    public async Task BonusRules_DefaultToOnePointAndRejectSubscoreRuleWithoutSets()
+    {
+        Assert.Equal(1, new BonusPointRuleInput().Points);
+        await using var db = CreateDbContext();
+        var seeded = await SeedCompletedRoundRobinAsync(db);
+
+        await Assert.ThrowsAsync<ValidationException>(() => CreateService(db).SetBonusPointRulesAsync(
+            seeded.EditionId,
+            seeded.DisciplineId,
+            [new() { Type = BonusPointType.LowestAverageSubscoreAgainst, Enabled = true, Points = 1 }]));
+
+        Assert.Empty(await db.DisciplineBonusPointRules.ToListAsync());
+    }
+
+    [Fact]
     public async Task Reopen_PreservesAwardedPointsUntilTheyAreExplicitlyRemoved()
     {
         await using var db = CreateDbContext();
@@ -127,7 +194,11 @@ public sealed class CompetitionScoringServiceTests
 
         Assert.True(await service.RemoveAwardedPointsAsync(seeded.EditionId, seeded.DisciplineId));
         Assert.Empty(await db.DisciplineStandings.ToListAsync());
-        Assert.True((await service.GetDisciplineSetupAsync(seeded.EditionId, seeded.DisciplineId))!.CanFinalize);
+        Assert.Empty(await db.DisciplineBonusAwards.ToListAsync());
+        var setupWithoutAwards = (await service.GetDisciplineSetupAsync(seeded.EditionId, seeded.DisciplineId))!;
+        Assert.True(setupWithoutAwards.CanFinalize);
+        Assert.Empty(setupWithoutAwards.BonusAwards!);
+        Assert.Empty(setupWithoutAwards.BonusMetricStandings!);
     }
 
     [Fact]

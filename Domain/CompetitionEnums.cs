@@ -22,3 +22,10 @@ public enum MatchStatus
     InProgress,
     Completed
 }
+
+public enum BonusPointType
+{
+    LowestAverageSubscoreAgainst,
+    HighestAverageScoreFor,
+    HighestAverageScoreDifference
+}

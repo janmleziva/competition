@@ -27,6 +27,9 @@ public sealed class DisciplineDetailModel(
     [BindProperty]
     public AwardPointSystemInput EditPointSystem { get; set; } = new();
 
+    [BindProperty]
+    public List<BonusPointRuleInput> BonusPointRules { get; set; } = [];
+
     [TempData]
     public string? StatusMessage { get; set; }
 
@@ -97,6 +100,23 @@ public sealed class DisciplineDetailModel(
         return RedirectToPage(new { id, disciplineId });
     }
 
+    public async Task<IActionResult> OnPostSetBonusPointRulesAsync(long id, long disciplineId, CancellationToken ct)
+    {
+        if (User.Identity?.IsAuthenticated != true) return Challenge();
+        try
+        {
+            if (!await scoring.SetBonusPointRulesAsync(id, disciplineId, BonusPointRules, ct)) return NotFound();
+        }
+        catch (ValidationException ex)
+        {
+            ModelState.Clear();
+            ModelState.AddModelError(string.Empty, ex.Message);
+            return await LoadAsync(id, disciplineId, true, ct) ? Page() : NotFound();
+        }
+        StatusMessage = "Nastavení bonusových bodů bylo uloženo.";
+        return RedirectToPage(new { id, disciplineId });
+    }
+
     public async Task<IActionResult> OnPostUpdatePointSystemAsync(long id, long disciplineId, long systemId, CancellationToken ct)
     {
         if (User.Identity?.IsAuthenticated != true) return Challenge();
@@ -153,6 +173,16 @@ public sealed class DisciplineDetailModel(
         Setup = setup;
         Scoring = await scoring.GetDisciplineSetupAsync(id, disciplineId, ct) ?? throw new InvalidOperationException();
         AwardPointSystemId = Scoring.AwardPointSystemId;
+        if (populateInput || BonusPointRules.Count == 0)
+        {
+            var configuredBonusRules = (Scoring.BonusRules ?? []).ToDictionary(rule => rule.Type);
+            BonusPointRules = Enum.GetValues<BonusPointType>().Select(type => new BonusPointRuleInput
+            {
+                Type = type,
+                Enabled = configuredBonusRules.ContainsKey(type),
+                Points = configuredBonusRules.GetValueOrDefault(type)?.Points ?? 1
+            }).ToList();
+        }
         if ((populateInput || EditPointSystem.Rules.Count == 0) && Scoring.AwardPointSystemId is not null)
         {
             var currentSystem = Scoring.AvailableSystems.Single(x => x.Id == Scoring.AwardPointSystemId);

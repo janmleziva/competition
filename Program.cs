@@ -111,6 +111,7 @@ using (var scope = app.Services.CreateScope())
 {
     var database = scope.ServiceProvider.GetRequiredService<CompetitionDbContext>();
     database.Database.EnsureCreated();
+    SqliteSchemaUpgrader.ApplyCompetitionUpgrades(database);
     // Keep committed data in the main file so FTP backups are self-contained.
     database.Database.ExecuteSqlRaw("PRAGMA journal_mode=DELETE;");
 }

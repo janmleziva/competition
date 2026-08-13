@@ -120,6 +120,7 @@ public sealed class CompetitorStatisticsService(
             .AsSplitQuery()
             .Include(team => team.CompetitionDiscipline).ThenInclude(discipline => discipline.Discipline)
             .Include(team => team.FinalStandingEntries)
+            .Include(team => team.BonusAwards)
             .Include(team => team.Members).ThenInclude(member => member.CompetitionEntry)
                 .ThenInclude(entry => entry.Competitor)
             .Where(team => team.Members.Any(member => member.CompetitionEntry.CompetitorId == competitorId) &&
@@ -130,7 +131,8 @@ public sealed class CompetitorStatisticsService(
         foreach (var team in sharedTeams)
         {
             var disciplineName = team.CompetitionDiscipline.Discipline.Name;
-            var points = team.FinalStandingEntries.SingleOrDefault()?.PointsAwarded ?? 0;
+            var points = (team.FinalStandingEntries.SingleOrDefault()?.PointsAwarded ?? 0) +
+                team.BonusAwards.Sum(award => award.PointsAwarded);
             foreach (var member in team.Members.Where(member => member.CompetitionEntry.CompetitorId != competitorId))
             {
                 var teammate = member.CompetitionEntry.Competitor;

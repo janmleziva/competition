@@ -19,6 +19,23 @@
             Body týmové disciplíny získává v plné výši každý člen týmu.
         </p>
 
+        <form method="get" class="phase-switcher overall-standings-mode" aria-label="Započítání bonusových bodů">
+            <button class="phase-switch-button @(Model.IncludeBonusPoints ? "is-active" : null)"
+                    type="submit"
+                    name="includeBonusPoints"
+                    value="true"
+                    aria-pressed="@Model.IncludeBonusPoints.ToString().ToLowerInvariant()">
+                Včetně bonusových bodů
+            </button>
+            <button class="phase-switch-button @(!Model.IncludeBonusPoints ? "is-active" : null)"
+                    type="submit"
+                    name="includeBonusPoints"
+                    value="false"
+                    aria-pressed="@((!Model.IncludeBonusPoints).ToString().ToLowerInvariant())">
+                Bez bonusových bodů
+            </button>
+        </form>
+
         <div class="standings-table-scroll">
             <table class="standings-table overall-standings-table">
                 <thead>
@@ -53,6 +70,10 @@
                                         <strong>@cell.Points b.</strong>
                                         <small>@cell.Rank. místo</small>
                                         <small class="standing-team">@cell.TeamName</small>
+                                        @if (Model.IncludeBonusPoints && cell.BonusPoints > 0)
+                                        {
+                                            <small class="standing-bonus">(@cell.BonusPoints b. bonus)</small>
+                                        }
                                     </td>
                                 }
                                 else

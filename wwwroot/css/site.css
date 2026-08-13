@@ -455,6 +455,26 @@ h1 { font-size: clamp(1.9rem, 4.5vw, 3.2rem); }
 .discipline-final-inline { margin: 16px 0 0; padding: 12px 14px; color: #14532d; background: #f0fdf4; border: 1px solid #86efac; border-radius: 10px; line-height: 1.65; }
 .discipline-scoring-inline { margin-top: 16px; }
 .discipline-scoring-inline .point-system-rules-summary { margin-top: 8px; }
+.discipline-bonus-section { margin-top: 16px; }
+.bonus-rule-form { display: grid; gap: 8px; margin-top: 12px; }
+.bonus-rule-row { display: grid; grid-template-columns: minmax(260px, 1fr) auto; align-items: center; gap: 14px; padding: 9px 12px; background: #f8fafc; border: 1px solid #dbe3ef; border-radius: 10px; }
+.bonus-rule-row.is-disabled { opacity: .55; }
+.registration-form .bonus-rule-label { display: flex; align-items: center; gap: 10px; margin: 0; }
+.bonus-rule-label input { width: 18px; height: 18px; margin: 0; }
+.registration-form .bonus-rule-points { display: flex; align-items: center; gap: 6px; margin: 0; white-space: nowrap; }
+.bonus-rule-points input { width: 3.5rem; margin: 0; padding: 6px 5px; border: 1px solid #cbd5e1; border-radius: 8px; font: inherit; text-align: center; }
+.bonus-rule-summary, .bonus-award-list { display: grid; gap: 8px; margin-top: 14px; }
+.bonus-rule-summary p, .bonus-award-list p, .discipline-bonus-inline p { margin: 0; line-height: 1.55; }
+.discipline-bonus-inline { display: grid; gap: 7px; margin-top: 12px; padding: 12px 14px; color: #713f12; background: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 8px; font-size: .8rem; }
+.bonus-points-results { margin-top: 24px; padding-top: 22px; border-top: 3px solid #f59e0b; }
+.bonus-points-results .phase-card-heading { margin-bottom: 10px; }
+.bonus-result-list { display: grid; gap: 12px; }
+.bonus-result-item { padding: 14px 16px; background: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid #f59e0b; border-radius: 10px; }
+.bonus-result-item h3 { margin: 0 0 8px; color: var(--text); font-size: 1rem; }
+.bonus-result-item p { margin: 0; line-height: 1.55; }
+.bonus-result-winner { color: #713f12; }
+.bonus-result-others { margin-top: 5px !important; color: var(--muted); font-size: .88rem; }
+.overall-standings-table .standing-bonus { color: #a16207; font-weight: 700; }
 .point-systems-page { display: grid; gap: 20px; }
 .point-system-list { display: grid; gap: 12px; }
 .point-system-create { margin: 0; }
@@ -477,6 +497,7 @@ h1 { font-size: clamp(1.9rem, 4.5vw, 3.2rem); }
 .point-system-edit-panel { margin-top: 18px; padding-top: 18px; border-top: 1px solid #dbe3ef; }
 .point-system-edit-panel h3 { margin: 0 0 18px; font-size: 1.05rem; }
 .overall-standings-table { width: min-content; }
+.overall-standings-mode { width: fit-content; max-width: 100%; }
 .overall-standings-table th, .overall-standings-table td { min-width: 96px; padding: 8px 9px; vertical-align: top; }
 .overall-standings-table .overall-standing-column { width: 1%; min-width: 40px; padding-right: 6px; padding-left: 6px; }
 .overall-standings-table th.overall-name-column { width: 1%; min-width: 0; }
@@ -528,4 +549,5 @@ h1 { font-size: clamp(1.9rem, 4.5vw, 3.2rem); }
     .discipline-description-field, .discipline-detail-actions { grid-column: auto; }
     .point-rule-row { grid-template-columns: 1fr 1fr; }
     .point-system-summary-heading { align-items: flex-start; flex-direction: column; }
+    .bonus-rule-row { grid-template-columns: 1fr; align-items: stretch; }
 }

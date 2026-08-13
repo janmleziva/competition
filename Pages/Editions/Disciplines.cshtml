@@ -1,5 +1,6 @@
 @page "/Editions/{id:long}/Disciplines"
 @model Competition.Pages.Editions.DisciplinesModel
+@using Competition.Services
 @using Competition.Domain
 
 @{
@@ -218,7 +219,7 @@
                                        asp-page="/Editions/DisciplineDetail"
                                        asp-route-id="@Model.Setup.EditionId"
                                        asp-route-disciplineId="@item.Id">
-                                        Detail
+                                        Nastavení
                                     </a>
 
                                     <a class="button button-ghost button-small"
@@ -422,6 +423,30 @@
                             </section>
                         }
 
+                        @if (item.BonusPointRules is { Count: > 0 })
+                        {
+                            <section class="discipline-bonus-inline" aria-label="Bonusové body">
+                                @foreach (var rule in item.BonusPointRules)
+                                {
+                                    var winners = (item.BonusAwards ?? [])
+                                        .Where(award => award.Type == rule.Type)
+                                        .Select(award => award.TeamName)
+                                        .ToList();
+                                    <p>
+                                        <strong>@BonusPointTypeLabels.FormatPoints(rule.Points):</strong>
+                                        @if (winners.Count > 0)
+                                        {
+                                            <span>@string.Join(", ", winners) (@BonusPointTypeLabels.Get(rule.Type))</span>
+                                        }
+                                        else
+                                        {
+                                            <span>@BonusPointTypeLabels.Get(rule.Type)</span>
+                                        }
+                                    </p>
+                                }
+                            </section>
+                        }
+
                         @if (User.Identity?.IsAuthenticated == true && item.CanRemove)
                         {
                             <div id="remove-discipline-modal-@item.Id" class="modal-backdrop" role="presentation" hidden>
@@ -451,7 +476,7 @@
                                     <h2 id="finalize-discipline-title-@item.Id">Přidělit body a uzavřít @item.Name?</h2>
                                     <div class="destructive-warning">
                                         <strong>Uzavření je trvalé.</strong>
-                                        <p>Body podle systému „@item.AwardPointSystemName“ dostane v plné výši každý člen týmu. Po potvrzení už nepůjde měnit nastavení, účastníky, týmy, rozpis ani výsledky disciplíny.</p>
+                                        <p>Body za umístění i nastavené bonusové body dostane v plné výši každý člen oceněného týmu. Po potvrzení už nepůjde měnit nastavení, účastníky, týmy, rozpis ani výsledky disciplíny.</p>
                                     </div>
                                     <div class="modal-actions">
                                         <form method="post" asp-page-handler="Finalize" data-close-modal-after-post="true">
