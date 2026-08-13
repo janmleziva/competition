@@ -1,5 +1,6 @@
 @page "/Competitors/{id:long}/Stats"
 @model Competition.Pages.Competitors.StatsModel
+@using Competition.Services
 @{
     ViewData["Title"] = $"Statistiky – {Model.Statistics.FirstName} {Model.Statistics.LastName}";
 }
@@ -34,7 +35,7 @@
                             <tr>
                                 <th scope="col" class="stats-label-column">Ročník</th>
                                 <th scope="col" class="stats-place-column">Celkové pořadí</th>
-                                <th scope="col" class="overall-total-column">Celkem</th>
+                                <th scope="col" class="overall-total-column">Body</th>
                                 @foreach (var discipline in Model.Statistics.Disciplines)
                                 {
                                     <th scope="col" class="overall-discipline-column">@discipline</th>
@@ -56,8 +57,7 @@
                                         if (edition.Disciplines.TryGetValue(discipline, out var cell))
                                         {
                                             <td class="overall-discipline-column">
-                                                <strong>@cell.Points b.</strong>
-                                                <small>@cell.Rank. místo</small>
+                                                <strong>@cell.Rank. místo</strong>
                                                 <small class="standing-team">@cell.TeamName</small>
                                             </td>
                                         }
@@ -74,7 +74,7 @@
                                 <td class="standing-points overall-total-column"><strong>@Model.Statistics.TotalPoints b.</strong></td>
                                 @foreach (var discipline in Model.Statistics.Disciplines)
                                 {
-                                    <td class="standing-points overall-discipline-column"><strong>@Model.Statistics.TotalsByDiscipline[discipline] b.</strong></td>
+                                    <td class="overall-discipline-column">@Html.Raw(FormatPlacements(Model.Statistics.PlacementsByDiscipline[discipline]))</td>
                                 }
                             </tr>
                         </tbody>
@@ -96,7 +96,7 @@
                         <thead>
                             <tr>
                                 <th scope="col" class="stats-label-column">Disciplína</th>
-                                <th scope="col" class="overall-total-column">Celkem</th>
+                                <th scope="col" class="overall-total-column">Umístění</th>
                                 @foreach (var edition in Model.Statistics.Editions)
                                 {
                                     <th scope="col" class="overall-discipline-column">@edition.EditionName</th>
@@ -108,14 +108,13 @@
                             {
                                 <tr>
                                     <th scope="row" class="stats-label-column">@discipline.DisciplineName</th>
-                                    <td class="standing-points overall-total-column"><strong>@discipline.TotalPoints b.</strong></td>
+                                    <td class="overall-total-column">@Html.Raw(FormatPlacements(discipline.Placements))</td>
                                     @foreach (var edition in Model.Statistics.Editions)
                                     {
                                         if (discipline.Editions.TryGetValue(edition.EditionId, out var cell))
                                         {
                                             <td class="overall-discipline-column">
-                                                <strong>@cell.Points b.</strong>
-                                                <small>@cell.Rank. místo</small>
+                                                <strong>@cell.Rank. místo</strong>
                                                 <small class="standing-team">@cell.TeamName</small>
                                             </td>
                                         }
@@ -126,14 +125,6 @@
                                     }
                                 </tr>
                             }
-                            <tr class="competitor-stats-summary-row">
-                                <th scope="row" class="stats-label-column">Celkem</th>
-                                <td class="standing-points overall-total-column"><strong>@Model.Statistics.TotalPoints b.</strong></td>
-                                @foreach (var edition in Model.Statistics.Editions)
-                                {
-                                    <td class="standing-points overall-discipline-column"><strong>@edition.TotalPoints b.</strong></td>
-                                }
-                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -141,7 +132,7 @@
         </section>
 
         <section id="stats-by-team-member" class="competitor-stats-view" data-stats-view="team-member" hidden>
-            <h2>Body podle spoluhráče</h2>
+            <h2>Umístění podle spoluhráče</h2>
             @if (Model.Statistics.ByTeamMember.Count == 0)
             {
                 <div class="empty-state">Soutěžící zatím nemá žádného spoluhráče.</div>
@@ -153,7 +144,7 @@
                         <thead>
                             <tr>
                                 <th scope="col" class="stats-label-column">Spoluhráč</th>
-                                <th scope="col" class="overall-total-column">Celkem</th>
+                                <th scope="col" class="overall-total-column">Umístění</th>
                                 @foreach (var discipline in Model.Statistics.Disciplines)
                                 {
                                     <th scope="col" class="overall-discipline-column">@discipline</th>
@@ -167,12 +158,12 @@
                                     <th scope="row" class="stats-label-column">
                                         <a asp-page="/Competitors/Stats" asp-route-id="@teammate.CompetitorId">@teammate.FirstName @teammate.LastName</a>
                                     </th>
-                                    <td class="standing-points overall-total-column"><strong>@teammate.TotalPoints b.</strong></td>
+                                    <td class="overall-total-column">@Html.Raw(FormatPlacements(teammate.Placements))</td>
                                     @foreach (var discipline in Model.Statistics.Disciplines)
                                     {
-                                        if (teammate.Disciplines.TryGetValue(discipline, out var points))
+                                        if (teammate.Disciplines.TryGetValue(discipline, out var placements))
                                         {
-                                            <td class="standing-points overall-discipline-column"><strong>@points b.</strong></td>
+                                            <td class="overall-discipline-column">@Html.Raw(FormatPlacements(placements))</td>
                                         }
                                         else
                                         {
@@ -181,16 +172,6 @@
                                     }
                                 </tr>
                             }
-                            <tr class="competitor-stats-summary-row">
-                                <th scope="row" class="stats-label-column">Celkem</th>
-                                <td class="standing-points overall-total-column"><strong>@Model.Statistics.ByTeamMember.Sum(teammate => teammate.TotalPoints) b.</strong></td>
-                                @foreach (var discipline in Model.Statistics.Disciplines)
-                                {
-                                    <td class="standing-points overall-discipline-column">
-                                        <strong>@Model.Statistics.ByTeamMember.Sum(teammate => teammate.Disciplines.GetValueOrDefault(discipline)) b.</strong>
-                                    </td>
-                                }
-                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -218,4 +199,18 @@
             });
         });
     </script>
+}
+
+@functions {
+    private static string FormatPlacements(PlacementSummary placements)
+    {
+        if (placements.Counts.Count == 0)
+        {
+            return "-";
+        }
+
+        return string.Join(", ", placements.Counts
+            .OrderBy(item => item.Key)
+            .Select(item => $"<strong>{item.Key}</strong>. místo <strong>{item.Value}x</strong>"));
+    }
 }
