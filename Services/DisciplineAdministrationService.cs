@@ -120,7 +120,20 @@ public sealed class DisciplineAdministrationService(CompetitionDbContext dbConte
                     ? null
                     : x.AwardPointSystem.Rules.OrderBy(rule => rule.Rank)
                         .Select(rule => new AwardPointRuleItem(rule.Rank, rule.Points))
-                        .ToList()))
+                        .ToList(),
+                x.BonusPointRules.OrderBy(rule => rule.Type)
+                    .Select(rule => new BonusPointRuleItem(rule.Type, rule.Points))
+                    .ToList(),
+                x.BonusAwards.OrderBy(award => award.Type).ThenBy(award => award.DisciplineTeamId)
+                    .Select(award => new DisciplineBonusAwardItem(
+                        award.Type,
+                        award.PointsAwarded,
+                        award.DisciplineTeamId,
+                        string.Join("/", award.DisciplineTeam.Members.OrderBy(member => member.Order)
+                            .Select(member => member.CompetitionEntry.Competitor.LastName)),
+                        award.MetricTotal,
+                        award.MatchCount))
+                    .ToList()))
             .ToListAsync(cancellationToken);
 
         var teams = await dbContext.DisciplineTeams.AsNoTrackingWithIdentityResolution()
@@ -137,8 +150,7 @@ public sealed class DisciplineAdministrationService(CompetitionDbContext dbConte
         var entryLabels = TeamNameFormatter.CreateEntryLabels(editionEntries);
         configured = configured.Select(item =>
         {
-            if (item.FinalStandings is not { Count: > 0 } ||
-                !teamsByDiscipline.TryGetValue(item.Id, out var disciplineTeams))
+            if (!teamsByDiscipline.TryGetValue(item.Id, out var disciplineTeams))
             {
                 return item;
             }
@@ -146,10 +158,14 @@ public sealed class DisciplineAdministrationService(CompetitionDbContext dbConte
             var teamById = disciplineTeams.ToDictionary(team => team.Id);
             return item with
             {
-                FinalStandings = item.FinalStandings.Select(standing =>
+                FinalStandings = item.FinalStandings?.Select(standing =>
                     teamById.TryGetValue(standing.TeamId, out var team)
                         ? standing with { TeamName = TeamNameFormatter.Format(team, entryLabels) }
-                        : standing).ToList()
+                        : standing).ToList(),
+                BonusAwards = item.BonusAwards?.Select(award =>
+                    teamById.TryGetValue(award.TeamId, out var team)
+                        ? award with { TeamName = TeamNameFormatter.Format(team, entryLabels) }
+                        : award).ToList()
             };
         }).ToList();
 
@@ -445,6 +461,9 @@ public sealed class DisciplineAdministrationService(CompetitionDbContext dbConte
         dbContext.DisciplineStandings.RemoveRange(await dbContext.DisciplineStandings
             .Where(x => x.CompetitionDisciplineId == competitionDisciplineId)
             .ToListAsync(cancellationToken));
+        dbContext.DisciplineBonusAwards.RemoveRange(await dbContext.DisciplineBonusAwards
+            .Where(x => x.CompetitionDisciplineId == competitionDisciplineId)
+            .ToListAsync(cancellationToken));
     }
 
     public async Task<bool> SetLockAsync(long editionId, long competitionDisciplineId, bool isLocked, CancellationToken cancellationToken = default)
@@ -500,6 +519,8 @@ public sealed class DisciplineAdministrationService(CompetitionDbContext dbConte
         dbContext.PhaseGroups.RemoveRange(phases.SelectMany(x => x.Groups));
         dbContext.DisciplinePhases.RemoveRange(phases);
         dbContext.DisciplineStandings.RemoveRange(await dbContext.DisciplineStandings.Where(x => x.CompetitionDisciplineId == item.Id).ToListAsync(cancellationToken));
+        dbContext.DisciplineBonusAwards.RemoveRange(await dbContext.DisciplineBonusAwards.Where(x => x.CompetitionDisciplineId == item.Id).ToListAsync(cancellationToken));
+        dbContext.DisciplineBonusPointRules.RemoveRange(await dbContext.DisciplineBonusPointRules.Where(x => x.CompetitionDisciplineId == item.Id).ToListAsync(cancellationToken));
         dbContext.DisciplineParticipantAssignments.RemoveRange(item.ParticipantAssignments);
         dbContext.DisciplineTeamMembers.RemoveRange(item.Teams.SelectMany(x => x.Members));
         dbContext.DisciplineTeams.RemoveRange(item.Teams);

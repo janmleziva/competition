@@ -10,4 +10,5 @@ public sealed class DisciplineTeam
     public ICollection<DisciplineTeamMember> Members { get; } = [];
     public ICollection<PhaseGroupTeam> GroupAssignments { get; } = [];
     public ICollection<DisciplineStanding> FinalStandingEntries { get; } = [];
+    public ICollection<DisciplineBonusAward> BonusAwards { get; } = [];
 }

@@ -25,4 +25,6 @@ public sealed class CompetitionDiscipline
     public ICollection<DisciplineTeam> Teams { get; } = [];
     public ICollection<DisciplinePhase> Phases { get; } = [];
     public ICollection<DisciplineStanding> FinalStandings { get; } = [];
+    public ICollection<DisciplineBonusPointRule> BonusPointRules { get; } = [];
+    public ICollection<DisciplineBonusAward> BonusAwards { get; } = [];
 }

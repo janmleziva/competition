@@ -1,5 +1,6 @@
 @model Competition.Pages.Editions.DisciplinePhasesModel
 @using Competition.Domain
+@using Competition.Services
 
 @{
     var isAuthenticated = User.Identity?.IsAuthenticated == true;
@@ -506,6 +507,50 @@
         {
             <article class="phase-card final-standings-card" data-phase-filter-card="final-standings">
                 <partial name="_FinalStandings" model="Model.FinalStandings" />
+                @if (Model.Scoring.BonusRules is { Count: > 0 })
+                {
+                    <section class="standings-section bonus-points-results" aria-labelledby="bonus-points-title">
+                        <div class="phase-card-heading">
+                            <div>
+                                <h2 id="bonus-points-title">Bonusové body</h2>
+                            </div>
+                        </div>
+                        <div class="bonus-result-list">
+                            @foreach (var rule in Model.Scoring.BonusRules)
+                            {
+                                var winners = (Model.Scoring.BonusAwards ?? [])
+                                    .Where(award => award.Type == rule.Type)
+                                    .ToList();
+                                var otherPlacements = (Model.Scoring.BonusMetricStandings ?? [])
+                                    .Where(standing => standing.Type == rule.Type && standing.Rank > 1)
+                                    .ToList();
+                                <article class="bonus-result-item">
+                                    <h3>@BonusPointTypeLabels.Get(rule.Type)</h3>
+                                    <p class="bonus-result-winner">
+                                        <strong>@BonusPointTypeLabels.FormatPoints(rule.Points):</strong>
+                                        @if (winners.Count > 0)
+                                        {
+                                            @string.Join(", ", winners.Select(winner =>
+                                                $"{winner.TeamName} ({BonusPointTypeLabels.FormatMetric(winner.MetricTotal, winner.MatchCount)})"))
+                                        }
+                                        else
+                                        {
+                                            <span class="meta-inline">zatím nepřiděleno</span>
+                                        }
+                                    </p>
+                                    @if (winners.Count > 0 && otherPlacements.Count > 0)
+                                    {
+                                        <p class="bonus-result-others">
+                                            <strong>Další umístění:</strong>
+                                            @string.Join(", ", otherPlacements.Select(standing =>
+                                                $"{standing.Rank}. {standing.TeamName} ({BonusPointTypeLabels.FormatMetric(standing.MetricTotal, standing.MatchCount)})"))
+                                        </p>
+                                    }
+                                </article>
+                            }
+                        </div>
+                    </section>
+                }
             </article>
         }
     </section>
@@ -537,7 +582,7 @@
             <h2 id="finalize-discipline-title">Přidělit body a uzavřít disciplínu?</h2>
             <div class="destructive-warning">
                 <strong>Uzavření je trvalé.</strong>
-                <p>Body podle systému „@Model.Scoring.AwardPointSystemName“ dostane v plné výši každý člen týmu. Po potvrzení už nepůjde měnit nastavení, účastníky, týmy, rozpis ani výsledky disciplíny.</p>
+                <p>Body za umístění i nastavené bonusové body dostane v plné výši každý člen oceněného týmu. Po potvrzení už nepůjde měnit nastavení, účastníky, týmy, rozpis ani výsledky disciplíny.</p>
             </div>
             <div class="modal-actions">
                 <form method="post" asp-page-handler="Finalize" data-close-modal-after-post="true">

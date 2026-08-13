@@ -22,6 +22,8 @@ public sealed class CompetitionDbContext(DbContextOptions<CompetitionDbContext> 
     public DbSet<AwardPointSystem> AwardPointSystems => Set<AwardPointSystem>();
     public DbSet<RankingPointRule> RankingPointRules => Set<RankingPointRule>();
     public DbSet<DisciplineStanding> DisciplineStandings => Set<DisciplineStanding>();
+    public DbSet<DisciplineBonusPointRule> DisciplineBonusPointRules => Set<DisciplineBonusPointRule>();
+    public DbSet<DisciplineBonusAward> DisciplineBonusAwards => Set<DisciplineBonusAward>();
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
@@ -270,6 +272,34 @@ public sealed class CompetitionDbContext(DbContextOptions<CompetitionDbContext> 
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.DisciplineTeam)
                 .WithMany(x => x.FinalStandingEntries)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<DisciplineBonusPointRule>(entity =>
+        {
+            entity.Property(x => x.Type).HasConversion<string>().HasMaxLength(50);
+            entity.HasIndex(x => new { x.CompetitionDisciplineId, x.Type }).IsUnique();
+            entity.ToTable("DisciplineBonusPointRules", table =>
+                table.HasCheckConstraint("CK_DisciplineBonusPointRules_Points", "Points >= 0"));
+            entity.HasOne(x => x.CompetitionDiscipline)
+                .WithMany(x => x.BonusPointRules)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<DisciplineBonusAward>(entity =>
+        {
+            entity.Property(x => x.Type).HasConversion<string>().HasMaxLength(50);
+            entity.HasIndex(x => new { x.CompetitionDisciplineId, x.DisciplineTeamId, x.Type }).IsUnique();
+            entity.ToTable("DisciplineBonusAwards", table =>
+            {
+                table.HasCheckConstraint("CK_DisciplineBonusAwards_Points", "PointsAwarded >= 0");
+                table.HasCheckConstraint("CK_DisciplineBonusAwards_MatchCount", "MatchCount > 0");
+            });
+            entity.HasOne(x => x.CompetitionDiscipline)
+                .WithMany(x => x.BonusAwards)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.DisciplineTeam)
+                .WithMany(x => x.BonusAwards)
                 .OnDelete(DeleteBehavior.Restrict);
         });
     }

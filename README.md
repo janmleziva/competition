@@ -200,6 +200,12 @@ completed, an authenticated administrator can confirm finalization from either t
 list or phase page. Finalization snapshots each team's rank and points, gives the full point
 value to every team member, and permanently closes all discipline mutations.
 
+Each discipline can additionally enable a fixed set of bonus rules: lowest average subscore
+conceded, highest average score, and highest average score difference. A rule awards one point
+by default, its value is configurable, and every team tied for the best exact average receives
+the full bonus. Bonus awards are snapshotted during finalization, shown below final standings,
+and included in every team member's edition total.
+
 Finalized points appear in the discipline's `Konečné umístění` table and as a top-four inline
 summary on the edition discipline list. `/Editions/{id}/Standings` shows each competitor's
 points and team for every discipline plus the total. Equal totals are ordered by the number of

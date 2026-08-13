@@ -1,6 +1,7 @@
 @page "/Editions/{id:long}/Disciplines/{disciplineId:long}"
 @model Competition.Pages.Editions.DisciplineDetailModel
 @using Competition.Domain
+@using Competition.Services
 
 @{
     ViewData["Title"] = $"{Model.Setup.Discipline.Name} – {Model.Setup.EditionName}";
@@ -9,6 +10,8 @@
     var isAdmin = isAuthenticated && !item.IsClosed;
     var canChangePlayingSystem = !item.IsScheduleLocked;
     var setSettingsLocked = item.HasResults;
+    var isBonusPointRulesPostback = HttpMethods.IsPost(Request.Method)
+        && string.Equals(Request.Query["handler"], "SetBonusPointRules", StringComparison.OrdinalIgnoreCase);
     var selectedPointSystem = Model.Scoring.AwardPointSystemId is null
         ? null
         : Model.Scoring.AvailableSystems.SingleOrDefault(system => system.Id == Model.Scoring.AwardPointSystemId);
@@ -41,7 +44,10 @@
         {
             <div class="status-message" role="status">@Model.StatusMessage</div>
         }
-        <div asp-validation-summary="ModelOnly" class="error validation-panel"></div>
+        @if (!isBonusPointRulesPostback)
+        {
+            <div asp-validation-summary="ModelOnly" class="error validation-panel"></div>
+        }
 
         @if (item.IsLocked && !item.IsClosed)
         {
@@ -146,6 +152,67 @@
             }
         </section>
 
+        @if (isBonusPointRulesPostback)
+        {
+            <div asp-validation-summary="ModelOnly" class="error validation-panel local-validation-panel"></div>
+        }
+        <section class="registration-form discipline-bonus-section" aria-labelledby="discipline-bonus-title">
+            <h2 id="discipline-bonus-title">Bonusové body</h2>
+            <p class="meta-inline">
+                Hodnotí se průměr na odehraný zápas. Při shodě získají plný počet bodů všechny nejlepší týmy.
+            </p>
+            @if (isAdmin && !item.IsLocked)
+            {
+                <form method="post"
+                      asp-page-handler="SetBonusPointRules"
+                      class="bonus-rule-form"
+                      data-bonus-rule-form>
+                    @for (var index = 0; index < Model.BonusPointRules.Count; index++)
+                    {
+                        var rule = Model.BonusPointRules[index];
+                        var unavailable = rule.Type == BonusPointType.LowestAverageSubscoreAgainst && !item.UsesSetScores;
+                        <div class="bonus-rule-row @(unavailable ? "is-disabled" : null)">
+                            <input asp-for="BonusPointRules[index].Type" type="hidden" />
+                            <label class="checkbox-label bonus-rule-label">
+                                <input asp-for="BonusPointRules[index].Enabled"
+                                       type="checkbox"
+                                       data-bonus-rule-autosubmit
+                                       disabled="@unavailable" />
+                                <span>@BonusPointTypeLabels.Get(rule.Type)</span>
+                            </label>
+                            @if (unavailable)
+                            {
+                                <input asp-for="BonusPointRules[index].Enabled" type="hidden" value="false" />
+                            }
+                            <label class="bonus-rule-points">
+                                <span>Bonus:</span>
+                                <input asp-for="BonusPointRules[index].Points"
+                                       type="number"
+                                       min="0"
+                                       max="1000"
+                                       data-bonus-rule-autosubmit
+                                       disabled="@unavailable" />
+                                <span>b.</span>
+                            </label>
+                        </div>
+                    }
+                </form>
+            }
+            else if (Model.Scoring.BonusRules is { Count: > 0 })
+            {
+                <div class="bonus-rule-summary">
+                    @foreach (var rule in Model.Scoring.BonusRules)
+                    {
+                        <p><strong>@BonusPointTypeLabels.FormatPoints(rule.Points):</strong> @BonusPointTypeLabels.Get(rule.Type)</p>
+                    }
+                </div>
+            }
+            else
+            {
+                <p class="meta-inline">Žádné bonusové body nejsou nastavené.</p>
+            }
+        </section>
+
         @if (isAdmin && !item.IsLocked)
         {
             <form method="post" asp-page-handler="Update" class="discipline-detail-form">
@@ -221,17 +288,6 @@
                 </div>
                 <div class="form-actions discipline-detail-actions">
                     <button class="button" type="submit">Uložit</button>
-                    <a class="button button-ghost"
-                       asp-page="/Editions/DisciplineParticipants"
-                       asp-route-id="@Model.Setup.EditionId"
-                       asp-route-disciplineId="@item.Id">Účastníci a týmy</a>
-                    @if (item.IsPhaseSetupAvailable)
-                    {
-                        <a class="button button-ghost"
-                           asp-page="@(item.IsScheduleLocked ? "/Editions/DisciplineResults" : "/Editions/DisciplinePhases")"
-                           asp-route-id="@Model.Setup.EditionId"
-                           asp-route-disciplineId="@item.Id">@(item.IsScheduleLocked ? "Rozpis a výsledky" : "Rozpis")</a>
-                    }
                 </div>
             </form>
         }
@@ -245,6 +301,20 @@
                 <div class="details-wide"><dt>Informace o disciplíně</dt><dd class="discipline-description">@(item.Description ?? "Bez dalších informací.")</dd></div>
             </dl>
         }
+
+        <nav class="form-actions discipline-detail-navigation" aria-label="Stránky disciplíny">
+            <a class="button button-ghost"
+               asp-page="/Editions/DisciplineParticipants"
+               asp-route-id="@Model.Setup.EditionId"
+               asp-route-disciplineId="@item.Id">Účastníci a týmy</a>
+            @if (item.IsPhaseSetupAvailable)
+            {
+                <a class="button button-ghost"
+                   asp-page="@(item.IsScheduleLocked ? "/Editions/DisciplineResults" : "/Editions/DisciplinePhases")"
+                   asp-route-id="@Model.Setup.EditionId"
+                   asp-route-disciplineId="@item.Id">@(item.IsScheduleLocked ? "Rozpis a výsledky" : "Rozpis")</a>
+            }
+        </nav>
     </section>
 </main>
 
@@ -285,6 +355,15 @@
             const update = () => submit.disabled = select.value === form.dataset.initialValue;
             select.addEventListener("change", update);
             update();
+        });
+        document.querySelectorAll("[data-bonus-rule-form]").forEach(form => {
+            form.querySelectorAll("[data-bonus-rule-autosubmit]").forEach(control => {
+                control.addEventListener("change", () => {
+                    if (form.dataset.submitting === "true") return;
+                    form.dataset.submitting = "true";
+                    form.requestSubmit();
+                });
+            });
         });
     </script>
 }
