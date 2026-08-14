@@ -53,9 +53,9 @@
 
             <div class="choice-divider" aria-hidden="true"><span>nebo</span></div>
 
-            <section class="registration-form" aria-labelledby="create-register-heading">
-                <h2 id="create-register-heading">Vytvořte nového</h2>
-                <form method="post" asp-page-handler="CreateAndRegister" class="edition-form">
+            <details class="registration-form create-competitor-disclosure" open="@Model.NewCompetitorDetailsOpen">
+                <summary id="create-register-heading">Vytvořte nového</summary>
+                <form method="post" asp-page-handler="CreateAndRegister" class="edition-form" aria-labelledby="create-register-heading">
                     <label for="newCompetitor_FirstName">Jméno</label>
                     @Html.TextBox("newCompetitor.FirstName", Model.NewCompetitor.FirstName, new { maxlength = 100, required = "required" })
                     @Html.ValidationMessage("newCompetitor.FirstName", null, new { @class = "field-error" })
@@ -72,7 +72,7 @@
                         <button class="button" type="submit">Vytvořit a přihlásit</button>
                     </div>
                 </form>
-            </section>
+            </details>
         }
 
         @if (Model.Registration.Entries.Count == 0)
@@ -81,10 +81,10 @@
         }
         else
         {
-            <div class="edition-list">
+            <div class="edition-list competitor-registration-list">
                 @foreach (var entry in Model.Registration.Entries)
                 {
-                    <article class="edition-row">
+                    <article class="edition-row registered-competitor-row">
                         <div>
                             <div class="edition-title"><span class="seed-badge">@entry.Seed</span> @entry.LastName @entry.FirstName</div>
                             <span class="meta-inline">Narozen/a: @Model.FormatDate(entry.DateOfBirth)</span>
@@ -95,7 +95,7 @@
                                 <form method="post" asp-page-handler="UpdateSeed" class="seed-update-form">
                                     <input type="hidden" name="entryId" value="@entry.Id" />
                                     <label class="visually-hidden" for="seed-@entry.Id">Nasazení pro @entry.FirstName @entry.LastName</label>
-                                    <input id="seed-@entry.Id" name="entrySeed" type="number" min="1" value="@entry.Seed" />
+                                    <input id="seed-@entry.Id" name="entrySeed" type="number" min="1" value="@entry.Seed" inputmode="numeric" />
                                     <button class="button button-ghost button-small" type="submit">Změnit</button>
                                 </form>
                                 <form method="post" asp-page-handler="Remove">

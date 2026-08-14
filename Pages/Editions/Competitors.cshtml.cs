@@ -21,6 +21,8 @@ public sealed class CompetitorsModel(ICompetitorAdministrationService competitor
 
     public CompetitorInput NewCompetitor { get; private set; } = new();
     public bool ShowDuplicateConfirmation { get; private set; }
+    public bool ExpandNewCompetitorForm { get; private set; }
+    public string? NewCompetitorDetailsOpen => ExpandNewCompetitorForm ? "open" : null;
 
     [TempData]
     public string? StatusMessage { get; set; }
@@ -73,6 +75,7 @@ public sealed class CompetitorsModel(ICompetitorAdministrationService competitor
         NewCompetitor = newCompetitor;
         if (!ModelState.IsValid)
         {
+            ExpandNewCompetitorForm = true;
             return await ReloadOrNotFoundAsync(id, cancellationToken);
         }
 
@@ -87,11 +90,13 @@ public sealed class CompetitorsModel(ICompetitorAdministrationService competitor
         catch (DuplicateCompetitorException)
         {
             ShowDuplicateConfirmation = true;
+            ExpandNewCompetitorForm = true;
             return await ReloadOrNotFoundAsync(id, cancellationToken);
         }
         catch (ValidationException exception)
         {
             ModelState.AddModelError(string.Empty, exception.Message);
+            ExpandNewCompetitorForm = true;
             return await ReloadOrNotFoundAsync(id, cancellationToken);
         }
 

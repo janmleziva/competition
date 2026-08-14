@@ -19,6 +19,8 @@ public sealed class IndexModel(
 
     public string EnvironmentName => environment.EnvironmentName;
 
+    public bool IsDevelopment => environment.IsDevelopment();
+
     public HomeEditionDisplay? Edition { get; private set; }
 
     public bool IsCompetitionRunning { get; private set; }

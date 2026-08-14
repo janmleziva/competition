@@ -1,8 +1,26 @@
 @using Competition.Configuration
+@using Competition.Services
 @using Microsoft.Extensions.Options
 @inject IOptionsMonitor<ThemeSettings> ThemeOptions
+@inject IEditionAdministrationService EditionAdministration
 @{
     var theme = ThemeOptions.CurrentValue;
+    var currentPath = Context.Request.Path;
+    var currentPathValue = currentPath.Value ?? string.Empty;
+    var activeEdition = (await EditionAdministration.ListAsync(Context.RequestAborted))
+        .FirstOrDefault(edition => edition.IsActive);
+    var activeEditionPrefix = activeEdition is null ? null : $"/Editions/{activeEdition.Id}";
+    var isEditionDisciplinesActive = activeEditionPrefix is not null &&
+        currentPathValue.StartsWith($"{activeEditionPrefix}/Disciplines", StringComparison.OrdinalIgnoreCase);
+    var isEditionStandingsActive = activeEditionPrefix is not null &&
+        currentPathValue.StartsWith($"{activeEditionPrefix}/Standings", StringComparison.OrdinalIgnoreCase);
+    var isEditionCompetitorsActive = activeEditionPrefix is not null &&
+        currentPathValue.StartsWith($"{activeEditionPrefix}/Competitors", StringComparison.OrdinalIgnoreCase);
+    var isCatalogActive = currentPath.StartsWithSegments("/Competitors") ||
+        currentPath.StartsWithSegments("/Disciplines") ||
+        currentPath.StartsWithSegments("/PointSystems") ||
+        currentPathValue.Equals("/Editions", StringComparison.OrdinalIgnoreCase) ||
+        currentPath.StartsWithSegments("/Editions/Details");
 }
 <!doctype html>
 <html lang="cs">
@@ -23,16 +41,56 @@
             --radius: @theme.BorderRadius;
         }
     </style>
+    <link rel="icon" href="~/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="512x512" href="~/favicon.png" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
 <body>
     <header class="site-header">
-        <nav class="site-nav" aria-label="Hlavní navigace">
-            <a asp-page="/Editions/Index">Soutěže</a>
-            <a asp-page="/Competitors/Index">Soutěžící</a>
-            <a asp-page="/Disciplines/Index">Disciplíny</a>
-            <a asp-page="/PointSystems/Index">Bodování</a>
-        </nav>
+        <div class="site-nav-cluster">
+            <a class="site-brand" asp-page="/Index" aria-label="Úvodní stránka">
+                <img src="~/favicon.png" asp-append-version="true" alt="" />
+            </a>
+
+            <nav class="site-nav" aria-label="Hlavní navigace">
+                @if (activeEdition is not null)
+                {
+                    <a class="@(isEditionDisciplinesActive ? "is-active" : null)"
+                       asp-page="/Editions/Disciplines"
+                       asp-route-id="@activeEdition.Id">Disciplíny</a>
+                    <a class="@(isEditionStandingsActive ? "is-active" : null)"
+                       asp-page="/Editions/OverallStandings"
+                       asp-route-id="@activeEdition.Id">Pořadí</a>
+                    <a class="@(isEditionCompetitorsActive ? "is-active" : null)"
+                       asp-page="/Editions/Competitors"
+                       asp-route-id="@activeEdition.Id">Soutěžící</a>
+                }
+                else
+                {
+                    <span class="site-nav-disabled" aria-disabled="true">Disciplíny</span>
+                    <span class="site-nav-disabled" aria-disabled="true">Pořadí</span>
+                    <span class="site-nav-disabled" aria-disabled="true">Soutěžící</span>
+                }
+
+                <details class="site-menu @(isCatalogActive ? "is-active" : null)" data-site-menu name="main-navigation-menu">
+                    <summary>Katalog</summary>
+                    <div class="site-submenu">
+                        <a asp-page="/Editions/Index">Soutěže</a>
+                        <a asp-page="/Competitors/Index">Soutěžící</a>
+                        <a asp-page="/Disciplines/Index">Disciplíny</a>
+                        <a asp-page="/PointSystems/Index">Bodování</a>
+                    </div>
+                </details>
+
+                <details class="site-menu" data-site-menu name="main-navigation-menu">
+                    <summary>Statistiky</summary>
+                    <div class="site-submenu site-submenu-upcoming">
+                        <span aria-disabled="true">Jednotlivci <small>Připravujeme</small></span>
+                        <span aria-disabled="true">Disciplíny <small>Připravujeme</small></span>
+                    </div>
+                </details>
+            </nav>
+        </div>
 
         <div class="auth-actions">
             @if (User.Identity?.IsAuthenticated == true)
@@ -52,6 +110,7 @@
     <script src="~/js/czech-date-picker.js" asp-append-version="true" defer></script>
     <script src="~/js/preserve-postback-position.js" asp-append-version="true" defer></script>
     <script src="~/js/feedback-auto-dismiss.js" asp-append-version="true" defer></script>
+    <script src="~/js/site-menu.js" asp-append-version="true" defer></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

@@ -1,3 +1,4 @@
+using System.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace Competition.Data;
@@ -6,6 +7,8 @@ public static class SqliteSchemaUpgrader
 {
     public static void ApplyCompetitionUpgrades(CompetitionDbContext database)
     {
+        RemoveObsoleteResultsLockColumn(database);
+
         database.Database.ExecuteSqlRaw(
             """
             CREATE TABLE IF NOT EXISTS "DisciplineBonusPointRules" (
@@ -42,5 +45,57 @@ public static class SqliteSchemaUpgrader
             CREATE INDEX IF NOT EXISTS "IX_DisciplineBonusAwards_DisciplineTeamId"
                 ON "DisciplineBonusAwards" ("DisciplineTeamId");
             """);
+    }
+
+    private static void RemoveObsoleteResultsLockColumn(CompetitionDbContext database)
+    {
+        if (!ColumnExists(database, "CompetitionDisciplines", "AreResultsLocked"))
+        {
+            return;
+        }
+
+        using var transaction = database.Database.BeginTransaction();
+        database.Database.ExecuteSqlRaw(
+            "ALTER TABLE \"CompetitionDisciplines\" DROP COLUMN \"AreResultsLocked\";");
+        transaction.Commit();
+    }
+
+    private static bool ColumnExists(
+        CompetitionDbContext database,
+        string tableName,
+        string columnName)
+    {
+        var connection = database.Database.GetDbConnection();
+        var shouldClose = connection.State == ConnectionState.Closed;
+        if (shouldClose)
+        {
+            connection.Open();
+        }
+
+        try
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText =
+                "SELECT COUNT(*) FROM pragma_table_info($tableName) WHERE name = $columnName;";
+
+            var tableParameter = command.CreateParameter();
+            tableParameter.ParameterName = "$tableName";
+            tableParameter.Value = tableName;
+            command.Parameters.Add(tableParameter);
+
+            var columnParameter = command.CreateParameter();
+            columnParameter.ParameterName = "$columnName";
+            columnParameter.Value = columnName;
+            command.Parameters.Add(columnParameter);
+
+            return Convert.ToInt64(command.ExecuteScalar()) > 0;
+        }
+        finally
+        {
+            if (shouldClose)
+            {
+                connection.Close();
+            }
+        }
     }
 }
