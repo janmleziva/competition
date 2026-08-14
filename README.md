@@ -7,6 +7,10 @@ Small ASP.NET Core countdown app for the competition landing page.
 The app uses a SQLite database at `App_Data/competition.db` in both local development and
 production. It does not require a database server or a production connection string. On first
 startup, an empty database is created automatically if the file is missing.
+Existing databases are upgraded idempotently at startup. The upgrade removes obsolete schema
+columns inside a transaction and preserves existing competition data. For production deployments,
+use `scripts/deploy.ps1 -Backup` so a copy of the remote database is downloaded before new code
+is activated.
 
 The existing SQL Server LocalDB data can be converted with the included migration tool:
 

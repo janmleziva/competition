@@ -18,7 +18,7 @@ public sealed class ThemeSettings
 
     public string AccentStrong { get; set; } = "#1d4ed8";
 
-    public string FontFamily { get; set; } = "Segoe UI, sans-serif";
+    public string FontFamily { get; set; } = "Barlow, Segoe UI, sans-serif";
 
     public string BorderRadius { get; set; } = "24px";
 }

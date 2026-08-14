@@ -7,6 +7,71 @@ namespace Competition.Tests;
 public sealed class SqliteSchemaUpgraderTests
 {
     [Fact]
+    public async Task ApplyCompetitionUpgrades_RemovesObsoleteResultsLockWithoutLosingData()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        await using (var command = connection.CreateCommand())
+        {
+            command.CommandText =
+                """
+                PRAGMA foreign_keys = ON;
+                CREATE TABLE CompetitionDisciplines (
+                    Id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                    CompetitionEditionId INTEGER NOT NULL,
+                    DisciplineId INTEGER NOT NULL,
+                    "Order" INTEGER NOT NULL,
+                    AreResultsLocked INTEGER NOT NULL
+                );
+                CREATE UNIQUE INDEX IX_CompetitionDisciplines_CompetitionEditionId_Order
+                    ON CompetitionDisciplines (CompetitionEditionId, "Order");
+                CREATE TABLE DisciplineTeams (
+                    Id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                    CompetitionDisciplineId INTEGER NOT NULL,
+                    FOREIGN KEY (CompetitionDisciplineId) REFERENCES CompetitionDisciplines (Id)
+                );
+                INSERT INTO CompetitionDisciplines
+                    (Id, CompetitionEditionId, DisciplineId, "Order", AreResultsLocked)
+                    VALUES (7, 2, 5, 3, 1);
+                INSERT INTO DisciplineTeams (Id, CompetitionDisciplineId) VALUES (11, 7);
+                """;
+            await command.ExecuteNonQueryAsync();
+        }
+        await using var db = new CompetitionDbContext(
+            new DbContextOptionsBuilder<CompetitionDbContext>().UseSqlite(connection).Options);
+
+        SqliteSchemaUpgrader.ApplyCompetitionUpgrades(db);
+        SqliteSchemaUpgrader.ApplyCompetitionUpgrades(db);
+
+        await using var verification = connection.CreateCommand();
+        verification.CommandText =
+            """
+            SELECT
+                (SELECT COUNT(*) FROM pragma_table_info('CompetitionDisciplines') WHERE name = 'AreResultsLocked'),
+                (SELECT COUNT(*) FROM CompetitionDisciplines
+                    WHERE Id = 7 AND CompetitionEditionId = 2 AND DisciplineId = 5 AND "Order" = 3),
+                (SELECT COUNT(*) FROM DisciplineTeams WHERE Id = 11 AND CompetitionDisciplineId = 7),
+                (SELECT COUNT(*) FROM sqlite_master
+                    WHERE type = 'index' AND name = 'IX_CompetitionDisciplines_CompetitionEditionId_Order');
+            """;
+        await using var reader = await verification.ExecuteReaderAsync();
+        Assert.True(await reader.ReadAsync());
+        Assert.Equal(0L, reader.GetInt64(0));
+        Assert.Equal(1L, reader.GetInt64(1));
+        Assert.Equal(1L, reader.GetInt64(2));
+        Assert.Equal(1L, reader.GetInt64(3));
+
+        await using var insert = connection.CreateCommand();
+        insert.CommandText =
+            """
+            INSERT INTO CompetitionDisciplines
+                (CompetitionEditionId, DisciplineId, "Order")
+                VALUES (2, 6, 4);
+            """;
+        Assert.Equal(1, await insert.ExecuteNonQueryAsync());
+    }
+
+    [Fact]
     public async Task ApplyCompetitionUpgrades_AddsBonusTablesToExistingDatabase()
     {
         await using var connection = new SqliteConnection("Data Source=:memory:");
