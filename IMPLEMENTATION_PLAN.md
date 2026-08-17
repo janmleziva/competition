@@ -128,12 +128,12 @@ Acceptance: every discipline produces one durable final rank and full per-member
 
 Acceptance: every competitor's edition total reconciles exactly with the sum of that individual's full team points across disciplines.
 
-### Step 10 - Statistics and records (in progress)
+### Step 10 - Statistics and records (completed)
 
 - Provide overall individual statistics for each competitor, broken down by edition, discipline, and teammate. This page is implemented and ranks performance primarily by final placements rather than awarded points, because point systems can differ between editions.
-- Add an individual statistics home page that ranks competitors best-first with ascending displayed rank numbers. Provide two tabbed views: one ordered by final-placement profile and one ordered by total points gained. Each competitor name links to the existing individual statistics detail page.
-- Add an edition-wide individual statistics page for comparing all competitors within one edition across disciplines, placements, points, and teammate combinations.
-- Add discipline-oriented statistics and records across editions, including placement distributions and notable performance records while preserving enough context to compare results produced under different formats and point systems.
+- Provide an individual statistics home page that ranks competitors best-first with ascending displayed rank numbers. Two tabbed views order competitors by final-placement profile or total points gained. Each competitor name links to the existing individual statistics detail page.
+- Provide an edition-wide individual statistics page that compares competitors within one edition by placements and points.
+- Provide discipline-oriented statistics and records across editions, including placement distributions and records for wins, podium finishes, appearances, and points.
 - Keep statistics queries and presentation models extensible so additional statistics pages, filters, and records can be added without duplicating aggregation and ranking rules.
 - Test solo and team disciplines, competitors with changing teammates, partially finalized editions, tied placements, different point systems across editions, and competitors with no qualifying results.
 

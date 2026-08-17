@@ -7,7 +7,7 @@
             <thead>
                 <tr>
                     <th scope="col"><span class="visually-hidden">Pořadí</span>#</th>
-                    <th scope="col">Tým</th>
+                    <th scope="col" class="standings-identity-column">Tým</th>
                     <th scope="col" title="Odehrané zápasy">Z</th>
                     <th scope="col" title="Výhry">V</th>
                     <th scope="col" title="Remízy">R</th>
@@ -27,7 +27,7 @@
                 {
                     <tr>
                         <td class="standing-position">@row.Position.</td>
-                        <th scope="row">@row.TeamName <span class="standing-seed">(@row.Seed)</span></th>
+                        <th scope="row" class="standings-identity-column">@row.TeamName <span class="standing-seed">(@row.Seed)</span></th>
                         <td>@row.Played</td>
                         <td>@row.Wins</td>
                         <td>@row.Draws</td>

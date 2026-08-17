@@ -11,6 +11,14 @@ public sealed record PlacementSummary(IReadOnlyDictionary<int, int> Counts)
 {
     public int TotalPlacements => Counts.Values.Sum();
 
+    public int CountAt(int rank) => Counts.GetValueOrDefault(rank);
+
+    public static PlacementSummary FromRanks(IEnumerable<int> ranks) => new(
+        ranks
+            .GroupBy(rank => rank)
+            .OrderBy(group => group.Key)
+            .ToDictionary(group => group.Key, group => group.Count()));
+
     public string Format()
     {
         if (Counts.Count == 0)
@@ -22,6 +30,30 @@ public sealed record PlacementSummary(IReadOnlyDictionary<int, int> Counts)
             .OrderBy(item => item.Key)
             .Select(item => $"{item.Key}. místo {item.Value}x"));
     }
+}
+
+public static class PlacementSummaryOrdering
+{
+    public static int Compare(PlacementSummary left, PlacementSummary right)
+    {
+        var maxRank = Math.Max(
+            left.Counts.Count == 0 ? 0 : left.Counts.Keys.Max(),
+            right.Counts.Count == 0 ? 0 : right.Counts.Keys.Max());
+
+        for (var rank = 1; rank <= maxRank; rank++)
+        {
+            var comparison = right.CountAt(rank).CompareTo(left.CountAt(rank));
+            if (comparison != 0)
+            {
+                return comparison;
+            }
+        }
+
+        return right.TotalPlacements.CompareTo(left.TotalPlacements);
+    }
+
+    public static bool AreEqual(PlacementSummary left, PlacementSummary right) =>
+        Compare(left, right) == 0;
 }
 
 public sealed record CompetitorEditionStatistics(

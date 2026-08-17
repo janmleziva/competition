@@ -7,18 +7,18 @@
 
 <main class="shell shell-wide">
     <section class="panel admin competitor-stats-page">
-        <div class="page-heading">
+        <div class="page-heading competitor-stats-heading">
             <div>
                 <h1>@Model.Statistics.FirstName @Model.Statistics.LastName</h1>
                 <p class="lead">Statistiky soutěžícího</p>
             </div>
-            <a class="button button-ghost" asp-page="/Competitors/Index">Zpět</a>
+            <a class="button button-ghost" asp-page="/Statistics/Individuals">Zpět</a>
         </div>
 
         <nav class="phase-switcher competitor-stats-tabs" aria-label="Zobrazení statistik" data-stats-tabs>
-            <button class="phase-switch-button is-active" type="button" data-stats-target="edition" aria-controls="stats-by-edition" aria-pressed="true">Podle ročníku</button>
-            <button class="phase-switch-button" type="button" data-stats-target="discipline" aria-controls="stats-by-discipline" aria-pressed="false">Podle disciplíny</button>
-            <button class="phase-switch-button" type="button" data-stats-target="team-member" aria-controls="stats-by-team-member" aria-pressed="false">Podle spoluhráče</button>
+            <button class="phase-switch-button is-active" type="button" data-stats-target="edition" aria-controls="stats-by-edition" aria-pressed="true">Ročníky</button>
+            <button class="phase-switch-button" type="button" data-stats-target="discipline" aria-controls="stats-by-discipline" aria-pressed="false">Disciplíny</button>
+            <button class="phase-switch-button" type="button" data-stats-target="team-member" aria-controls="stats-by-team-member" aria-pressed="false">Spoluhráči</button>
         </nav>
 
         <section id="stats-by-edition" class="competitor-stats-view" data-stats-view="edition">
@@ -33,7 +33,7 @@
                     <table class="standings-table overall-standings-table competitor-stats-table">
                         <thead>
                             <tr>
-                                <th scope="col" class="stats-label-column">Ročník</th>
+                                <th scope="col" class="stats-label-column standings-identity-column">Ročník</th>
                                 <th scope="col" class="stats-place-column">Celkové pořadí</th>
                                 <th scope="col" class="overall-total-column">Body</th>
                                 @foreach (var discipline in Model.Statistics.Disciplines)
@@ -46,7 +46,7 @@
                             @foreach (var edition in Model.Statistics.Editions)
                             {
                                 <tr>
-                                    <th scope="row" class="stats-label-column">
+                                    <th scope="row" class="stats-label-column standings-identity-column">
                                         <a asp-page="/Editions/OverallStandings" asp-route-id="@edition.EditionId">@edition.EditionName</a>
                                         <small>@edition.StartDate.ToString("yyyy")</small>
                                     </th>
@@ -69,7 +69,7 @@
                                 </tr>
                             }
                             <tr class="competitor-stats-summary-row">
-                                <th scope="row" class="stats-label-column">Celkem</th>
+                                <th scope="row" class="stats-label-column standings-identity-column">Celkem</th>
                                 <td class="standing-empty stats-place-column">—</td>
                                 <td class="standing-points overall-total-column"><strong>@Model.Statistics.TotalPoints b.</strong></td>
                                 @foreach (var discipline in Model.Statistics.Disciplines)
@@ -95,7 +95,7 @@
                     <table class="standings-table overall-standings-table competitor-stats-table">
                         <thead>
                             <tr>
-                                <th scope="col" class="stats-label-column">Disciplína</th>
+                                <th scope="col" class="stats-label-column standings-identity-column">Disciplína</th>
                                 <th scope="col" class="overall-total-column">Umístění</th>
                                 @foreach (var edition in Model.Statistics.Editions)
                                 {
@@ -107,7 +107,7 @@
                             @foreach (var discipline in Model.Statistics.ByDiscipline)
                             {
                                 <tr>
-                                    <th scope="row" class="stats-label-column">@discipline.DisciplineName</th>
+                                    <th scope="row" class="stats-label-column standings-identity-column">@discipline.DisciplineName</th>
                                     <td class="overall-total-column">@Html.Raw(FormatPlacements(discipline.Placements))</td>
                                     @foreach (var edition in Model.Statistics.Editions)
                                     {
@@ -143,7 +143,7 @@
                     <table class="standings-table overall-standings-table competitor-stats-table">
                         <thead>
                             <tr>
-                                <th scope="col" class="stats-label-column">Spoluhráč</th>
+                                <th scope="col" class="stats-label-column standings-identity-column">Spoluhráč</th>
                                 <th scope="col" class="overall-total-column">Umístění</th>
                                 @foreach (var discipline in Model.Statistics.Disciplines)
                                 {
@@ -155,8 +155,8 @@
                             @foreach (var teammate in Model.Statistics.ByTeamMember)
                             {
                                 <tr>
-                                    <th scope="row" class="stats-label-column">
-                                        <a asp-page="/Competitors/Stats" asp-route-id="@teammate.CompetitorId">@teammate.FirstName @teammate.LastName</a>
+                                    <th scope="row" class="stats-label-column standings-identity-column">
+                                        <a class="statistics-person-link" asp-page="/Competitors/Stats" asp-route-id="@teammate.CompetitorId">@teammate.FirstName @teammate.LastName</a>
                                     </th>
                                     <td class="overall-total-column">@Html.Raw(FormatPlacements(teammate.Placements))</td>
                                     @foreach (var discipline in Model.Statistics.Disciplines)

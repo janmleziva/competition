@@ -187,11 +187,8 @@ public sealed class CompetitorStatisticsService(
             .ToList();
     }
 
-    private static PlacementSummary BuildPlacementSummary(IEnumerable<int> ranks) => new(
-        ranks
-            .GroupBy(rank => rank)
-            .OrderBy(group => group.Key)
-            .ToDictionary(group => group.Key, group => group.Count()));
+    private static PlacementSummary BuildPlacementSummary(IEnumerable<int> ranks) =>
+        PlacementSummary.FromRanks(ranks);
 
     private sealed class MutableTeamMemberStatistics(long competitorId, string firstName, string lastName)
     {
@@ -222,23 +219,7 @@ public sealed class CompetitorStatisticsService(
                 return -1;
             }
 
-            var leftSummary = selector(left);
-            var rightSummary = selector(right);
-            var maxRank = Math.Max(
-                leftSummary.Counts.Count == 0 ? 0 : leftSummary.Counts.Keys.Max(),
-                rightSummary.Counts.Count == 0 ? 0 : rightSummary.Counts.Keys.Max());
-
-            for (var rank = 1; rank <= maxRank; rank++)
-            {
-                var comparison = rightSummary.Counts.GetValueOrDefault(rank)
-                    .CompareTo(leftSummary.Counts.GetValueOrDefault(rank));
-                if (comparison != 0)
-                {
-                    return comparison;
-                }
-            }
-
-            return rightSummary.TotalPlacements.CompareTo(leftSummary.TotalPlacements);
+            return PlacementSummaryOrdering.Compare(selector(left), selector(right));
         }
     }
 }

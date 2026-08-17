@@ -21,6 +21,8 @@
         currentPath.StartsWithSegments("/PointSystems") ||
         currentPathValue.Equals("/Editions", StringComparison.OrdinalIgnoreCase) ||
         currentPath.StartsWithSegments("/Editions/Details");
+    var isStatisticsActive = currentPath.StartsWithSegments("/Statistics") ||
+        currentPathValue.EndsWith("/Statistics", StringComparison.OrdinalIgnoreCase);
 }
 <!doctype html>
 <html lang="cs">
@@ -82,11 +84,15 @@
                     </div>
                 </details>
 
-                <details class="site-menu" data-site-menu name="main-navigation-menu">
+                <details class="site-menu @(isStatisticsActive ? "is-active" : null)" data-site-menu name="main-navigation-menu">
                     <summary>Statistiky</summary>
-                    <div class="site-submenu site-submenu-upcoming">
-                        <span aria-disabled="true">Jednotlivci <small>Připravujeme</small></span>
-                        <span aria-disabled="true">Disciplíny <small>Připravujeme</small></span>
+                    <div class="site-submenu">
+                        <a asp-page="/Statistics/Individuals">Jednotlivci</a>
+                        @if (activeEdition is not null)
+                        {
+                            <a asp-page="/Statistics/Edition" asp-route-id="@activeEdition.Id">Aktivní ročník</a>
+                        }
+                        <a asp-page="/Statistics/Disciplines">Disciplíny</a>
                     </div>
                 </details>
             </nav>
