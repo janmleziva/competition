@@ -97,6 +97,7 @@ builder.Services.AddSingleton<AdminCredentialValidator>();
 builder.Services.AddScoped<IEditionAdministrationService, EditionAdministrationService>();
 builder.Services.AddScoped<ICompetitorAdministrationService, CompetitorAdministrationService>();
 builder.Services.AddScoped<ICompetitorStatisticsService, CompetitorStatisticsService>();
+builder.Services.AddScoped<IStatisticsOverviewService, StatisticsOverviewService>();
 builder.Services.AddScoped<IDisciplineAdministrationService, DisciplineAdministrationService>();
 builder.Services.AddScoped<IPhaseSetupService, PhaseSetupService>();
 builder.Services.AddScoped<IGroupStandingsService, GroupStandingsService>();

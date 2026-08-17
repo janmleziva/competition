@@ -1,0 +1,99 @@
+@model Competition.Services.IndividualRankingTableModel
+@using Competition.Services
+@{
+    var isPlacementMode = Model.Mode == IndividualRankingTableMode.Placements;
+    var isEditionMode = Model.EditionId.HasValue;
+    var maximumRank = Model.Rows
+        .SelectMany(row => row.Placements.Counts.Keys)
+        .DefaultIfEmpty(0)
+        .Max();
+}
+
+@if (Model.Rows.Count == 0)
+{
+    <div class="empty-state">Zatím nejsou k dispozici žádné uzavřené výsledky.</div>
+}
+else
+{
+    <div class="standings-table-scroll">
+        <table class="standings-table overall-standings-table statistics-ranking-table">
+            <thead>
+                <tr>
+                    <th scope="col" class="overall-name-column standings-identity-column">Soutěžící</th>
+                    @if (!isEditionMode)
+                    {
+                        <th scope="col" class="statistics-edition-count-column">Ročníky</th>
+                    }
+                    else
+                    {
+                        <th scope="col" class="statistics-discipline-count-column">Disciplíny</th>
+                    }
+                    @if (isPlacementMode)
+                    {
+                        @for (var rank = 1; rank <= maximumRank; rank++)
+                        {
+                            <th scope="col" class="statistics-rank-column">@rank.</th>
+                        }
+                        @if (!isEditionMode)
+                        {
+                            <th scope="col" class="statistics-discipline-count-column">Disciplíny</th>
+                        }
+                    }
+                    else
+                    {
+                        <th scope="col" class="overall-total-column">Body</th>
+                        @if (!isEditionMode)
+                        {
+                            <th scope="col" class="statistics-discipline-count-column">Disciplíny</th>
+                        }
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in Model.Rows)
+                {
+                    <tr>
+                        <th scope="row" class="overall-name-column standings-identity-column">
+                            <span class="statistics-ranking-place">@row.Place.</span>
+                            @if (Model.EditionId.HasValue)
+                            {
+                                <a class="statistics-person-link" asp-page="/Statistics/EditionCompetitor" asp-route-id="@Model.EditionId" asp-route-competitorId="@row.CompetitorId">@row.FirstName @row.LastName</a>
+                            }
+                            else
+                            {
+                                <a class="statistics-person-link" asp-page="/Competitors/Stats" asp-route-id="@row.CompetitorId">@row.FirstName @row.LastName</a>
+                            }
+                        </th>
+                        @if (!isEditionMode)
+                        {
+                            <td class="statistics-edition-count-column">@row.EditionCount</td>
+                        }
+                        else
+                        {
+                            <td class="statistics-discipline-count-column">@row.ResultCount</td>
+                        }
+                        @if (isPlacementMode)
+                        {
+                            @for (var rank = 1; rank <= maximumRank; rank++)
+                            {
+                                <td class="statistics-rank-count">@(row.Placements.CountAt(rank) == 0 ? "—" : row.Placements.CountAt(rank))</td>
+                            }
+                            @if (!isEditionMode)
+                            {
+                                <td class="statistics-discipline-count-column">@row.ResultCount</td>
+                            }
+                        }
+                        else
+                        {
+                            <td class="standing-points overall-total-column"><strong>@row.TotalPoints b.</strong></td>
+                            @if (!isEditionMode)
+                            {
+                                <td class="statistics-discipline-count-column">@row.ResultCount</td>
+                            }
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

@@ -1,0 +1,19 @@
+<script>
+    document.querySelectorAll("[data-stats-tabs]").forEach(tabList => {
+        const buttons = Array.from(tabList.querySelectorAll("[data-stats-target]"));
+        const container = tabList.parentElement;
+        const views = Array.from(container.querySelectorAll("[data-stats-view]"));
+
+        buttons.forEach(button => {
+            button.addEventListener("click", () => {
+                const target = button.dataset.statsTarget;
+                buttons.forEach(item => {
+                    const active = item === button;
+                    item.classList.toggle("is-active", active);
+                    item.setAttribute("aria-pressed", active ? "true" : "false");
+                });
+                views.forEach(view => view.hidden = view.dataset.statsView !== target);
+            });
+        });
+    });
+</script>

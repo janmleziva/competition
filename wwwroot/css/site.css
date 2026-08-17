@@ -253,6 +253,9 @@ h1 { font-size: clamp(1.9rem, 4.5vw, 3.2rem); }
 .standings-table th, .standings-table td { padding: 10px 12px; border-bottom: 1px solid #cbd5e1; text-align: center; white-space: nowrap; }
 .standings-table thead th { color: #475569; font-size: .82rem; text-transform: uppercase; }
 .standings-table th:nth-child(2) { min-width: 150px; text-align: left; }
+.standings-table .standings-identity-column { position: sticky; left: 0; z-index: 2; background: #fff; box-shadow: 1px 0 0 #cbd5e1; text-align: left; }
+.standings-table thead .standings-identity-column { z-index: 3; background: #eff6ff; }
+.standings-table tbody tr:hover > .standings-identity-column { background: #eef9ff; }
 .standings-table tbody tr:last-child th, .standings-table tbody tr:last-child td { border-bottom: 0; }
 .standings-table .standing-position { color: #64748b; font-weight: 700; }
 .standing-seed { color: #64748b; font-size: .86em; font-weight: 700; }
@@ -525,6 +528,8 @@ h1 { font-size: clamp(1.9rem, 4.5vw, 3.2rem); }
 .overall-standings-table .standing-team { width: 92px; margin-top: 2px; line-height: 1.2; overflow-wrap: anywhere; }
 .standing-empty { color: var(--muted); text-align: center; }
 .competitor-stats-page { display: grid; gap: 22px; }
+.competitor-stats-heading { flex-flow: row wrap; }
+.competitor-stats-heading > div { min-width: 0; }
 .competitor-stats-tabs { width: fit-content; max-width: 100%; }
 .competitor-stats-view { min-width: 0; }
 .competitor-stats-view h2 { margin: 0 0 14px; }
@@ -533,6 +538,59 @@ h1 { font-size: clamp(1.9rem, 4.5vw, 3.2rem); }
 .competitor-stats-table .stats-label-column a { color: var(--accent); }
 .competitor-stats-table .stats-label-column small { display: block; margin-top: 4px; color: var(--muted); font-size: .72rem; font-weight: 500; }
 .competitor-stats-summary-row > * { border-top: 3px solid #94a3b8; background: #f8fafc; }
+.statistics-ranking-table .overall-name-column { min-width: 175px; }
+.statistics-person-link { color: var(--text) !important; text-decoration: none; }
+.statistics-person-link:hover, .statistics-person-link:focus-visible { color: var(--accent) !important; text-decoration: none; }
+.statistics-ranking-table th, .statistics-ranking-table td { vertical-align: middle; }
+.statistics-ranking-table thead th:nth-child(-n+2) { text-align: center; }
+.statistics-ranking-place { display: inline-block; min-width: 28px; margin-right: 4px; color: #64748b; font-weight: 800; }
+.statistics-ranking-table .statistics-rank-column,
+.statistics-ranking-table .statistics-rank-count { width: 44px; min-width: 44px; padding-right: 5px; padding-left: 5px; }
+.statistics-rank-count { font-size: 1rem; font-weight: 800; }
+.statistics-ranking-table th.statistics-discipline-count-column,
+.statistics-ranking-table td.statistics-discipline-count-column { width: 1%; min-width: 0; padding-right: 8px; padding-left: 8px; white-space: nowrap; }
+.statistics-ranking-table th.statistics-edition-count-column,
+.statistics-ranking-table td.statistics-edition-count-column { width: 82px; min-width: 82px; padding-right: 8px; padding-left: 8px; }
+.discipline-statistics-page { display: grid; min-width: 0; gap: 22px; }
+.discipline-statistics-page > h2, .discipline-statistics-ranking h2 { margin: 0 0 14px; }
+.discipline-statistics-ranking { min-width: 0; }
+.statistics-discipline-picker { display: flex; align-items: end; gap: 10px; width: 100%; max-width: 520px; }
+.statistics-discipline-picker label { display: grid; flex: 1; gap: 6px; color: var(--muted); font-size: .82rem; font-weight: 750; }
+.statistics-discipline-picker select { width: 100%; min-height: 42px; padding: 0 38px 0 12px; color: var(--text); background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; font: inherit; }
+.statistics-record-grid { display: grid; min-width: 0; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.statistics-record-card { min-width: 0; padding: 16px; background: #f8fafc; border: 1px solid #dbe3ef; border-radius: 8px; }
+.statistics-record-card > span { display: block; color: var(--muted); font-size: .78rem; font-weight: 750; }
+.statistics-record-card > strong { display: block; margin-top: 5px; font-size: 1.2rem; }
+.statistics-record-card p { display: grid; gap: 3px; margin: 10px 0 0; }
+.statistics-record-card a { color: var(--accent); font-weight: 700; }
+.edition-competitor-results-page { display: grid; gap: 26px; }
+.edition-competitor-discipline { min-width: 0; }
+.edition-competitor-discipline-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 10px; }
+.edition-competitor-discipline-heading h2 { margin: 0; }
+.edition-competitor-discipline-heading span { color: var(--muted); font-size: .82rem; font-weight: 750; }
+.edition-competitor-match-table { min-width: 820px; }
+.edition-competitor-match-table th, .edition-competitor-match-table td { vertical-align: middle; text-align: left; }
+.edition-competitor-match-table .standings-identity-column { min-width: 180px; }
+.edition-match-stage { min-width: 170px; text-align: left !important; }
+.edition-match-stage small { display: block; margin-top: 3px; color: var(--muted); font-size: .75rem; }
+.edition-match-outcome { display: inline-flex; align-items: center; min-width: 76px; justify-content: center; gap: 6px; padding: 5px 9px; border: 1px solid transparent; border-radius: 999px; box-shadow: 0 3px 9px rgba(15, 23, 42, .1); font-size: .76rem; font-weight: 850; }
+.edition-match-outcome::before { display: grid; width: 16px; height: 16px; place-items: center; border-radius: 50%; color: #fff; font-size: .68rem; line-height: 1; }
+.edition-match-outcome-win { color: #166534; background: linear-gradient(135deg, #ecfdf5, #bbf7d0); border-color: #86efac; }
+.edition-match-outcome-win::before { content: "✓"; background: #16a34a; }
+.edition-match-outcome-loss { color: #991b1b; background: linear-gradient(135deg, #fff1f2, #fecaca); border-color: #fca5a5; }
+.edition-match-outcome-loss::before { content: "×"; background: #dc2626; }
+.edition-match-outcome-draw { color: #854d0e; background: linear-gradient(135deg, #fffbeb, #fef08a); border-color: #fde047; }
+.edition-match-outcome-draw::before { content: "="; background: #ca8a04; }
+.edition-match-subscores { min-width: 130px; color: var(--muted); font-weight: 700; }
+
+@media (max-width: 900px) {
+    .statistics-record-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 560px) {
+    .statistics-discipline-picker { align-items: stretch; flex-direction: column; }
+    .statistics-record-grid { grid-template-columns: 1fr; }
+}
 
 @media (max-width: 700px) {
     .countdown, .admin-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -541,8 +599,13 @@ h1 { font-size: clamp(1.9rem, 4.5vw, 3.2rem); }
     .auth-actions .button { width: 100%; }
     .panel { padding: 24px; }
     .page-heading, .edition-row { align-items: flex-start; flex-direction: column; }
+    .competitor-stats-heading { flex-direction: row; flex-wrap: wrap; }
     .form-grid, .details-grid { grid-template-columns: 1fr; }
     .search-actions, .inline-form, .registration-actions { align-items: stretch; flex-direction: column; }
+    .registered-competitor-row { gap: 12px; padding: 14px; }
+    .registered-competitor-row .registration-actions { align-items: center; flex-direction: row; flex-wrap: nowrap; gap: 8px; width: 100%; }
+    .registered-competitor-row .seed-update-form input { width: 52px; padding: 8px 6px; }
+    .registered-competitor-row .button-small { padding: 8px 11px; }
     .discipline-settings-grid, .compact-grid { grid-template-columns: 1fr; }
     .seed-field { width: 100%; }
     .participant-option-content, .team-row { align-items: flex-start; }

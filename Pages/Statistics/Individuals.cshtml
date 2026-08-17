@@ -1,0 +1,33 @@
+@page "/Statistics/Individuals"
+@model Competition.Pages.Statistics.IndividualsModel
+@{
+    ViewData["Title"] = "Statistiky jednotlivců";
+}
+
+<main class="shell shell-wide">
+    <section class="panel admin competitor-stats-page">
+        <div class="page-heading">
+            <div>
+                <h1>Statistiky jednotlivců</h1>
+                <p class="lead">Historické pořadí ze všech uzavřených disciplín</p>
+            </div>
+        </div>
+
+        <nav class="phase-switcher competitor-stats-tabs" aria-label="Způsob řazení" data-stats-tabs>
+            <button class="phase-switch-button is-active" type="button" data-stats-target="placements" aria-controls="individuals-by-placements" aria-pressed="true">Podle umístění</button>
+            <button class="phase-switch-button" type="button" data-stats-target="points" aria-controls="individuals-by-points" aria-pressed="false">Podle bodů</button>
+        </nav>
+
+        <section id="individuals-by-placements" class="competitor-stats-view" data-stats-view="placements">
+            <h2>Pořadí podle umístění</h2>
+            <partial name="_IndividualRankingTable" model="new Competition.Services.IndividualRankingTableModel(Model.Statistics.ByPlacements, Competition.Services.IndividualRankingTableMode.Placements)" />
+        </section>
+
+        <section id="individuals-by-points" class="competitor-stats-view" data-stats-view="points" hidden>
+            <h2>Pořadí podle získaných bodů</h2>
+            <partial name="_IndividualRankingTable" model="new Competition.Services.IndividualRankingTableModel(Model.Statistics.ByPoints, Competition.Services.IndividualRankingTableMode.Points)" />
+        </section>
+    </section>
+</main>
+
+<partial name="_StatisticsTabsScript" />

@@ -50,8 +50,8 @@ public sealed class CompetitorStatisticsServiceTests
         Assert.Equal("1. místo 2x, 2. místo 2x", statistics.Placements.Format());
         Assert.Equal(8, statistics.TotalsByDiscipline["Padel"]);
         Assert.Equal(6, statistics.TotalsByDiscipline["Tenis"]);
-        Assert.Equal("1. místo 2x", statistics.PlacementsByDiscipline["Padel"].Format());
-        Assert.Equal("2. místo 2x", statistics.PlacementsByDiscipline["Tenis"].Format());
+        Assert.Equal("1. místo 1x, 2. místo 1x", statistics.PlacementsByDiscipline["Padel"].Format());
+        Assert.Equal("1. místo 1x, 2. místo 1x", statistics.PlacementsByDiscipline["Tenis"].Format());
         Assert.Equal(new[] { "Padel", "Tenis" }, statistics.ByDiscipline.Select(row => row.DisciplineName));
 
         Assert.Collection(statistics.ByTeamMember,

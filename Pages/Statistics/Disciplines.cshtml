@@ -1,0 +1,68 @@
+@page "/Statistics/Disciplines"
+@model Competition.Pages.Statistics.DisciplinesModel
+@{
+    ViewData["Title"] = "Statistiky disciplín";
+}
+
+<main class="shell shell-wide">
+    <section class="panel admin discipline-statistics-page">
+        <div class="page-heading">
+            <div>
+                <h1>Statistiky disciplín</h1>
+                <p class="lead">Historické výsledky a rekordy</p>
+            </div>
+        </div>
+
+        @if (Model.Statistics.Disciplines.Count == 0)
+        {
+            <div class="empty-state">Zatím nejsou k dispozici žádné uzavřené výsledky disciplín.</div>
+        }
+        else
+        {
+            <form method="get" class="statistics-discipline-picker">
+                <label for="disciplineId">
+                    Disciplína
+                    <select id="disciplineId" name="disciplineId">
+                        @foreach (var discipline in Model.Statistics.Disciplines)
+                        {
+                            <option value="@discipline.Id" selected="@(discipline.Id == Model.Statistics.SelectedDisciplineId)">@discipline.Name</option>
+                        }
+                    </select>
+                </label>
+                <button class="button button-primary" type="submit">Zobrazit</button>
+            </form>
+
+            <h2>@Model.Statistics.SelectedDisciplineName</h2>
+
+            <nav class="phase-switcher competitor-stats-tabs" aria-label="Pohled na statistiky disciplíny" data-stats-tabs>
+                <button class="phase-switch-button is-active" type="button" data-stats-target="records" aria-controls="discipline-records" aria-pressed="true">Rekordy</button>
+                <button class="phase-switch-button" type="button" data-stats-target="standings" aria-controls="discipline-standings" aria-pressed="false">Pořadí</button>
+            </nav>
+
+            <section id="discipline-records" class="competitor-stats-view" data-stats-view="records">
+                <section class="statistics-record-grid" aria-label="Rekordy disciplíny">
+                    @foreach (var record in Model.Statistics.Records)
+                    {
+                        <article class="statistics-record-card">
+                            <span>@record.Label</span>
+                            <strong>@record.Value @record.Unit</strong>
+                            <p>
+                                @foreach (var holder in record.Holders)
+                                {
+                                    <a class="statistics-person-link" asp-page="/Competitors/Stats" asp-route-id="@holder.CompetitorId">@holder.FirstName @holder.LastName</a>
+                                }
+                            </p>
+                        </article>
+                    }
+                </section>
+            </section>
+
+            <section id="discipline-standings" class="competitor-stats-view discipline-statistics-ranking" data-stats-view="standings" hidden>
+                <h2>Pořadí podle umístění</h2>
+                <partial name="_IndividualRankingTable" model="new Competition.Services.IndividualRankingTableModel(Model.Statistics.Rankings, Competition.Services.IndividualRankingTableMode.Placements)" />
+            </section>
+        }
+    </section>
+</main>
+
+<partial name="_StatisticsTabsScript" />

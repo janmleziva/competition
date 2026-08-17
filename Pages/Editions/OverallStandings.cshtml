@@ -11,7 +11,10 @@
                 <h1>Celkové pořadí</h1>
                 <p class="lead">@Model.Standing.EditionName</p>
             </div>
-            <a class="button button-ghost" asp-page="/Editions/Details" asp-route-id="@Model.Standing.EditionId">Zpět</a>
+            <div class="row-actions">
+                <a class="button button-ghost" asp-page="/Statistics/Edition" asp-route-id="@Model.Standing.EditionId">Statistiky ročníku</a>
+                <a class="button button-ghost" asp-page="/Editions/Details" asp-route-id="@Model.Standing.EditionId">Zpět</a>
+            </div>
         </div>
 
         <p class="meta-inline">
@@ -41,7 +44,7 @@
                 <thead>
                     <tr>
                         <th scope="col" class="overall-standing-column">#</th>
-                        <th scope="col" class="overall-name-column">Soutěžící</th>
+                        <th scope="col" class="overall-name-column standings-identity-column">Soutěžící</th>
                         <th scope="col" class="overall-total-column">Celkem</th>
                         @foreach (var discipline in Model.Standing.Disciplines)
                         {
@@ -60,7 +63,7 @@
                     {
                         <tr>
                             <td class="standing-position overall-standing-column">@row.Place.</td>
-                            <th scope="row" class="overall-name-column">@row.FirstName @row.LastName</th>
+                            <th scope="row" class="overall-name-column standings-identity-column">@row.FirstName @row.LastName</th>
                             <td class="standing-points overall-total-column"><strong>@row.TotalPoints b.</strong></td>
                             @foreach (var discipline in Model.Standing.Disciplines)
                             {

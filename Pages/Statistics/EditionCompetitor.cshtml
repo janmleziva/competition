@@ -1,0 +1,76 @@
+@page "/Editions/{id:long}/Statistics/Competitors/{competitorId:long}"
+@model Competition.Pages.Statistics.EditionCompetitorModel
+@{
+    ViewData["Title"] = $"Výsledky – {Model.Results.FirstName} {Model.Results.LastName}";
+}
+
+<main class="shell shell-wide">
+    <section class="panel admin edition-competitor-results-page">
+        <div class="page-heading">
+            <div>
+                <h1>@Model.Results.FirstName @Model.Results.LastName</h1>
+                <p class="lead">@Model.Results.EditionName · všechny odehrané zápasy</p>
+            </div>
+            <a class="button button-ghost" asp-page="/Statistics/Edition" asp-route-id="@Model.Results.EditionId">Zpět na statistiky</a>
+        </div>
+
+        @if (Model.Results.Disciplines.Count == 0)
+        {
+            <div class="empty-state">Soutěžící v tomto ročníku zatím nemá žádný dokončený zápas.</div>
+        }
+        else
+        {
+            @foreach (var discipline in Model.Results.Disciplines)
+            {
+                <section class="edition-competitor-discipline" aria-labelledby="discipline-results-@discipline.DisciplineId">
+                    <div class="edition-competitor-discipline-heading">
+                        <h2 id="discipline-results-@discipline.DisciplineId">@discipline.DisciplineName</h2>
+                        <span>@discipline.Matches.Count zápasů</span>
+                    </div>
+
+                    <div class="standings-table-scroll">
+                        <table class="standings-table edition-competitor-match-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Fáze / zápas</th>
+                                    <th scope="col">Spoluhráč</th>
+                                    <th scope="col" class="standings-identity-column">Soupeř</th>
+                                    <th scope="col">Výsledek</th>
+                                    <th scope="col">Skóre</th>
+                                    <th scope="col">Dílčí skóre</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var match in discipline.Matches)
+                                {
+                                    <tr>
+                                        <td class="edition-match-stage">
+                                            <strong>@match.DisplayName</strong>
+                                            <small>@match.StageLabel</small>
+                                        </td>
+                                        <td>@match.Teammates</td>
+                                        <th scope="row" class="standings-identity-column">@match.Opponent</th>
+                                        <td><span class="edition-match-outcome edition-match-outcome-@OutcomeClass(match.Outcome)">@match.Outcome</span></td>
+                                        <td class="standing-score"><strong>@match.ScoreFor:@match.ScoreAgainst</strong></td>
+                                        <td class="edition-match-subscores">
+                                            @(match.Subscores.Count == 0 ? "—" : string.Join(" · ", match.Subscores))
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            }
+        }
+    </section>
+</main>
+
+@functions {
+    private static string OutcomeClass(string outcome) => outcome switch
+    {
+        "Výhra" => "win",
+        "Prohra" => "loss",
+        _ => "draw"
+    };
+}
