@@ -8,12 +8,15 @@
     var isResultsPage = Model.IsResultsPage;
 }
 
-<main class="shell shell-wide">
+<main class="shell shell-wide @(isResultsPage ? "results-workflow" : "schedule-workflow")">
     <section class="panel admin phase-setup-page">
-        <div class="page-heading">
-            <div>
-                <h1>@Model.Setup.DisciplineName</h1>
-                <p class="lead">@(isResultsPage ? "Rozpis a výsledky" : "Tvorba rozpisu") · @Model.Setup.EditionName</p>
+        <div class="page-heading phase-page-heading">
+            <div class="phase-page-title-row">
+                <div>
+                    <h1>@Model.Setup.DisciplineName</h1>
+                    <p class="lead">@(isResultsPage ? "Rozpis a výsledky" : "Tvorba rozpisu") · @Model.Setup.EditionName</p>
+                </div>
+                <a class="button button-ghost" asp-page="/Editions/Disciplines" asp-route-id="@Model.Setup.EditionId">Zpět</a>
             </div>
             <div class="action-group phase-heading-actions">
                 @if (isResultsPage && isAuthenticated && Model.Setup.IsClosed)
@@ -88,7 +91,6 @@
                         Smazat rozpis
                     </button>
                 }
-                <a class="button button-ghost" asp-page="/Editions/Disciplines" asp-route-id="@Model.Setup.EditionId">Zpět</a>
             </div>
         </div>
 
@@ -197,7 +199,7 @@
                     <section class="fixture-section">
                         <h3>Rozpis zápasů</h3>
                         <partial name="_PhaseMatchList"
-                                 model="new PhaseMatchListViewModel(group.Matches, Model.Setup.UsesSetScores, Model.Setup.SetsToWin, Model.CanEditResults(isAdmin), false, Model.MatchStatusMessage, Model.MatchStatusMatchId, ValidationMessage: Model.MatchValidationMessage, ValidationMatchId: Model.MatchValidationMatchId, ShowTeamSeed: isResultsPage && Model.Setup.TeamSize > 1)" />
+                                 model="new PhaseMatchListViewModel(group.Matches, Model.Setup.UsesSetScores, Model.Setup.SetsToWin, Model.CanEditResults(isAdmin), false, Model.MatchStatusMessage, Model.MatchStatusMatchId, ValidationMessage: Model.MatchValidationMessage, ValidationMatchId: Model.MatchValidationMatchId, ShowTeamSeed: isResultsPage && Model.Setup.TeamSize > 1, ShowResultsControls: isResultsPage, AttemptedSetScores: Model.SetScoresInput, ValidationIsSetScores: Model.MatchValidationIsSetScores)" />
                     </section>
                 }
             </article>
@@ -269,7 +271,7 @@
                         <section class="fixture-section">
                             <h3>Rozpis</h3>
                             <partial name="_PhaseMatchList"
-                                     model="new PhaseMatchListViewModel(group.Matches, Model.Setup.UsesSetScores, Model.Setup.SetsToWin, Model.CanEditResults(isAdmin), false, Model.MatchStatusMessage, Model.MatchStatusMatchId, ValidationMessage: Model.MatchValidationMessage, ValidationMatchId: Model.MatchValidationMatchId, ShowTeamSeed: isResultsPage && Model.Setup.TeamSize > 1)" />
+                                     model="new PhaseMatchListViewModel(group.Matches, Model.Setup.UsesSetScores, Model.Setup.SetsToWin, Model.CanEditResults(isAdmin), false, Model.MatchStatusMessage, Model.MatchStatusMatchId, ValidationMessage: Model.MatchValidationMessage, ValidationMatchId: Model.MatchValidationMatchId, ShowTeamSeed: isResultsPage && Model.Setup.TeamSize > 1, ShowResultsControls: isResultsPage, AttemptedSetScores: Model.SetScoresInput, ValidationIsSetScores: Model.MatchValidationIsSetScores)" />
                         </section>
                     }
                 </article>
@@ -287,7 +289,7 @@
                 else
                 {
                     <partial name="_PhaseMatchList"
-                             model="new PhaseMatchListViewModel(finalPhase.Matches, Model.Setup.UsesSetScores, Model.Setup.SetsToWin, Model.CanEditResults(isAdmin), true, Model.MatchStatusMessage, Model.MatchStatusMatchId, ValidationMessage: Model.MatchValidationMessage, ValidationMatchId: Model.MatchValidationMatchId, ShowTeamSeed: isResultsPage && Model.Setup.TeamSize > 1)" />
+                             model="new PhaseMatchListViewModel(finalPhase.Matches, Model.Setup.UsesSetScores, Model.Setup.SetsToWin, Model.CanEditResults(isAdmin), true, Model.MatchStatusMessage, Model.MatchStatusMatchId, ValidationMessage: Model.MatchValidationMessage, ValidationMatchId: Model.MatchValidationMatchId, ShowTeamSeed: isResultsPage && Model.Setup.TeamSize > 1, ShowResultsControls: isResultsPage, AttemptedSetScores: Model.SetScoresInput, ValidationIsSetScores: Model.MatchValidationIsSetScores)" />
                 }
             </article>
 
@@ -339,7 +341,7 @@
                                 }
                             </div>
                             <div class="stage-actions">
-                                <span class="points-badge">@directTeamCapacity přímo</span>
+                                <span class="points-badge">@directTeamCapacity nasazení</span>
                                 @if (advancingTeamCount > 0)
                                 {
                                     <span class="advancing-teams-badge">+ @advancingTeamCount postupující</span>
@@ -385,7 +387,7 @@
                         @if (stage.Matches.Count > 0)
                         {
                             <partial name="_PhaseMatchList"
-                                     model="new PhaseMatchListViewModel(stage.Matches, Model.Setup.UsesSetScores, Model.Setup.SetsToWin, Model.CanEditResults(isAdmin), true, Model.MatchStatusMessage, Model.MatchStatusMatchId, isAdmin && !Model.Setup.IsScheduleLocked, Model.Setup.Teams.Where(x => stage.TeamIds.Contains(x.Id)).ToList(), sourceOptions, Model.MatchValidationMessage, Model.MatchValidationMatchId, isResultsPage && Model.Setup.TeamSize > 1)" />
+                                     model="new PhaseMatchListViewModel(stage.Matches, Model.Setup.UsesSetScores, Model.Setup.SetsToWin, Model.CanEditResults(isAdmin), true, Model.MatchStatusMessage, Model.MatchStatusMatchId, isAdmin && !Model.Setup.IsScheduleLocked, Model.Setup.Teams.Where(x => stage.TeamIds.Contains(x.Id)).ToList(), sourceOptions, Model.MatchValidationMessage, Model.MatchValidationMatchId, isResultsPage && Model.Setup.TeamSize > 1, ShowResultsControls: isResultsPage, AttemptedSetScores: Model.SetScoresInput, ValidationIsSetScores: Model.MatchValidationIsSetScores)" />
                         }
                     </section>
                     previousStageCapacity = stage.Capacity.GetValueOrDefault();

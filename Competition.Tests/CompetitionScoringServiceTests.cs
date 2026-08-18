@@ -3,6 +3,7 @@ using Competition.Data;
 using Competition.Domain;
 using Competition.Models;
 using Competition.Services;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace Competition.Tests;
@@ -162,6 +163,33 @@ public sealed class CompetitionScoringServiceTests
             [new() { Type = BonusPointType.LowestAverageSubscoreAgainst, Enabled = true, Points = 1 }]));
 
         Assert.Empty(await db.DisciplineBonusPointRules.ToListAsync());
+    }
+
+    [Fact]
+    public async Task BonusRules_UpdateExistingRuleWithSqliteUniqueIndex()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        await using var db = new CompetitionDbContext(new DbContextOptionsBuilder<CompetitionDbContext>()
+            .UseSqlite(connection).Options);
+        await db.Database.EnsureCreatedAsync();
+        var seeded = await SeedCompletedRoundRobinAsync(db);
+        var service = CreateService(db);
+
+        await service.SetBonusPointRulesAsync(seeded.EditionId, seeded.DisciplineId,
+        [
+            new() { Type = BonusPointType.HighestAverageScoreFor, Enabled = true, Points = 1 }
+        ]);
+        var originalRuleId = await db.DisciplineBonusPointRules.Select(rule => rule.Id).SingleAsync();
+
+        await service.SetBonusPointRulesAsync(seeded.EditionId, seeded.DisciplineId,
+        [
+            new() { Type = BonusPointType.HighestAverageScoreFor, Enabled = true, Points = 2 }
+        ]);
+
+        var rule = await db.DisciplineBonusPointRules.SingleAsync();
+        Assert.Equal(originalRuleId, rule.Id);
+        Assert.Equal(2, rule.Points);
     }
 
     [Fact]

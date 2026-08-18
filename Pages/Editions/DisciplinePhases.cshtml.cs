@@ -20,7 +20,10 @@ public sealed record PhaseMatchListViewModel(
     IReadOnlyList<PhaseSetupMatchSource>? SourceOptions = null,
     string? ValidationMessage = null,
     long? ValidationMatchId = null,
-    bool ShowTeamSeed = false);
+    bool ShowTeamSeed = false,
+    bool ShowResultsControls = true,
+    MatchSetScoresInput? AttemptedSetScores = null,
+    bool ValidationIsSetScores = false);
 
 public sealed record PhaseFilterItem(string Key, string Label);
 
@@ -77,6 +80,8 @@ public class DisciplinePhasesModel(
     public string? MatchValidationMessage { get; private set; }
 
     public long? MatchValidationMatchId { get; private set; }
+
+    public bool MatchValidationIsSetScores { get; private set; }
 
     public async Task<IActionResult> OnGetAsync(long id, long disciplineId, CancellationToken ct)
     {
@@ -218,7 +223,8 @@ public class DisciplinePhasesModel(
     public async Task<IActionResult> OnPostUpdateSetScoresAsync(long id, long disciplineId, CancellationToken ct) =>
         await ExecuteMatchEditAsync(id, disciplineId, SetScoresInput.MatchId, ct,
             () => phases.UpdateMatchSetScoresAsync(id, disciplineId, SetScoresInput, User.Identity?.IsAuthenticated == true, ct),
-            "Dílčí skóre bylo uloženo.");
+            "Dílčí skóre bylo uloženo.",
+            isSetScoreEdit: true);
 
     public async Task<IActionResult> OnPostDeleteSetScoresAsync(long id, long disciplineId, CancellationToken ct)
     {
@@ -313,7 +319,7 @@ public class DisciplinePhasesModel(
                 routeValues: new { id = editionId, disciplineId }, fragment: fragment);
     }
 
-    private async Task<IActionResult> ExecuteMatchEditAsync<T>(long editionId, long disciplineId, long matchId, CancellationToken ct, Func<Task<T>> action, string message)
+    private async Task<IActionResult> ExecuteMatchEditAsync<T>(long editionId, long disciplineId, long matchId, CancellationToken ct, Func<Task<T>> action, string message, bool isSetScoreEdit = false)
     {
         try
         {
@@ -323,6 +329,7 @@ public class DisciplinePhasesModel(
         {
             MatchValidationMessage = ex.Message;
             MatchValidationMatchId = matchId;
+            MatchValidationIsSetScores = isSetScoreEdit;
             return await LoadAsync(editionId, disciplineId, ct) ? Page() : NotFound();
         }
 
