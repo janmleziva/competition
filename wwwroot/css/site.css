@@ -221,6 +221,10 @@ h1 { font-size: clamp(1.9rem, 4.5vw, 3.2rem); }
 
 .phase-setup-page { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; gap: 18px; }
 .phase-setup-page > * { min-width: 0; }
+.phase-page-heading { display: grid; gap: 18px; }
+.phase-page-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; min-width: 0; }
+.phase-page-title-row > div { min-width: 0; }
+.phase-page-title-row h1 { overflow-wrap: anywhere; }
 .playing-system-banner { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 18px 22px; color: #fff; background: linear-gradient(135deg, var(--accent), #1d4ed8); border-radius: calc(var(--radius) * 0.7); }
 .playing-system-banner.is-locked { background: linear-gradient(135deg, #92400e, #b45309); }
 .playing-system-banner strong { font-size: 1.1rem; text-align: right; }
@@ -313,6 +317,15 @@ h1 { font-size: clamp(1.9rem, 4.5vw, 3.2rem); }
 .knockout-match-list .match-row.has-editable-teams { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
 .knockout-match-list .match-identity { overflow: visible; }
 .knockout-match-list .matchup { align-items: center; }
+.knockout-match-list .matchup.has-team-seeds { align-items: flex-start; }
+.knockout-match-list .matchup.has-team-seeds .match-team-name { line-height: 1.2; }
+.knockout-match-list .matchup.has-team-seeds > b {
+    align-self: flex-start;
+    display: grid;
+    place-items: center;
+    height: 1.2em;
+    line-height: 1.2;
+}
 .knockout-match-list .match-row.has-editable-teams .match-identity { min-width: 0; }
 .knockout-match-list .match-row.has-editable-teams .matchup {
     display: grid;
@@ -323,6 +336,15 @@ h1 { font-size: clamp(1.9rem, 4.5vw, 3.2rem); }
 .knockout-match-list .match-row.has-editable-teams .score-editor { justify-self: end; margin-top: 18px; }
 .knockout-match-list .match-row.has-editable-teams .subscore-control,
 .knockout-match-list .match-row.has-editable-teams .round-label { grid-column: 1 / -1; justify-self: start; }
+.schedule-workflow .knockout-match-list .match-row.has-editable-teams { grid-template-columns: minmax(0, 1fr); }
+.schedule-workflow .knockout-match-list .match-row.has-editable-teams .matchup {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    width: 100%;
+    gap: 12px;
+}
+.schedule-workflow .knockout-match-list .match-row.has-editable-teams .match-team-select { width: 100%; }
+.schedule-workflow .score-editor,
+.schedule-workflow .subscore-control { display: none; }
 .match-status-message { margin: 0 0 12px; }
 .set-score-modal { width: min(500px, 100%); }
 .set-score-matchup { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px; }
@@ -346,7 +368,14 @@ h1 { font-size: clamp(1.9rem, 4.5vw, 3.2rem); }
 .stage-actions .button { margin: 0; }
 .custom-phase-create { border-style: dashed; }
 
+@media (max-width: 1000px) {
+    .knockout-match-list .match-row.has-editable-teams { grid-template-columns: minmax(0, 1fr); }
+    .knockout-match-list .match-row.has-editable-teams .matchup { width: 100%; }
+    .knockout-match-list .match-row.has-editable-teams .score-editor { justify-self: start; margin-top: 0; }
+}
+
 @media (max-width: 700px) {
+    .phase-page-title-row .lead { margin-bottom: 0; }
     .playing-system-banner, .phase-card-heading, .stage-heading { align-items: flex-start; flex-direction: column; }
     .playing-system-banner strong { text-align: left; }
     .playing-system-value { align-items: flex-start; flex-direction: column; }
@@ -357,7 +386,21 @@ h1 { font-size: clamp(1.9rem, 4.5vw, 3.2rem); }
     .fixture-row > div { align-items: flex-start; flex-direction: column; gap: 4px; }
     .stage-actions { align-items: flex-start; flex-wrap: wrap; }
     .match-row { grid-template-columns: 1fr; gap: 10px; padding: 12px 10px; }
-    .knockout-match-list .match-row { grid-template-columns: 1fr; }
+    .knockout-match-list .match-row,
+    .knockout-match-list .match-row.has-editable-teams { grid-template-columns: minmax(0, 1fr); }
+    .knockout-match-list .match-row.has-editable-teams .matchup {
+        grid-template-columns: minmax(0, 1fr);
+        width: 100%;
+        gap: 6px;
+    }
+    .schedule-workflow .knockout-match-list .match-row.has-editable-teams .matchup {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 6px;
+    }
+    .knockout-match-list .match-row.has-editable-teams .matchup > b { justify-self: center; height: auto; }
+    .knockout-match-list .match-row.has-editable-teams .match-team,
+    .knockout-match-list .match-row.has-editable-teams .match-team-select { width: 100%; min-width: 0; }
+    .knockout-match-list .match-row.has-editable-teams .score-editor { justify-self: start; margin-top: 0; }
     .subscore-control { justify-content: flex-start; }
     .round-label { text-align: left; }
     .score-editor { flex-wrap: wrap; }
@@ -528,8 +571,8 @@ h1 { font-size: clamp(1.9rem, 4.5vw, 3.2rem); }
 .overall-standings-table .standing-team { width: 92px; margin-top: 2px; line-height: 1.2; overflow-wrap: anywhere; }
 .standing-empty { color: var(--muted); text-align: center; }
 .competitor-stats-page { display: grid; gap: 22px; }
-.competitor-stats-heading { flex-flow: row wrap; }
-.competitor-stats-heading > div { min-width: 0; }
+.competitor-stats-heading, .competitor-registration-heading { flex-flow: row wrap; }
+.competitor-stats-heading > div, .competitor-registration-heading > div { min-width: 0; }
 .competitor-stats-tabs { width: fit-content; max-width: 100%; }
 .competitor-stats-view { min-width: 0; }
 .competitor-stats-view h2 { margin: 0 0 14px; }
@@ -599,7 +642,7 @@ h1 { font-size: clamp(1.9rem, 4.5vw, 3.2rem); }
     .auth-actions .button { width: 100%; }
     .panel { padding: 24px; }
     .page-heading, .edition-row { align-items: flex-start; flex-direction: column; }
-    .competitor-stats-heading { flex-direction: row; flex-wrap: wrap; }
+    .competitor-stats-heading, .competitor-registration-heading { flex-direction: row; flex-wrap: wrap; }
     .form-grid, .details-grid { grid-template-columns: 1fr; }
     .search-actions, .inline-form, .registration-actions { align-items: stretch; flex-direction: column; }
     .registered-competitor-row { gap: 12px; padding: 14px; }

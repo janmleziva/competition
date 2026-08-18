@@ -606,7 +606,113 @@ public sealed class PhaseSetupServiceTests
         var saved = await db.Matches.Include(x => x.SetScores).SingleAsync();
         var set = Assert.Single(saved.SetScores);
         Assert.Equal((1, 6, 4), (set.SetNumber, set.HomeScore, set.AwayScore));
+        Assert.Null(saved.HomeScore);
+        Assert.Null(saved.AwayScore);
         Assert.Equal(MatchStatus.InProgress, saved.Status);
+    }
+
+    [Fact]
+    public async Task SetScores_CalculateAndSaveMissingMainScoreWhenMatchIsDecided()
+    {
+        await using var db = CreateDbContext();
+        var (editionId, disciplineId, _) = await SeedDisciplineAsync(db, 2, PlayingSystemType.RoundRobin);
+        var discipline = await db.CompetitionDisciplines.SingleAsync();
+        discipline.UsesSetScores = true;
+        discipline.SetsToWin = 2;
+        await db.SaveChangesAsync();
+        var service = new PhaseSetupService(db);
+        await service.GetSetupAsync(editionId, disciplineId);
+        await service.GeneratePresetMatchesAsync(editionId, disciplineId);
+        var match = await db.Matches.SingleAsync();
+
+        Assert.True(await service.UpdateMatchSetScoresAsync(editionId, disciplineId,
+            new MatchSetScoresInput
+            {
+                MatchId = match.Id,
+                Version = match.Version,
+                Sets =
+                [
+                    new MatchSetScoreInput { SetNumber = 1, HomeScore = 6, AwayScore = 3 },
+                    new MatchSetScoreInput { SetNumber = 2, HomeScore = 4, AwayScore = 6 },
+                    new MatchSetScoreInput { SetNumber = 3, HomeScore = 6, AwayScore = 2 }
+                ]
+            }, false));
+
+        var saved = await db.Matches.SingleAsync();
+        Assert.Equal((2, 1), (saved.HomeScore, saved.AwayScore));
+        Assert.Equal(MatchStatus.Completed, saved.Status);
+    }
+
+    [Fact]
+    public async Task SetScores_RejectSetsPlayedAfterBestOfThreeWasAlreadyWon()
+    {
+        await using var db = CreateDbContext();
+        var (editionId, disciplineId, _) = await SeedDisciplineAsync(db, 2, PlayingSystemType.RoundRobin);
+        var discipline = await db.CompetitionDisciplines.SingleAsync();
+        discipline.UsesSetScores = true;
+        discipline.SetsToWin = 2;
+        await db.SaveChangesAsync();
+        var service = new PhaseSetupService(db);
+        await service.GetSetupAsync(editionId, disciplineId);
+        await service.GeneratePresetMatchesAsync(editionId, disciplineId);
+        var match = await db.Matches.SingleAsync();
+
+        var error = await Assert.ThrowsAsync<ValidationException>(() => service.UpdateMatchSetScoresAsync(
+            editionId, disciplineId,
+            new MatchSetScoresInput
+            {
+                MatchId = match.Id,
+                Version = match.Version,
+                Sets =
+                [
+                    new MatchSetScoreInput { SetNumber = 1, HomeScore = 6, AwayScore = 3 },
+                    new MatchSetScoreInput { SetNumber = 2, HomeScore = 6, AwayScore = 4 },
+                    new MatchSetScoreInput { SetNumber = 3, HomeScore = 6, AwayScore = 2 }
+                ]
+            }, false));
+
+        Assert.Contains("další sety", error.Message);
+        Assert.Null((await db.Matches.SingleAsync()).HomeScore);
+        Assert.Empty(await db.MatchSetScores.ToListAsync());
+    }
+
+    [Fact]
+    public async Task InvalidSetScoresHandler_ReopensModalAndPreservesSubmittedScores()
+    {
+        await using var db = CreateDbContext();
+        var (editionId, disciplineId, _) = await SeedDisciplineAsync(db, 2, PlayingSystemType.RoundRobin);
+        (await db.CompetitionDisciplines.SingleAsync()).UsesSetScores = true;
+        (await db.CompetitionDisciplines.SingleAsync()).SetsToWin = 2;
+        await db.SaveChangesAsync();
+        var service = new PhaseSetupService(db);
+        await service.GetSetupAsync(editionId, disciplineId);
+        await service.GeneratePresetMatchesAsync(editionId, disciplineId);
+        var match = await db.Matches.SingleAsync();
+        var submitted = new MatchSetScoresInput
+        {
+            MatchId = match.Id,
+            Version = match.Version,
+            Sets =
+            [
+                new MatchSetScoreInput { SetNumber = 1, HomeScore = 6, AwayScore = null },
+                new MatchSetScoreInput { SetNumber = 2, HomeScore = 3, AwayScore = 6 }
+            ]
+        };
+        var page = new DisciplinePhasesModel(service, new GroupStandingsService(db))
+        {
+            PageContext = new PageContext { HttpContext = new DefaultHttpContext() },
+            SetScoresInput = submitted
+        };
+
+        Assert.IsType<PageResult>(await page.OnPostUpdateSetScoresAsync(editionId, disciplineId, default));
+
+        Assert.True(page.MatchValidationIsSetScores);
+        Assert.Equal(match.Id, page.MatchValidationMatchId);
+        Assert.Contains("obě hodnoty", page.MatchValidationMessage);
+        Assert.Equal((6, null),
+            (page.SetScoresInput.Sets[0].HomeScore, page.SetScoresInput.Sets[0].AwayScore));
+        Assert.Equal((3, 6),
+            (page.SetScoresInput.Sets[1].HomeScore, page.SetScoresInput.Sets[1].AwayScore));
     }
 
     [Fact]

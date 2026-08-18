@@ -147,12 +147,14 @@
                         }
                     </span>
                 </strong>
-                @if (Model.ValidationMatchId == match.Id && !string.IsNullOrWhiteSpace(Model.ValidationMessage))
+                @if (!Model.ValidationIsSetScores && Model.ValidationMatchId == match.Id && !string.IsNullOrWhiteSpace(Model.ValidationMessage))
                 {
                     <span class="match-row-error">@Model.ValidationMessage</span>
                 }
             </div>
 
+            @if (Model.ShowResultsControls)
+            {
             <div class="score-editor" aria-label="Hlavní skóre">
                 <input name="ResultInput.HomeScore"
                        id="match-@match.Id-home-score"
@@ -199,6 +201,7 @@
                     }
                 </div>
             }
+            }
 
             <span class="round-label">@match.RoundLabel</span>
         </form>
@@ -222,7 +225,7 @@
     }
 </div>
 
-@if (Model.UsesSetScores && Model.CanEdit)
+@if (Model.ShowResultsControls && Model.UsesSetScores && Model.CanEdit)
 {
     @foreach (var match in Model.Matches.Where(x => x.HomeTeamId is not null && x.AwayTeamId is not null))
     {
@@ -231,7 +234,13 @@
         var homeScore = match.HomeScore;
         var awayScore = match.AwayScore;
         var maximumSets = Math.Max(1, Model.SetsToWin.GetValueOrDefault(1) * 2 - 1);
-        <div id="set-score-modal-@match.Id" class="modal-backdrop" role="presentation" hidden>
+        var hasValidationError = Model.ValidationIsSetScores &&
+            Model.ValidationMatchId == match.Id &&
+            !string.IsNullOrWhiteSpace(Model.ValidationMessage);
+        var attemptedSets = hasValidationError && Model.AttemptedSetScores?.MatchId == match.Id
+            ? Model.AttemptedSetScores.Sets
+            : null;
+        <div id="set-score-modal-@match.Id" class="modal-backdrop" role="presentation" hidden="@(!hasValidationError)">
             <section class="modal set-score-modal" role="dialog" aria-modal="true" aria-labelledby="set-score-title-@match.Id">
                 <h2 id="set-score-title-@match.Id">Výsledky setů</h2>
                 <p class="set-score-matchup">
@@ -241,6 +250,10 @@
                         <span>@homeScore : @awayScore</span>
                     }
                 </p>
+                @if (hasValidationError)
+                {
+                    <div class="error validation-panel set-score-validation" role="alert">@Model.ValidationMessage</div>
+                }
                 <form id="match-set-form-@match.Id"
                       method="post"
                       asp-page-handler="UpdateSetScores"
@@ -252,12 +265,15 @@
                         @for (var index = 0; index < maximumSets; index++)
                         {
                             var setNumber = index + 1;
-                            var score = match.SetScores.SingleOrDefault(x => x.SetNumber == setNumber);
+                            var attemptedScore = attemptedSets?.SingleOrDefault(x => x.SetNumber == setNumber);
+                            var savedScore = match.SetScores.SingleOrDefault(x => x.SetNumber == setNumber);
+                            var submittedHomeScore = attemptedSets is not null ? attemptedScore?.HomeScore : savedScore?.HomeScore;
+                            var submittedAwayScore = attemptedSets is not null ? attemptedScore?.AwayScore : savedScore?.AwayScore;
                             <strong>Set @setNumber</strong>
                             <input type="hidden" name="SetScoresInput.Sets[@index].SetNumber" value="@setNumber" />
-                            <input id="match-@match.Id-set-@setNumber-home" name="SetScoresInput.Sets[@index].HomeScore" value="@score?.HomeScore" type="number" min="0" inputmode="numeric" aria-label="@homeName, set @setNumber" />
+                            <input id="match-@match.Id-set-@setNumber-home" name="SetScoresInput.Sets[@index].HomeScore" value="@submittedHomeScore" type="number" min="0" inputmode="numeric" aria-label="@homeName, set @setNumber" />
                             <span>:</span>
-                            <input id="match-@match.Id-set-@setNumber-away" name="SetScoresInput.Sets[@index].AwayScore" value="@score?.AwayScore" type="number" min="0" inputmode="numeric" aria-label="@awayName, set @setNumber" />
+                            <input id="match-@match.Id-set-@setNumber-away" name="SetScoresInput.Sets[@index].AwayScore" value="@submittedAwayScore" type="number" min="0" inputmode="numeric" aria-label="@awayName, set @setNumber" />
                         }
                     </div>
                     <div class="modal-actions">

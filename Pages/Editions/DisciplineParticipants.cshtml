@@ -266,7 +266,9 @@
                 Pokračováním smažete všechny existující týmy a vytvoříte je znovu náhodným rozdělením účastníků.
             </p>
             <div class="modal-actions">
-                <form method="post" asp-page-handler="RandomizeTeams">
+                <form method="post"
+                      asp-page-handler="RandomizeTeams"
+                      data-close-modal-after-post="true">
                     <button class="button" type="submit">Pokračovat</button>
                 </form>
                 <button class="button button-ghost" type="button" data-close-random-modal>Zrušit</button>

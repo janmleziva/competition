@@ -1063,8 +1063,41 @@ public sealed class PhaseSetupService : IPhaseSetupService
             throw new ValidationException("Set musí mít vítěze.");
         }
 
-        ValidateSetResultConsistency(match, orderedSets
-            .Select(x => new SetResult(x.SetNumber, x.HomeScore!.Value, x.AwayScore!.Value)).ToList());
+        var setResults = orderedSets
+            .Select(x => new SetResult(x.SetNumber, x.HomeScore!.Value, x.AwayScore!.Value)).ToList();
+        var homeSetWins = 0;
+        var awaySetWins = 0;
+        for (var index = 0; index < setResults.Count; index++)
+        {
+            if (setResults[index].HomeScore > setResults[index].AwayScore)
+            {
+                homeSetWins++;
+            }
+            else
+            {
+                awaySetWins++;
+            }
+
+            if ((homeSetWins == setsToWin || awaySetWins == setsToWin) && index != setResults.Count - 1)
+            {
+                throw new ValidationException(
+                    $"Zápas končí, jakmile tým vyhraje {setsToWin} sety; další sety už nelze zadat.");
+            }
+        }
+        if (homeSetWins > setsToWin || awaySetWins > setsToWin)
+        {
+            throw new ValidationException(
+                $"Vítěz zápasu může mít nejvýše {setsToWin} vyhrané sety.");
+        }
+
+        if (match.HomeScore is null && match.AwayScore is null &&
+            (homeSetWins == setsToWin || awaySetWins == setsToWin))
+        {
+            match.HomeScore = homeSetWins;
+            match.AwayScore = awaySetWins;
+        }
+        ValidateMainScore(match, match.HomeScore, match.AwayScore);
+        ValidateSetResultConsistency(match, setResults);
 
         var previousSets = match.SetScores.OrderBy(x => x.SetNumber)
             .Select(x => $"{x.SetNumber}:{x.HomeScore}-{x.AwayScore}").ToArray();
@@ -1085,6 +1118,7 @@ public sealed class PhaseSetupService : IPhaseSetupService
             : suppliedSets.Count == 0 ? MatchStatus.Scheduled : MatchStatus.InProgress;
         match.UpdatedAtUtc = DateTime.UtcNow;
         LockScheduleAfterResult(match);
+        await UpdateKnockoutAdvancementAsync(match, cancellationToken);
         await SaveMatchEditAsync(cancellationToken);
         await ReconcileGroupStandingMatchesAsync(editionId, competitionDisciplineId, cancellationToken);
         logger.LogInformation(

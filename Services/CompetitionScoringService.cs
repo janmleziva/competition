@@ -131,8 +131,19 @@ public sealed class CompetitionScoringService(
             throw new ValidationException("Bonus za dílčí skóre lze nastavit jen u disciplíny používající sety.");
         }
 
-        dbContext.DisciplineBonusPointRules.RemoveRange(discipline.BonusPointRules);
-        foreach (var rule in enabled)
+        var enabledByType = enabled.ToDictionary(rule => rule.Type);
+        foreach (var existingRule in discipline.BonusPointRules.ToList())
+        {
+            if (enabledByType.Remove(existingRule.Type, out var replacement))
+            {
+                existingRule.Points = replacement.Points;
+            }
+            else
+            {
+                dbContext.DisciplineBonusPointRules.Remove(existingRule);
+            }
+        }
+        foreach (var rule in enabledByType.Values)
         {
             dbContext.DisciplineBonusPointRules.Add(new DisciplineBonusPointRule
             {
