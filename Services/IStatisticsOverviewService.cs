@@ -5,6 +5,7 @@ public interface IStatisticsOverviewService
     Task<IndividualStatisticsOverview> GetIndividualsAsync(CancellationToken cancellationToken = default);
     Task<EditionIndividualStatistics?> GetEditionAsync(long editionId, CancellationToken cancellationToken = default);
     Task<EditionCompetitorResults?> GetEditionCompetitorResultsAsync(long editionId, long competitorId, CancellationToken cancellationToken = default);
+    Task<DisciplineTeamResults?> GetDisciplineTeamResultsAsync(long editionId, long competitionDisciplineId, long teamId, CancellationToken cancellationToken = default);
     Task<DisciplineStatisticsOverview> GetDisciplinesAsync(long? disciplineId = null, CancellationToken cancellationToken = default);
 }
 
@@ -66,6 +67,26 @@ public sealed record EditionCompetitorResults(
     string FirstName,
     string LastName,
     IReadOnlyList<EditionCompetitorDisciplineResults> Disciplines);
+
+public sealed record DisciplineTeamMatchResult(
+    long MatchId,
+    string DisplayName,
+    string StageLabel,
+    long? OpponentTeamId,
+    string OpponentTeamName,
+    string Outcome,
+    int? ScoreFor,
+    int? ScoreAgainst,
+    IReadOnlyList<string> Subscores);
+
+public sealed record DisciplineTeamResults(
+    long EditionId,
+    string EditionName,
+    long CompetitionDisciplineId,
+    string DisciplineName,
+    long TeamId,
+    string TeamName,
+    IReadOnlyList<DisciplineTeamMatchResult> Matches);
 
 public sealed record DisciplineStatisticsOption(long Id, string Name);
 

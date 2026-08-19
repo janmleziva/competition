@@ -159,6 +159,101 @@ public sealed class StatisticsOverviewServiceTests
         Assert.Null(await service.GetEditionCompetitorResultsAsync(edition.Id, 999));
     }
 
+    [Fact]
+    public async Task DisciplineTeamResults_ListAllMatchesAndOrientResultsToTeam()
+    {
+        await using var db = CreateDbContext();
+        var participant = new Competitor { FirstName = "Jan", LastName = "Hráč" };
+        var teammate = new Competitor { FirstName = "Tomáš", LastName = "Parťák" };
+        var opponent = new Competitor { FirstName = "Petr", LastName = "Soupeř" };
+        var edition = CreateEdition("Cup 2026", 2026);
+        var participantEntry = AddEntry(edition, participant, 1);
+        var teammateEntry = AddEntry(edition, teammate, 2);
+        var opponentEntry = AddEntry(edition, opponent, 3);
+        var discipline = new CompetitionDiscipline
+        {
+            CompetitionEdition = edition,
+            Discipline = new Discipline { Name = "Beach" },
+            PlayingSystem = PlayingSystemType.RoundRobin,
+            TeamSize = 2,
+            Order = 1,
+            UsesSetScores = true
+        };
+        edition.Disciplines.Add(discipline);
+        var participantTeam = AddTeam(discipline, 1, participantEntry, teammateEntry);
+        var opponentTeam = AddTeam(discipline, 2, opponentEntry);
+        var phase = new DisciplinePhase
+        {
+            CompetitionDiscipline = discipline,
+            Name = "Skupina",
+            Type = PhaseType.Group,
+            Order = 1,
+            SetRule = SetRuleType.FixedSets,
+            SetCount = 2
+        };
+        discipline.Phases.Add(phase);
+        var group = new PhaseGroup { DisciplinePhase = phase, Name = "Skupina A", Order = 1 };
+        phase.Groups.Add(group);
+        var completedMatch = new Match
+        {
+            DisciplinePhase = phase,
+            PhaseGroup = group,
+            HomeTeam = opponentTeam,
+            AwayTeam = participantTeam,
+            Name = "1. kolo",
+            Order = 1,
+            Status = MatchStatus.Completed,
+            HomeScore = 1,
+            AwayScore = 1
+        };
+        completedMatch.SetScores.Add(new MatchSetScore
+        {
+            Match = completedMatch,
+            SetNumber = 1,
+            HomeScore = 10,
+            AwayScore = 7
+        });
+        completedMatch.SetScores.Add(new MatchSetScore
+        {
+            Match = completedMatch,
+            SetNumber = 2,
+            HomeScore = 5,
+            AwayScore = 10
+        });
+        phase.Matches.Add(completedMatch);
+        phase.Matches.Add(new Match
+        {
+            DisciplinePhase = phase,
+            PhaseGroup = group,
+            HomeTeam = participantTeam,
+            AwayTeam = opponentTeam,
+            Name = "2. kolo",
+            Order = 2,
+            Status = MatchStatus.Scheduled
+        });
+        db.Add(edition);
+        await db.SaveChangesAsync();
+
+        var service = new StatisticsOverviewService(db);
+        var result = await service.GetDisciplineTeamResultsAsync(
+            edition.Id, discipline.Id, participantTeam.Id);
+
+        Assert.NotNull(result);
+        Assert.Equal("Cup 2026", result.EditionName);
+        Assert.Equal("Beach", result.DisciplineName);
+        Assert.Equal("Hráč/Parťák", result.TeamName);
+        Assert.Equal(2, result.Matches.Count);
+        var completed = result.Matches[0];
+        Assert.Equal(opponentTeam.Id, completed.OpponentTeamId);
+        Assert.Equal("Soupeř", completed.OpponentTeamName);
+        Assert.Equal("Výhra", completed.Outcome);
+        Assert.Equal((1, 1), (completed.ScoreFor, completed.ScoreAgainst));
+        Assert.Equal(new[] { "7:10", "10:5" }, completed.Subscores);
+        Assert.Equal("Neodehráno", result.Matches[1].Outcome);
+        Assert.Null(result.Matches[1].ScoreFor);
+        Assert.Null(await service.GetDisciplineTeamResultsAsync(edition.Id, discipline.Id, 999));
+    }
+
     private static CompetitionEdition CreateEdition(string name, int year) => new()
     {
         Name = name,

@@ -644,6 +644,201 @@ public sealed class PhaseSetupServiceTests
     }
 
     [Fact]
+    public async Task FixedPlayedSets_UsesAggregateSubscoreToResolveEqualSetWins()
+    {
+        await using var db = CreateDbContext();
+        var (editionId, disciplineId, _) = await SeedDisciplineAsync(db, 2, PlayingSystemType.RoundRobin);
+        var discipline = await db.CompetitionDisciplines.SingleAsync();
+        discipline.UsesSetScores = true;
+        discipline.SetsToWin = 2;
+        await db.SaveChangesAsync();
+        var service = new PhaseSetupService(db);
+        var phase = Assert.Single((await service.GetSetupAsync(editionId, disciplineId))!.Phases);
+        await service.UpdatePhaseSetRuleAsync(editionId, disciplineId, new PhaseSetRuleInput
+        {
+            PhaseId = phase.Id,
+            SetRule = SetRuleType.FixedSets,
+            SetCount = 2
+        });
+        await service.GeneratePresetMatchesAsync(editionId, disciplineId);
+        var match = await db.Matches.SingleAsync();
+
+        Assert.True(await service.UpdateMatchSetScoresAsync(editionId, disciplineId, new MatchSetScoresInput
+        {
+            MatchId = match.Id,
+            Version = match.Version,
+            Sets =
+            [
+                new MatchSetScoreInput { SetNumber = 1, HomeScore = 10, AwayScore = 7 },
+                new MatchSetScoreInput { SetNumber = 2, HomeScore = 5, AwayScore = 10 }
+            ]
+        }, false));
+
+        var saved = await db.Matches.Include(x => x.SetScores).SingleAsync();
+        Assert.Equal((1, 1), (saved.HomeScore, saved.AwayScore));
+        Assert.Equal(MatchStatus.Completed, saved.Status);
+        Assert.Equal(2, saved.SetScores.Count);
+
+        var standings = Assert.Single(await new GroupStandingsService(db)
+            .GetForDisciplineAsync(editionId, disciplineId));
+        var winner = standings.Rows.Single(x => x.TeamId == saved.AwayTeamId);
+        var loser = standings.Rows.Single(x => x.TeamId == saved.HomeTeamId);
+        Assert.Equal((1, 0, 0, 2), (winner.Wins, winner.Draws, winner.Losses, winner.TablePoints));
+        Assert.Equal((0, 0, 1, 0), (loser.Wins, loser.Draws, loser.Losses, loser.TablePoints));
+    }
+
+    [Fact]
+    public async Task FixedPlayedSets_RemainsDrawWhenSetWinsAndAggregateSubscoreAreEqual()
+    {
+        await using var db = CreateDbContext();
+        var (editionId, disciplineId, _) = await SeedDisciplineAsync(db, 2, PlayingSystemType.RoundRobin);
+        var discipline = await db.CompetitionDisciplines.SingleAsync();
+        discipline.UsesSetScores = true;
+        discipline.SetsToWin = 2;
+        await db.SaveChangesAsync();
+        var service = new PhaseSetupService(db);
+        var phase = Assert.Single((await service.GetSetupAsync(editionId, disciplineId))!.Phases);
+        await service.UpdatePhaseSetRuleAsync(editionId, disciplineId, new PhaseSetRuleInput
+        {
+            PhaseId = phase.Id,
+            SetRule = SetRuleType.FixedSets,
+            SetCount = 2
+        });
+        await service.GeneratePresetMatchesAsync(editionId, disciplineId);
+        var match = await db.Matches.SingleAsync();
+        await service.UpdateMatchSetScoresAsync(editionId, disciplineId, new MatchSetScoresInput
+        {
+            MatchId = match.Id,
+            Version = match.Version,
+            Sets =
+            [
+                new MatchSetScoreInput { SetNumber = 1, HomeScore = 10, AwayScore = 5 },
+                new MatchSetScoreInput { SetNumber = 2, HomeScore = 5, AwayScore = 10 }
+            ]
+        }, false);
+
+        var standings = Assert.Single(await new GroupStandingsService(db)
+            .GetForDisciplineAsync(editionId, disciplineId));
+        Assert.All(standings.Rows, row =>
+        {
+            Assert.Equal(0, row.Wins);
+            Assert.Equal(1, row.Draws);
+            Assert.Equal(0, row.Losses);
+            Assert.Equal(1, row.TablePoints);
+        });
+    }
+
+    [Fact]
+    public async Task SetRules_CanDifferBetweenGroupAndFinalPhases()
+    {
+        await using var db = CreateDbContext();
+        var (editionId, disciplineId, _) = await SeedDisciplineAsync(
+            db, 4, PlayingSystemType.GroupsThenClassificationMatches);
+        var discipline = await db.CompetitionDisciplines.SingleAsync();
+        discipline.UsesSetScores = true;
+        discipline.SetsToWin = 2;
+        await db.SaveChangesAsync();
+        var service = new PhaseSetupService(db);
+        var setup = await service.GetSetupAsync(editionId, disciplineId);
+        var groupPhase = setup!.Phases.First(x => x.Type == PhaseType.Group);
+        var finalPhase = setup.Phases.Single(x => x.Type == PhaseType.FinalStanding);
+
+        await service.UpdatePhaseSetRuleAsync(editionId, disciplineId, new PhaseSetRuleInput
+        {
+            PhaseId = groupPhase.Id,
+            SetRule = SetRuleType.FixedSets,
+            SetCount = 2
+        });
+        await service.UpdatePhaseSetRuleAsync(editionId, disciplineId, new PhaseSetRuleInput
+        {
+            PhaseId = finalPhase.Id,
+            SetRule = SetRuleType.SetsToWin,
+            SetCount = 3
+        });
+
+        setup = await service.GetSetupAsync(editionId, disciplineId);
+        groupPhase = setup!.Phases.Single(x => x.Id == groupPhase.Id);
+        finalPhase = setup.Phases.Single(x => x.Id == finalPhase.Id);
+        Assert.Equal((SetRuleType.FixedSets, 2), (groupPhase.SetRule, groupPhase.SetCount));
+        Assert.Equal((SetRuleType.SetsToWin, 3), (finalPhase.SetRule, finalPhase.SetCount));
+    }
+
+    [Fact]
+    public async Task GroupPhasePoints_CanBeConfiguredBeforeResults()
+    {
+        await using var db = CreateDbContext();
+        var (editionId, disciplineId, _) = await SeedDisciplineAsync(db, 2, PlayingSystemType.RoundRobin);
+        var service = new PhaseSetupService(db);
+        var phase = Assert.Single((await service.GetSetupAsync(editionId, disciplineId))!.Phases);
+
+        Assert.True(await service.UpdatePhasePointsAsync(editionId, disciplineId, new PhasePointsInput
+        {
+            PhaseId = phase.Id,
+            PointsForWin = 3,
+            PointsForDraw = 1,
+            PointsForLoss = 0
+        }));
+
+        phase = Assert.Single((await service.GetSetupAsync(editionId, disciplineId))!.Phases);
+        Assert.Equal((3, 1, 0), (phase.PointsForWin, phase.PointsForDraw, phase.PointsForLoss));
+    }
+
+    [Fact]
+    public async Task FixedEvenSetCount_IsRejectedForAWinRequiredPhase()
+    {
+        await using var db = CreateDbContext();
+        var (editionId, disciplineId, _) = await SeedDisciplineAsync(db, 2, PlayingSystemType.Knockout);
+        var discipline = await db.CompetitionDisciplines.SingleAsync();
+        discipline.UsesSetScores = true;
+        discipline.SetsToWin = 2;
+        await db.SaveChangesAsync();
+        var service = new PhaseSetupService(db);
+        var phase = Assert.Single((await service.GetSetupAsync(editionId, disciplineId))!.Phases);
+
+        var error = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.UpdatePhaseSetRuleAsync(editionId, disciplineId, new PhaseSetRuleInput
+            {
+                PhaseId = phase.Id,
+                SetRule = SetRuleType.FixedSets,
+                SetCount = 2
+            }));
+
+        Assert.Contains("lichý", error.Message);
+    }
+
+    [Fact]
+    public async Task PhaseSetRule_CannotChangeAfterAResultWasEntered()
+    {
+        await using var db = CreateDbContext();
+        var (editionId, disciplineId, _) = await SeedDisciplineAsync(db, 2, PlayingSystemType.RoundRobin);
+        var discipline = await db.CompetitionDisciplines.SingleAsync();
+        discipline.UsesSetScores = true;
+        discipline.SetsToWin = 2;
+        await db.SaveChangesAsync();
+        var service = new PhaseSetupService(db);
+        var phase = Assert.Single((await service.GetSetupAsync(editionId, disciplineId))!.Phases);
+        await service.GeneratePresetMatchesAsync(editionId, disciplineId);
+        var match = await db.Matches.SingleAsync();
+        await service.UpdateMatchResultAsync(editionId, disciplineId, new MatchResultInput
+        {
+            MatchId = match.Id,
+            HomeScore = 2,
+            AwayScore = 0,
+            Version = match.Version
+        }, false);
+
+        var error = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.UpdatePhaseSetRuleAsync(editionId, disciplineId, new PhaseSetRuleInput
+            {
+                PhaseId = phase.Id,
+                SetRule = SetRuleType.FixedSets,
+                SetCount = 2
+            }));
+
+        Assert.Contains("obsahuje výsledky", error.Message);
+    }
+
+    [Fact]
     public async Task SetScores_RejectSetsPlayedAfterBestOfThreeWasAlreadyWon()
     {
         await using var db = CreateDbContext();

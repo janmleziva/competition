@@ -1,0 +1,101 @@
+@page "/Editions/{id:long}/Disciplines/{disciplineId:long}/Teams/{teamId:long}/Results"
+@model Competition.Pages.Editions.DisciplineTeamResultsModel
+@{
+    ViewData["Title"] = $"Výsledky týmu – {Model.Results.TeamName}";
+}
+
+<main class="shell shell-wide">
+    <section class="panel admin edition-competitor-results-page team-results-page">
+        <div class="page-heading">
+            <div>
+                <h1>@Model.Results.TeamName</h1>
+                <p class="lead">
+                    @Model.Results.EditionName · @Model.Results.DisciplineName · všechny zápasy týmu
+                </p>
+            </div>
+            <a class="button button-ghost"
+               asp-page="/Editions/DisciplineResults"
+               asp-route-id="@Model.Results.EditionId"
+               asp-route-disciplineId="@Model.Results.CompetitionDisciplineId">
+                Zpět na výsledky
+            </a>
+        </div>
+
+        @if (Model.Results.Matches.Count == 0)
+        {
+            <div class="empty-state">Tým zatím nemá v této disciplíně žádný zápas.</div>
+        }
+        else
+        {
+            <div class="standings-table-scroll">
+                <table class="standings-table edition-competitor-match-table team-match-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Fáze / zápas</th>
+                            <th scope="col" class="standings-identity-column">Soupeř</th>
+                            <th scope="col">Výsledek</th>
+                            <th scope="col">Skóre</th>
+                            <th scope="col">Dílčí skóre</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var match in Model.Results.Matches)
+                        {
+                            <tr>
+                                <td class="edition-match-stage">
+                                    <strong>@match.DisplayName</strong>
+                                    <small>@match.StageLabel</small>
+                                </td>
+                                <th scope="row" class="standings-identity-column">
+                                    @if (match.OpponentTeamId is not null)
+                                    {
+                                        <a class="match-team-name team-results-link"
+                                           asp-page="/Editions/DisciplineTeamResults"
+                                           asp-route-id="@Model.Results.EditionId"
+                                           asp-route-disciplineId="@Model.Results.CompetitionDisciplineId"
+                                           asp-route-teamId="@match.OpponentTeamId">
+                                            @match.OpponentTeamName
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        <span class="match-team-name">@match.OpponentTeamName</span>
+                                    }
+                                </th>
+                                <td>
+                                    <span class="edition-match-outcome edition-match-outcome-@OutcomeClass(match.Outcome)">
+                                        @match.Outcome
+                                    </span>
+                                </td>
+                                <td class="standing-score">
+                                    @if (match.ScoreFor is not null && match.ScoreAgainst is not null)
+                                    {
+                                        <strong>@match.ScoreFor:@match.ScoreAgainst</strong>
+                                    }
+                                    else
+                                    {
+                                        <text>—</text>
+                                    }
+                                </td>
+                                <td class="edition-match-subscores">
+                                    @(match.Subscores.Count == 0 ? "—" : string.Join(" · ", match.Subscores))
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+</main>
+
+@functions {
+    private static string OutcomeClass(string outcome) => outcome switch
+    {
+        "Výhra" => "win",
+        "Prohra" => "loss",
+        "Remíza" => "draw",
+        "Probíhá" => "progress",
+        _ => "scheduled"
+    };
+}

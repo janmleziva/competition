@@ -453,8 +453,13 @@ public sealed class GroupStandingsService(CompetitionDbContext dbContext) : IGro
         var awayScore = match.AwayScore!.Value;
         var homeSubscore = match.SetScores.Sum(set => set.HomeScore);
         var awaySubscore = match.SetScores.Sum(set => set.AwayScore);
-        var homePoints = homeScore == awayScore ? pointsForDraw : homeScore > awayScore ? pointsForWin : pointsForLoss;
-        var awayPoints = homeScore == awayScore ? pointsForDraw : awayScore > homeScore ? pointsForWin : pointsForLoss;
+        var outcome = MatchOutcomeResolver.Resolve(match);
+        var homePoints = outcome == MatchOutcome.Draw
+            ? pointsForDraw
+            : outcome == MatchOutcome.HomeWin ? pointsForWin : pointsForLoss;
+        var awayPoints = outcome == MatchOutcome.Draw
+            ? pointsForDraw
+            : outcome == MatchOutcome.AwayWin ? pointsForWin : pointsForLoss;
 
         if (scope == StandingScope.MiniTable)
         {
@@ -477,12 +482,12 @@ public sealed class GroupStandingsService(CompetitionDbContext dbContext) : IGro
         away.TablePoints += awayPoints;
         AddScores(home, homeScore, awayScore, homeSubscore, awaySubscore);
         AddScores(away, awayScore, homeScore, awaySubscore, homeSubscore);
-        if (homeScore == awayScore)
+        if (outcome == MatchOutcome.Draw)
         {
             home.Draws++;
             away.Draws++;
         }
-        else if (homeScore > awayScore)
+        else if (outcome == MatchOutcome.HomeWin)
         {
             home.Wins++;
             away.Losses++;
@@ -569,13 +574,19 @@ public sealed class GroupStandingsService(CompetitionDbContext dbContext) : IGro
         match.Status == MatchStatus.Completed && match.HomeTeamId is not null && match.AwayTeamId is not null &&
         match.HomeScore is not null && match.AwayScore is not null;
 
-    private static long? WinnerId(Match match) => match.HomeScore == match.AwayScore
-        ? null
-        : match.HomeScore > match.AwayScore ? match.HomeTeamId : match.AwayTeamId;
+    private static long? WinnerId(Match match) => MatchOutcomeResolver.Resolve(match) switch
+    {
+        MatchOutcome.HomeWin => match.HomeTeamId,
+        MatchOutcome.AwayWin => match.AwayTeamId,
+        _ => null
+    };
 
-    private static long? LoserId(Match match) => match.HomeScore == match.AwayScore
-        ? null
-        : match.HomeScore < match.AwayScore ? match.HomeTeamId : match.AwayTeamId;
+    private static long? LoserId(Match match) => MatchOutcomeResolver.Resolve(match) switch
+    {
+        MatchOutcome.HomeWin => match.AwayTeamId,
+        MatchOutcome.AwayWin => match.HomeTeamId,
+        _ => null
+    };
 
     private static string TeamName(DisciplineTeam team) => string.Join("/", team.Members
         .OrderBy(member => member.Order)

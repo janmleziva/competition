@@ -11,6 +11,8 @@ public sealed class DisciplinePhase
     public int PointsForWin { get; set; } = 2;
     public int PointsForDraw { get; set; } = 1;
     public int PointsForLoss { get; set; }
+    public SetRuleType? SetRule { get; set; }
+    public int? SetCount { get; set; }
 
     public ICollection<PhaseGroup> Groups { get; } = [];
     public ICollection<Match> Matches { get; } = [];

@@ -3,7 +3,7 @@ using Competition.Domain;
 
 namespace Competition.Models;
 
-public sealed class PhaseInput
+public sealed class PhaseInput : IValidatableObject
 {
     [Required(ErrorMessage = "Zadejte název fáze.")]
     [StringLength(120, ErrorMessage = "Název fáze může mít nejvýše 120 znaků.")]
@@ -21,6 +21,53 @@ public sealed class PhaseInput
     public int PointsForDraw { get; set; } = 1;
 
     [Range(0, int.MaxValue)]
+    public int PointsForLoss { get; set; }
+
+    public SetRuleType? SetRule { get; set; }
+
+    [Range(1, 10, ErrorMessage = "Počet setů musí být mezi 1 a 10.")]
+    public int? SetCount { get; set; }
+
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (SetRule is not null && SetCount is null)
+        {
+            yield return new ValidationResult("Zadejte počet setů.", [nameof(SetCount)]);
+        }
+    }
+}
+
+public sealed class PhaseSetRuleInput : IValidatableObject
+{
+    [Range(1, long.MaxValue)]
+    public long PhaseId { get; set; }
+
+    public SetRuleType SetRule { get; set; } = SetRuleType.SetsToWin;
+
+    [Range(1, 10, ErrorMessage = "Počet setů musí být mezi 1 a 10.")]
+    public int? SetCount { get; set; }
+
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (SetCount is null)
+        {
+            yield return new ValidationResult("Zadejte počet setů.", [nameof(SetCount)]);
+        }
+    }
+}
+
+public sealed class PhasePointsInput
+{
+    [Range(1, long.MaxValue)]
+    public long PhaseId { get; set; }
+
+    [Range(0, int.MaxValue, ErrorMessage = "Body za výhru nesmí být záporné.")]
+    public int PointsForWin { get; set; } = 2;
+
+    [Range(0, int.MaxValue, ErrorMessage = "Body za remízu nesmí být záporné.")]
+    public int PointsForDraw { get; set; } = 1;
+
+    [Range(0, int.MaxValue, ErrorMessage = "Body za prohru nesmí být záporné.")]
     public int PointsForLoss { get; set; }
 }
 

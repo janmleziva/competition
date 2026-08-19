@@ -117,6 +117,7 @@ public sealed class PhaseSetupService : IPhaseSetupService
 
         var phases = discipline.Phases.OrderBy(x => x.Order).Select(phase => new PhaseSetupPhase(
             phase.Id, phase.Name, phase.Type, phase.Order, phase.PointsForWin, phase.PointsForDraw, phase.PointsForLoss,
+            phase.SetRule, phase.SetCount,
             phase.Groups.OrderBy(x => x.Order).Select(group => new PhaseSetupGroup(
                 group.Id, group.Name, group.Order, group.Capacity,
                 group.Teams.OrderBy(x => x.Seed).Select(x => x.DisciplineTeamId).ToList(),
@@ -135,7 +136,10 @@ public sealed class PhaseSetupService : IPhaseSetupService
     public async Task<long> CreatePhaseAsync(long editionId, long competitionDisciplineId, PhaseInput input, CancellationToken cancellationToken = default)
     {
         Validate(input);
-        await EnsureDisciplineAsync(editionId, competitionDisciplineId, cancellationToken);
+        var discipline = await dbContext.CompetitionDisciplines.AsNoTracking().SingleOrDefaultAsync(
+            x => x.Id == competitionDisciplineId && x.CompetitionEditionId == editionId, cancellationToken)
+            ?? throw new ValidationException("Disciplína neexistuje.");
+        EnsureOpen(discipline);
         if (await dbContext.DisciplinePhases.AnyAsync(x => x.CompetitionDisciplineId == competitionDisciplineId && x.Order == input.Order, cancellationToken))
         {
             throw new ValidationException("Fáze s tímto pořadím už existuje.");
@@ -149,11 +153,84 @@ public sealed class PhaseSetupService : IPhaseSetupService
             Order = input.Order,
             PointsForWin = input.PointsForWin,
             PointsForDraw = input.PointsForDraw,
-            PointsForLoss = input.PointsForLoss
+            PointsForLoss = input.PointsForLoss,
+            SetRule = discipline.UsesSetScores ? input.SetRule ?? SetRuleType.SetsToWin : null,
+            SetCount = discipline.UsesSetScores ? input.SetCount ?? discipline.SetsToWin : null
         };
+        ValidatePhaseSetRule(phase.Type, phase.SetRule, phase.SetCount);
         dbContext.DisciplinePhases.Add(phase);
         await dbContext.SaveChangesAsync(cancellationToken);
         return phase.Id;
+    }
+
+    public async Task<bool> UpdatePhaseSetRuleAsync(
+        long editionId,
+        long competitionDisciplineId,
+        PhaseSetRuleInput input,
+        CancellationToken cancellationToken = default)
+    {
+        Validate(input);
+        var phase = await dbContext.DisciplinePhases
+            .Include(x => x.CompetitionDiscipline)
+            .Include(x => x.Matches).ThenInclude(x => x.SetScores)
+            .SingleOrDefaultAsync(x => x.Id == input.PhaseId &&
+                x.CompetitionDisciplineId == competitionDisciplineId &&
+                x.CompetitionDiscipline.CompetitionEditionId == editionId, cancellationToken);
+        if (phase is null)
+        {
+            return false;
+        }
+
+        EnsureOpen(phase.CompetitionDiscipline);
+        if (!phase.CompetitionDiscipline.UsesSetScores)
+        {
+            throw new ValidationException("Nejprve povolte sety v nastavení disciplíny.");
+        }
+        if (phase.Matches.Any(HasResult))
+        {
+            throw new ValidationException("Pravidlo setů nelze změnit, protože fáze už obsahuje výsledky.");
+        }
+
+        ValidatePhaseSetRule(phase.Type, input.SetRule, input.SetCount);
+        phase.SetRule = input.SetRule;
+        phase.SetCount = input.SetCount;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<bool> UpdatePhasePointsAsync(
+        long editionId,
+        long competitionDisciplineId,
+        PhasePointsInput input,
+        CancellationToken cancellationToken = default)
+    {
+        Validate(input);
+        var phase = await dbContext.DisciplinePhases
+            .Include(x => x.CompetitionDiscipline)
+            .Include(x => x.Matches).ThenInclude(x => x.SetScores)
+            .SingleOrDefaultAsync(x => x.Id == input.PhaseId &&
+                x.CompetitionDisciplineId == competitionDisciplineId &&
+                x.CompetitionDiscipline.CompetitionEditionId == editionId, cancellationToken);
+        if (phase is null)
+        {
+            return false;
+        }
+
+        EnsureOpen(phase.CompetitionDiscipline);
+        if (phase.Type != PhaseType.Group)
+        {
+            throw new ValidationException("Body za výhru, remízu a prohru lze nastavit jen u skupinové fáze.");
+        }
+        if (phase.Matches.Any(HasResult))
+        {
+            throw new ValidationException("Bodování fáze nelze změnit, protože fáze už obsahuje výsledky.");
+        }
+
+        phase.PointsForWin = input.PointsForWin;
+        phase.PointsForDraw = input.PointsForDraw;
+        phase.PointsForLoss = input.PointsForLoss;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
     }
 
     public async Task<bool> SetPlayingSystemAsync(long editionId, long competitionDisciplineId, PlayingSystemType playingSystem, CancellationToken cancellationToken = default)
@@ -891,17 +968,18 @@ public sealed class PhaseSetupService : IPhaseSetupService
                 .Select(x => new RandomResultMatch(
                     x.Id,
                     x.Version,
-                    x.DisciplinePhase.CompetitionDiscipline.UsesSetScores,
-                    x.DisciplinePhase.CompetitionDiscipline.SetsToWin))
+                    x.DisciplinePhase.SetRule,
+                    x.DisciplinePhase.SetCount,
+                    x.DisciplinePhase.Type))
                 .FirstOrDefaultAsync(cancellationToken);
             if (match is null)
             {
                 break;
             }
 
-            var result = CreateRandomResult(match.UsesSetScores, match.SetsToWin);
+            var result = CreateRandomResult(match.SetRule, match.SetCount, match.PhaseType);
             var version = match.Version;
-            if (match.UsesSetScores)
+            if (match.SetRule is not null)
             {
                 await UpdateMatchSetScoresAsync(editionId, competitionDisciplineId, new MatchSetScoresInput
                 {
@@ -937,10 +1015,13 @@ public sealed class PhaseSetupService : IPhaseSetupService
         return generatedCount;
     }
 
-    private static RandomMatchResult CreateRandomResult(bool usesSetScores, int? configuredSetsToWin)
+    private static RandomMatchResult CreateRandomResult(
+        SetRuleType? setRule,
+        int? configuredSetCount,
+        PhaseType phaseType)
     {
         var homeWins = Random.Shared.Next(2) == 0;
-        if (!usesSetScores)
+        if (setRule is null)
         {
             var winningScore = Random.Shared.Next(1, 6);
             var losingScore = Random.Shared.Next(0, winningScore);
@@ -950,15 +1031,39 @@ public sealed class PhaseSetupService : IPhaseSetupService
                 []);
         }
 
-        var setsToWin = configuredSetsToWin
-            ?? throw new ValidationException("U disciplíny není nastaven počet vítězných setů.");
+        var setCount = configuredSetCount
+            ?? throw new ValidationException("U fáze není nastaven počet setů.");
+        if (setRule == SetRuleType.FixedSets)
+        {
+            var fixedSetWinners = Enumerable.Range(0, setCount)
+                .Select(_ => Random.Shared.Next(2) == 0)
+                .ToList();
+            var fixedHomeWins = fixedSetWinners.Count(x => x);
+            if (phaseType != PhaseType.Group && fixedHomeWins * 2 == setCount)
+            {
+                fixedSetWinners[^1] = !fixedSetWinners[^1];
+                fixedHomeWins = fixedSetWinners.Count(x => x);
+            }
+            var fixedSets = CreateRandomSetScores(fixedSetWinners);
+            return new RandomMatchResult(fixedHomeWins, setCount - fixedHomeWins, fixedSets);
+        }
+
+        var setsToWin = setCount;
         var losingSetWins = Random.Shared.Next(setsToWin);
         var setWinners = Enumerable.Repeat(homeWins, setsToWin - 1)
             .Concat(Enumerable.Repeat(!homeWins, losingSetWins))
             .OrderBy(_ => Random.Shared.Next())
             .Append(homeWins)
             .ToList();
-        var sets = setWinners.Select((isHomeWinner, index) =>
+        var sets = CreateRandomSetScores(setWinners);
+        return new RandomMatchResult(
+            homeWins ? setsToWin : losingSetWins,
+            homeWins ? losingSetWins : setsToWin,
+            sets);
+    }
+
+    private static List<MatchSetScoreInput> CreateRandomSetScores(IReadOnlyList<bool> setWinners) =>
+        setWinners.Select((isHomeWinner, index) =>
         {
             var losingScore = Random.Shared.Next(0, 10);
             return new MatchSetScoreInput
@@ -968,11 +1073,6 @@ public sealed class PhaseSetupService : IPhaseSetupService
                 AwayScore = isHomeWinner ? losingScore : 10
             };
         }).ToList();
-        return new RandomMatchResult(
-            homeWins ? setsToWin : losingSetWins,
-            homeWins ? losingSetWins : setsToWin,
-            sets);
-    }
 
     public async Task<bool> UpdateMatchResultAsync(long editionId, long competitionDisciplineId, MatchResultInput input, bool isAdmin, CancellationToken cancellationToken = default)
     {
@@ -1022,9 +1122,10 @@ public sealed class PhaseSetupService : IPhaseSetupService
         Validate(input);
         var match = await LoadMatchForEditingAsync(editionId, competitionDisciplineId, input.MatchId, cancellationToken);
         EnsureMatchCanBeEdited(match, input.Version, isAdmin);
-        if (!match.DisciplinePhase.CompetitionDiscipline.UsesSetScores)
+        if (!match.DisciplinePhase.CompetitionDiscipline.UsesSetScores ||
+            match.DisciplinePhase.SetRule is null)
         {
-            throw new ValidationException("Tato disciplína nemá povolené dílčí skóre.");
+            throw new ValidationException("Tato fáze nemá povolené dílčí skóre.");
         }
         if (match.HomeTeamId is null || match.AwayTeamId is null)
         {
@@ -1045,9 +1146,11 @@ public sealed class PhaseSetupService : IPhaseSetupService
         {
             throw new ValidationException("U každého setu vyplňte obě hodnoty.");
         }
-        var setsToWin = match.DisciplinePhase.CompetitionDiscipline.SetsToWin
-            ?? throw new ValidationException("U disciplíny není nastaven počet vítězných setů.");
-        var maximumSets = setsToWin * 2 - 1;
+        var setCount = match.DisciplinePhase.SetCount
+            ?? throw new ValidationException("U fáze není nastaven počet setů.");
+        var maximumSets = match.DisciplinePhase.SetRule == SetRuleType.SetsToWin
+            ? setCount * 2 - 1
+            : setCount;
         if (suppliedSets.Select(x => x.SetNumber).Distinct().Count() != suppliedSets.Count ||
             suppliedSets.Any(x => x.SetNumber < 1 || x.SetNumber > maximumSets))
         {
@@ -1065,36 +1168,49 @@ public sealed class PhaseSetupService : IPhaseSetupService
 
         var setResults = orderedSets
             .Select(x => new SetResult(x.SetNumber, x.HomeScore!.Value, x.AwayScore!.Value)).ToList();
-        var homeSetWins = 0;
-        var awaySetWins = 0;
-        for (var index = 0; index < setResults.Count; index++)
+        var homeSetWins = setResults.Count(x => x.HomeScore > x.AwayScore);
+        var awaySetWins = setResults.Count - homeSetWins;
+        if (match.DisciplinePhase.SetRule == SetRuleType.SetsToWin)
         {
-            if (setResults[index].HomeScore > setResults[index].AwayScore)
+            var runningHomeWins = 0;
+            var runningAwayWins = 0;
+            for (var index = 0; index < setResults.Count; index++)
             {
-                homeSetWins++;
-            }
-            else
-            {
-                awaySetWins++;
+                if (setResults[index].HomeScore > setResults[index].AwayScore)
+                {
+                    runningHomeWins++;
+                }
+                else
+                {
+                    runningAwayWins++;
+                }
+
+                if ((runningHomeWins == setCount || runningAwayWins == setCount) && index != setResults.Count - 1)
+                {
+                    throw new ValidationException(
+                        $"Zápas končí, jakmile tým vyhraje {setCount} sety; další sety už nelze zadat.");
+                }
             }
 
-            if ((homeSetWins == setsToWin || awaySetWins == setsToWin) && index != setResults.Count - 1)
+            if (homeSetWins > setCount || awaySetWins > setCount)
             {
                 throw new ValidationException(
-                    $"Zápas končí, jakmile tým vyhraje {setsToWin} sety; další sety už nelze zadat.");
+                    $"Vítěz zápasu může mít nejvýše {setCount} vyhrané sety.");
             }
         }
-        if (homeSetWins > setsToWin || awaySetWins > setsToWin)
-        {
-            throw new ValidationException(
-                $"Vítěz zápasu může mít nejvýše {setsToWin} vyhrané sety.");
-        }
 
-        if (match.HomeScore is null && match.AwayScore is null &&
-            (homeSetWins == setsToWin || awaySetWins == setsToWin))
+        var isComplete = match.DisciplinePhase.SetRule == SetRuleType.SetsToWin
+            ? homeSetWins == setCount || awaySetWins == setCount
+            : setResults.Count == setCount;
+        if (isComplete)
         {
             match.HomeScore = homeSetWins;
             match.AwayScore = awaySetWins;
+        }
+        else if (match.DisciplinePhase.SetRule == SetRuleType.FixedSets)
+        {
+            match.HomeScore = null;
+            match.AwayScore = null;
         }
         ValidateMainScore(match, match.HomeScore, match.AwayScore);
         ValidateSetResultConsistency(match, setResults);
@@ -1160,6 +1276,22 @@ public sealed class PhaseSetupService : IPhaseSetupService
     private static bool HasResult(Match match) => match.HomeScore is not null || match.AwayScore is not null ||
         match.SetScores.Count != 0 || match.Status != MatchStatus.Scheduled;
 
+    private static void ValidatePhaseSetRule(PhaseType phaseType, SetRuleType? setRule, int? setCount)
+    {
+        if (setRule is null && setCount is null)
+        {
+            return;
+        }
+        if (setRule is null || !Enum.IsDefined(setRule.Value) || setCount is null or < 1 or > 10)
+        {
+            throw new ValidationException("Vyberte pravidlo setů a zadejte počet od 1 do 10.");
+        }
+        if (setRule == SetRuleType.FixedSets && phaseType != PhaseType.Group && setCount % 2 == 0)
+        {
+            throw new ValidationException("Ve vyřazovací nebo finálové fázi musí pevný počet setů zaručit vítěze, proto musí být lichý.");
+        }
+    }
+
     private static void LockScheduleAfterResult(Match match)
     {
         if (HasResult(match))
@@ -1170,26 +1302,33 @@ public sealed class PhaseSetupService : IPhaseSetupService
 
     private static void ValidateMainScore(Match match, int? homeScore, int? awayScore)
     {
-        var discipline = match.DisciplinePhase.CompetitionDiscipline;
-        if (!discipline.UsesSetScores || homeScore is null || awayScore is null)
+        var phase = match.DisciplinePhase;
+        if (phase.SetRule is null || homeScore is null || awayScore is null)
         {
             return;
         }
 
-        var setsToWin = discipline.SetsToWin
-            ?? throw new ValidationException("U disciplíny není nastaven počet vítězných setů.");
-        var isValid = (homeScore == setsToWin && awayScore >= 0 && awayScore < setsToWin) ||
-            (awayScore == setsToWin && homeScore >= 0 && homeScore < setsToWin);
+        var setCount = phase.SetCount
+            ?? throw new ValidationException("U fáze není nastaven počet setů.");
+        var isValid = phase.SetRule == SetRuleType.SetsToWin
+            ? (homeScore == setCount && awayScore >= 0 && awayScore < setCount) ||
+              (awayScore == setCount && homeScore >= 0 && homeScore < setCount)
+            : homeScore + awayScore == setCount &&
+              (phase.Type == PhaseType.Group || homeScore != awayScore);
         if (!isValid)
         {
-            throw new ValidationException(
-                $"Hlavní výsledek musí mít vítěze s {setsToWin} vyhranými sety a poraženého s méně než {setsToWin} sety.");
+            var message = phase.SetRule == SetRuleType.SetsToWin
+                ? $"Hlavní výsledek musí mít vítěze s {setCount} vyhranými sety a poraženého s méně než {setCount} sety."
+                : phase.Type == PhaseType.Group
+                    ? $"Součet vyhraných setů musí být {setCount}."
+                    : $"Součet vyhraných setů musí být {setCount} a zápas musí mít vítěze.";
+            throw new ValidationException(message);
         }
     }
 
     private static void ValidateSetResultConsistency(Match match, IReadOnlyList<SetResult> sets)
     {
-        if (!match.DisciplinePhase.CompetitionDiscipline.UsesSetScores || sets.Count == 0 ||
+        if (match.DisciplinePhase.SetRule is null || sets.Count == 0 ||
             match.HomeScore is null || match.AwayScore is null)
         {
             return;
@@ -1205,7 +1344,7 @@ public sealed class PhaseSetupService : IPhaseSetupService
     }
 
     private sealed record SetResult(int SetNumber, int HomeScore, int AwayScore);
-    private sealed record RandomResultMatch(long Id, int Version, bool UsesSetScores, int? SetsToWin);
+    private sealed record RandomResultMatch(long Id, int Version, SetRuleType? SetRule, int? SetCount, PhaseType PhaseType);
     private sealed record RandomMatchResult(int HomeScore, int AwayScore, List<MatchSetScoreInput> Sets);
 
     private async Task SaveMatchEditAsync(CancellationToken cancellationToken)
@@ -1549,7 +1688,7 @@ public sealed class PhaseSetupService : IPhaseSetupService
             if (!HasRoundRobinPreset(discipline) && canRebuildPreset)
             {
                 await ClearPhasesAsync(discipline, cancellationToken);
-                var phase = CreatePresetPhase(discipline.Id, "Detaily", PhaseType.Group, 1);
+                var phase = CreatePresetPhase(discipline, "Detaily", PhaseType.Group, 1);
                 var presetGroup = new PhaseGroup { Name = "Každý s každým", Order = 1 };
                 phase.Groups.Add(presetGroup);
                 foreach (var team in discipline.Teams.OrderBy(x => x.Seed))
@@ -1585,11 +1724,11 @@ public sealed class PhaseSetupService : IPhaseSetupService
                  !HasTwoGroupPreset(discipline) && canRebuildPreset)
         {
             await ClearPhasesAsync(discipline, cancellationToken);
-            var groupA = CreatePresetPhase(discipline.Id, "Skupina A", PhaseType.Group, 1);
+            var groupA = CreatePresetPhase(discipline, "Skupina A", PhaseType.Group, 1);
             groupA.Groups.Add(new PhaseGroup { Name = "Skupina A", Order = 1 });
-            var groupB = CreatePresetPhase(discipline.Id, "Skupina B", PhaseType.Group, 2);
+            var groupB = CreatePresetPhase(discipline, "Skupina B", PhaseType.Group, 2);
             groupB.Groups.Add(new PhaseGroup { Name = "Skupina B", Order = 1 });
-            var final = CreatePresetPhase(discipline.Id, "O konečné umístění", PhaseType.FinalStanding, 3);
+            var final = CreatePresetPhase(discipline, "O konečné umístění", PhaseType.FinalStanding, 3);
             dbContext.DisciplinePhases.AddRange(groupA, groupB, final);
             await dbContext.SaveChangesAsync(cancellationToken);
         }
@@ -1597,7 +1736,7 @@ public sealed class PhaseSetupService : IPhaseSetupService
                  !HasKnockoutPreset(discipline) && canRebuildPreset)
         {
             await ClearPhasesAsync(discipline, cancellationToken);
-            dbContext.DisciplinePhases.Add(CreatePresetPhase(discipline.Id, "Vyřazovací část", PhaseType.Knockout, 1));
+            dbContext.DisciplinePhases.Add(CreatePresetPhase(discipline, "Vyřazovací část", PhaseType.Knockout, 1));
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
@@ -1614,15 +1753,17 @@ public sealed class PhaseSetupService : IPhaseSetupService
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    private static DisciplinePhase CreatePresetPhase(long disciplineId, string name, PhaseType type, int order) => new()
+    private static DisciplinePhase CreatePresetPhase(CompetitionDiscipline discipline, string name, PhaseType type, int order) => new()
     {
-        CompetitionDisciplineId = disciplineId,
+        CompetitionDisciplineId = discipline.Id,
         Name = name,
         Type = type,
         Order = order,
         PointsForWin = 2,
         PointsForDraw = 1,
-        PointsForLoss = 0
+        PointsForLoss = 0,
+        SetRule = discipline.UsesSetScores ? SetRuleType.SetsToWin : null,
+        SetCount = discipline.UsesSetScores ? discipline.SetsToWin : null
     };
 
     private static bool HasRoundRobinPreset(CompetitionDiscipline discipline) =>

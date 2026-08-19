@@ -96,4 +96,51 @@ public sealed class SqliteSchemaUpgraderTests
             "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('DisciplineBonusPointRules', 'DisciplineBonusAwards');";
         Assert.Equal(2L, (long)(await verification.ExecuteScalarAsync())!);
     }
+
+    [Fact]
+    public async Task ApplyCompetitionUpgrades_AddsAndBackfillsPhaseSetRules()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        await using (var command = connection.CreateCommand())
+        {
+            command.CommandText =
+                """
+                CREATE TABLE CompetitionDisciplines (
+                    Id INTEGER NOT NULL PRIMARY KEY,
+                    UsesSetScores INTEGER NOT NULL,
+                    SetsToWin INTEGER NULL
+                );
+                CREATE TABLE DisciplinePhases (
+                    Id INTEGER NOT NULL PRIMARY KEY,
+                    CompetitionDisciplineId INTEGER NOT NULL
+                );
+                CREATE TABLE DisciplineTeams (Id INTEGER NOT NULL PRIMARY KEY);
+                INSERT INTO CompetitionDisciplines (Id, UsesSetScores, SetsToWin) VALUES (1, 1, 2), (2, 0, NULL);
+                INSERT INTO DisciplinePhases (Id, CompetitionDisciplineId) VALUES (10, 1), (20, 2);
+                """;
+            await command.ExecuteNonQueryAsync();
+        }
+        await using var db = new CompetitionDbContext(
+            new DbContextOptionsBuilder<CompetitionDbContext>().UseSqlite(connection).Options);
+
+        SqliteSchemaUpgrader.ApplyCompetitionUpgrades(db);
+        SqliteSchemaUpgrader.ApplyCompetitionUpgrades(db);
+
+        await using var verification = connection.CreateCommand();
+        verification.CommandText =
+            """
+            SELECT
+                (SELECT COUNT(*) FROM pragma_table_info('DisciplinePhases') WHERE name IN ('SetRule', 'SetCount')),
+                (SELECT SetRule FROM DisciplinePhases WHERE Id = 10),
+                (SELECT SetCount FROM DisciplinePhases WHERE Id = 10),
+                (SELECT COUNT(*) FROM DisciplinePhases WHERE Id = 20 AND SetRule IS NULL AND SetCount IS NULL);
+            """;
+        await using var reader = await verification.ExecuteReaderAsync();
+        Assert.True(await reader.ReadAsync());
+        Assert.Equal(2L, reader.GetInt64(0));
+        Assert.Equal("SetsToWin", reader.GetString(1));
+        Assert.Equal(2L, reader.GetInt64(2));
+        Assert.Equal(1L, reader.GetInt64(3));
+    }
 }

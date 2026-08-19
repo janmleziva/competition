@@ -8,6 +8,8 @@ public interface IPhaseSetupService
     Task<DisciplinePhaseSetup?> GetSetupAsync(long editionId, long competitionDisciplineId, CancellationToken cancellationToken = default);
     Task<bool> SetPlayingSystemAsync(long editionId, long competitionDisciplineId, PlayingSystemType playingSystem, CancellationToken cancellationToken = default);
     Task<long> CreatePhaseAsync(long editionId, long competitionDisciplineId, PhaseInput input, CancellationToken cancellationToken = default);
+    Task<bool> UpdatePhaseSetRuleAsync(long editionId, long competitionDisciplineId, PhaseSetRuleInput input, CancellationToken cancellationToken = default);
+    Task<bool> UpdatePhasePointsAsync(long editionId, long competitionDisciplineId, PhasePointsInput input, CancellationToken cancellationToken = default);
     Task<long> CreateGroupAsync(long editionId, long competitionDisciplineId, long phaseId, PhaseGroupInput input, CancellationToken cancellationToken = default);
     Task<bool> AssignGroupTeamsAsync(long editionId, long competitionDisciplineId, long phaseId, long groupId, IReadOnlyCollection<long> teamIds, CancellationToken cancellationToken = default);
     Task<bool> DeleteGroupAsync(long editionId, long competitionDisciplineId, long phaseId, long groupId, CancellationToken cancellationToken = default);
@@ -31,7 +33,12 @@ public sealed record PhaseSetupMatchSource(long MatchId, string Name);
 public sealed record PhaseSetupSetScore(int SetNumber, int HomeScore, int AwayScore);
 public sealed record PhaseSetupMatch(long Id, string Name, int Order, long? HomeTeamId, string? HomeTeamName, int? HomeTeamSeed, long? AwayTeamId, string? AwayTeamName, int? AwayTeamSeed, long? HomeSourceMatchId, long? AwaySourceMatchId, string? HomeSource, string? AwaySource, string? HomeAdvancementSource, string? AwayAdvancementSource, int? HomeScore, int? AwayScore, int Version, string? RoundLabel, IReadOnlyList<PhaseSetupSetScore> SetScores);
 public sealed record PhaseSetupGroup(long Id, string Name, int Order, int? Capacity, IReadOnlyList<long> TeamIds, IReadOnlyList<PhaseSetupMatch> Matches);
-public sealed record PhaseSetupPhase(long Id, string Name, PhaseType Type, int Order, int PointsForWin, int PointsForDraw, int PointsForLoss, IReadOnlyList<PhaseSetupGroup> Groups, IReadOnlyList<PhaseSetupMatch> Matches);
+public sealed record PhaseSetupPhase(long Id, string Name, PhaseType Type, int Order, int PointsForWin, int PointsForDraw, int PointsForLoss, SetRuleType? SetRule, int? SetCount, IReadOnlyList<PhaseSetupGroup> Groups, IReadOnlyList<PhaseSetupMatch> Matches)
+{
+    public bool UsesSetScores => SetRule is not null;
+    public bool HasResults => Matches.Concat(Groups.SelectMany(x => x.Matches)).Any(x =>
+        x.HomeScore is not null || x.AwayScore is not null || x.SetScores.Count != 0);
+}
 public sealed record DisciplinePhaseSetup(long EditionId, string EditionName, long DisciplineId, string DisciplineName, PlayingSystemType PlayingSystem, int TeamSize, bool UsesSetScores, int? SetsToWin, bool IsScheduleLocked, bool IsClosed, bool IsAnonymousResultEditingEnabled, bool HasMatchResults, IReadOnlyList<PhaseSetupTeam> Teams, IReadOnlyList<PhaseSetupPhase> Phases)
 {
     public IReadOnlySet<long> AssignedTeamIds => Phases.SelectMany(x => x.Groups).SelectMany(x => x.TeamIds).ToHashSet();
