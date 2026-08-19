@@ -171,7 +171,8 @@
                     {
                         var rule = Model.BonusPointRules[index];
                         var unavailable = rule.Type == BonusPointType.LowestAverageSubscoreAgainst && !item.UsesSetScores;
-                        <div class="bonus-rule-row @(unavailable ? "is-disabled" : null)">
+                        <div class="bonus-rule-row @(unavailable ? "is-disabled" : null)"
+                             data-requires-set-scores="@((rule.Type == BonusPointType.LowestAverageSubscoreAgainst).ToString().ToLowerInvariant())">
                             <input asp-for="BonusPointRules[index].Type" type="hidden" />
                             <label class="checkbox-label bonus-rule-label">
                                 <input asp-for="BonusPointRules[index].Enabled"
@@ -259,7 +260,7 @@
                         {
                             <input asp-for="Input.UsesSetScores" data-uses-set-scores />
                         }
-                        Dílčí skóre (sety)
+                        Hraje se na sety
                     </label>
                     @if (setSettingsLocked)
                     {
@@ -267,13 +268,16 @@
                     }
                 </div>
                 <div data-sets-to-win-container hidden="@(!Model.Input.UsesSetScores)">
-                    <label asp-for="Input.SetsToWin">Vítězné sety</label>
+                    <label asp-for="Input.SetsToWin">Výchozí počet setů pro novou fázi</label>
                     <input asp-for="Input.SetsToWin" type="number" min="1" max="10" disabled="@(!Model.Input.UsesSetScores || setSettingsLocked)" />
                     @if (setSettingsLocked)
                     {
                         <input asp-for="Input.SetsToWin" type="hidden" />
                     }
-                    <small>Počet setů, které musí tým vyhrát pro vítězství v zápasu.</small>
+                    <small>
+                        Pro každou fázi později zvolíte, zda se odehraje pevný počet setů,
+                        nebo zda je potřeba tento počet setů vyhrát.
+                    </small>
                 </div>
                 <div>
                     <label asp-for="Input.ScheduledAt">Datum a čas</label>
@@ -297,7 +301,7 @@
                 <div><dt>Herní systém</dt><dd>@DisciplineDetailModel.GetPlayingSystemLabel(item.PlayingSystem)</dd></div>
                 <div><dt>Velikost týmu</dt><dd>@item.TeamSize</dd></div>
                 <div><dt>Datum a čas</dt><dd>@(item.ScheduledAt?.ToString("dd/MM/yyyy HH:mm") ?? "Není určeno")</dd></div>
-                <div><dt>Sety</dt><dd>@(item.UsesSetScores ? $"Ano · {item.SetsToWin} vítězné" : "Ne")</dd></div>
+                <div><dt>Sety</dt><dd>@(item.UsesSetScores ? $"Ano · výchozí počet {item.SetsToWin}" : "Ne")</dd></div>
                 <div class="details-wide"><dt>Informace o disciplíně</dt><dd class="discipline-description">@(item.Description ?? "Bez dalších informací.")</dd></div>
             </dl>
         }
@@ -330,6 +334,13 @@
                 input.disabled = checkbox.dataset.setSettingsLocked === "true" || !checkbox.checked;
                 input.required = checkbox.checked;
                 if (checkbox.checked && !input.value) input.value = "2";
+
+                document.querySelectorAll('[data-requires-set-scores="true"]').forEach(row => {
+                    row.classList.toggle("is-disabled", !checkbox.checked);
+                    row.querySelectorAll('input:not([type="hidden"])').forEach(control => {
+                        control.disabled = !checkbox.checked;
+                    });
+                });
             };
             checkbox.addEventListener("change", update);
             update();

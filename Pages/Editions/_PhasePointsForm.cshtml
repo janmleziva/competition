@@ -1,0 +1,48 @@
+@model Competition.Pages.Editions.PhasePointsFormViewModel
+
+<section id="phase-points-@Model.Phase.Id" class="phase-points" aria-label="Bodování fáze @Model.Phase.Name">
+    @if (Model.CanEdit)
+    {
+        <form method="post" asp-page-handler="UpdatePhasePoints" class="phase-points-form" data-phase-auto-submit>
+            <input type="hidden" name="PhasePointsInput.PhaseId" value="@Model.Phase.Id" />
+            <strong class="phase-points-title">Body za výsledek:</strong>
+            <div>
+                <label for="phase-@Model.Phase.Id-points-win">Výhra</label>
+                <input id="phase-@Model.Phase.Id-points-win"
+                       name="PhasePointsInput.PointsForWin"
+                       value="@Model.Phase.PointsForWin"
+                       type="number"
+                       min="0"
+                       required
+                       data-phase-auto-submit-control />
+            </div>
+            <div>
+                <label for="phase-@Model.Phase.Id-points-draw">Remíza</label>
+                <input id="phase-@Model.Phase.Id-points-draw"
+                       name="PhasePointsInput.PointsForDraw"
+                       value="@Model.Phase.PointsForDraw"
+                       type="number"
+                       min="0"
+                       required
+                       data-phase-auto-submit-control />
+            </div>
+            <div>
+                <label for="phase-@Model.Phase.Id-points-loss">Prohra</label>
+                <input id="phase-@Model.Phase.Id-points-loss"
+                       name="PhasePointsInput.PointsForLoss"
+                       value="@Model.Phase.PointsForLoss"
+                       type="number"
+                       min="0"
+                       required
+                       data-phase-auto-submit-control />
+            </div>
+            <small>Změny se ukládají automaticky.</small>
+        </form>
+    }
+    else
+    {
+        <span class="points-badge">
+            Body @Model.Phase.PointsForWin / @Model.Phase.PointsForDraw / @Model.Phase.PointsForLoss
+        </span>
+    }
+</section>

@@ -157,11 +157,13 @@ public sealed class CompetitionDbContext(DbContextOptions<CompetitionDbContext> 
         {
             entity.Property(x => x.Name).HasMaxLength(120);
             entity.Property(x => x.Type).HasConversion<string>().HasMaxLength(30);
+            entity.Property(x => x.SetRule).HasConversion<string>().HasMaxLength(30);
             entity.HasIndex(x => new { x.CompetitionDisciplineId, x.Order }).IsUnique();
             entity.ToTable("DisciplinePhases", table =>
             {
                 table.HasCheckConstraint("CK_DisciplinePhases_Order", "\"Order\" > 0");
                 table.HasCheckConstraint("CK_DisciplinePhases_Points", "PointsForWin >= 0 AND PointsForDraw >= 0 AND PointsForLoss >= 0");
+                table.HasCheckConstraint("CK_DisciplinePhases_SetRule", "(SetRule IS NULL AND SetCount IS NULL) OR (SetRule IS NOT NULL AND SetCount > 0)");
             });
             entity.HasOne(x => x.CompetitionDiscipline)
                 .WithMany(x => x.Phases)

@@ -108,6 +108,55 @@ public sealed class StatisticsOverviewService(CompetitionDbContext dbContext) : 
             disciplineResults);
     }
 
+    public async Task<DisciplineTeamResults?> GetDisciplineTeamResultsAsync(
+        long editionId,
+        long competitionDisciplineId,
+        long teamId,
+        CancellationToken cancellationToken = default)
+    {
+        var discipline = await dbContext.CompetitionDisciplines
+            .AsNoTrackingWithIdentityResolution()
+            .AsSplitQuery()
+            .Include(item => item.CompetitionEdition).ThenInclude(edition => edition.Entries)
+                .ThenInclude(entry => entry.Competitor)
+            .Include(item => item.Discipline)
+            .Include(item => item.Teams).ThenInclude(team => team.Members)
+                .ThenInclude(member => member.CompetitionEntry).ThenInclude(entry => entry.Competitor)
+            .SingleOrDefaultAsync(item => item.Id == competitionDisciplineId &&
+                item.CompetitionEditionId == editionId, cancellationToken);
+        var team = discipline?.Teams.SingleOrDefault(item => item.Id == teamId);
+        if (discipline is null || team is null)
+        {
+            return null;
+        }
+
+        var entryLabels = TeamNameFormatter.CreateEntryLabels(discipline.CompetitionEdition.Entries);
+        var teamNames = discipline.Teams.ToDictionary(
+            item => item.Id,
+            item => TeamNameFormatter.Format(item, entryLabels));
+        var matches = await dbContext.Matches
+            .AsNoTrackingWithIdentityResolution()
+            .AsSplitQuery()
+            .Include(match => match.DisciplinePhase)
+            .Include(match => match.PhaseGroup)
+            .Include(match => match.SetScores)
+            .Where(match => match.DisciplinePhase.CompetitionDisciplineId == competitionDisciplineId &&
+                (match.HomeTeamId == teamId || match.AwayTeamId == teamId))
+            .OrderBy(match => match.DisciplinePhase.Order)
+            .ThenBy(match => match.PhaseGroup == null ? 0 : match.PhaseGroup.Order)
+            .ThenBy(match => match.Order)
+            .ToListAsync(cancellationToken);
+
+        return new DisciplineTeamResults(
+            discipline.CompetitionEditionId,
+            discipline.CompetitionEdition.Name,
+            discipline.Id,
+            discipline.Discipline.Name,
+            team.Id,
+            teamNames[team.Id],
+            matches.Select(match => BuildTeamMatchResult(match, team.Id, teamNames)).ToList());
+    }
+
     public async Task<DisciplineStatisticsOverview> GetDisciplinesAsync(
         long? disciplineId = null,
         CancellationToken cancellationToken = default)
@@ -271,7 +320,11 @@ public sealed class StatisticsOverviewService(CompetitionDbContext dbContext) : 
         var opponentTeam = isHome ? match.AwayTeam! : match.HomeTeam;
         var scoreFor = isHome ? match.HomeScore!.Value : match.AwayScore!.Value;
         var scoreAgainst = isHome ? match.AwayScore!.Value : match.HomeScore!.Value;
-        var outcome = scoreFor > scoreAgainst ? "Výhra" : scoreFor < scoreAgainst ? "Prohra" : "Remíza";
+        var matchOutcome = MatchOutcomeResolver.Resolve(match);
+        var isWinner = isHome
+            ? matchOutcome == MatchOutcome.HomeWin
+            : matchOutcome == MatchOutcome.AwayWin;
+        var outcome = matchOutcome == MatchOutcome.Draw ? "Remíza" : isWinner ? "Výhra" : "Prohra";
         var teammates = FormatPeople(ownTeam.Members
             .Where(member => member.CompetitionEntry.CompetitorId != competitorId));
         var opponent = FormatPeople(opponentTeam.Members);
@@ -290,6 +343,48 @@ public sealed class StatisticsOverviewService(CompetitionDbContext dbContext) : 
             stageLabel,
             teammates,
             opponent,
+            outcome,
+            scoreFor,
+            scoreAgainst,
+            subscores);
+    }
+
+    private static DisciplineTeamMatchResult BuildTeamMatchResult(
+        Match match,
+        long teamId,
+        IReadOnlyDictionary<long, string> teamNames)
+    {
+        var isHome = match.HomeTeamId == teamId;
+        var opponentTeamId = isHome ? match.AwayTeamId : match.HomeTeamId;
+        var scoreFor = isHome ? match.HomeScore : match.AwayScore;
+        var scoreAgainst = isHome ? match.AwayScore : match.HomeScore;
+        var outcome = "Neodehráno";
+        if (match.Status == MatchStatus.Completed && scoreFor is not null && scoreAgainst is not null)
+        {
+            var resolved = MatchOutcomeResolver.Resolve(match);
+            var isWinner = isHome
+                ? resolved == MatchOutcome.HomeWin
+                : resolved == MatchOutcome.AwayWin;
+            outcome = resolved == MatchOutcome.Draw ? "Remíza" : isWinner ? "Výhra" : "Prohra";
+        }
+        else if (match.Status == MatchStatus.InProgress || match.SetScores.Count > 0)
+        {
+            outcome = "Probíhá";
+        }
+
+        var subscores = match.SetScores
+            .OrderBy(set => set.SetNumber)
+            .Select(set => isHome ? $"{set.HomeScore}:{set.AwayScore}" : $"{set.AwayScore}:{set.HomeScore}")
+            .ToList();
+        var (displayName, stageLabel) = FormatMatchStage(match);
+        return new DisciplineTeamMatchResult(
+            match.Id,
+            displayName,
+            stageLabel,
+            opponentTeamId,
+            opponentTeamId is not null && teamNames.TryGetValue(opponentTeamId.Value, out var opponentName)
+                ? opponentName
+                : "neurčeno",
             outcome,
             scoreFor,
             scoreAgainst,

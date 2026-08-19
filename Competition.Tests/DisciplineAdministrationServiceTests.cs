@@ -262,6 +262,51 @@ public sealed class DisciplineAdministrationServiceTests
     }
 
     [Fact]
+    public async Task Update_SetScoringAvailabilityKeepsExistingPhasesConsistent()
+    {
+        await using var db = CreateDbContext();
+        var editionId = await SeedEditionWithCompetitors(db, 0);
+        var disciplineId = await AddDiscipline(db, editionId, teamSize: 1);
+        var discipline = await db.CompetitionDisciplines.SingleAsync(x => x.Id == disciplineId);
+        var phase = new DisciplinePhase
+        {
+            CompetitionDisciplineId = disciplineId,
+            Name = "Skupina",
+            Type = PhaseType.Group,
+            Order = 1
+        };
+        db.DisciplinePhases.Add(phase);
+        await db.SaveChangesAsync();
+        var service = new DisciplineAdministrationService(db);
+
+        Assert.True(await service.UpdateAsync(editionId, disciplineId, new EditionDisciplineInput
+        {
+            DisciplineId = discipline.DisciplineId,
+            Order = discipline.Order,
+            TeamSize = discipline.TeamSize,
+            PlayingSystem = discipline.PlayingSystem,
+            UsesSetScores = true,
+            SetsToWin = 3
+        }));
+
+        phase = await db.DisciplinePhases.SingleAsync();
+        Assert.Equal((SetRuleType.SetsToWin, 3), (phase.SetRule, phase.SetCount));
+
+        Assert.True(await service.UpdateAsync(editionId, disciplineId, new EditionDisciplineInput
+        {
+            DisciplineId = discipline.DisciplineId,
+            Order = discipline.Order,
+            TeamSize = discipline.TeamSize,
+            PlayingSystem = discipline.PlayingSystem,
+            UsesSetScores = false
+        }));
+
+        phase = await db.DisciplinePhases.SingleAsync();
+        Assert.Null(phase.SetRule);
+        Assert.Null(phase.SetCount);
+    }
+
+    [Fact]
     public async Task DisciplineLock_BlocksConfigurationUpdatesUntilUnlocked()
     {
         await using var db = CreateDbContext();

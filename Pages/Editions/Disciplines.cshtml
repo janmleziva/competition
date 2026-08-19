@@ -89,14 +89,10 @@
 
                         <div>
                             <label class="checkbox-label">
-                                <input asp-for="Input.UsesSetScores" data-uses-set-scores />
-                                Dílčí skóre (sety)
+                                <input asp-for="Input.UsesSetScores" />
+                                Hraje se na sety
                             </label>
-                        </div>
-
-                        <div data-sets-to-win-container hidden="@(!Model.Input.UsesSetScores)">
-                            <label asp-for="Input.SetsToWin">Vítězné sety</label>
-                            <input asp-for="Input.SetsToWin" type="number" min="1" max="10" disabled="@(!Model.Input.UsesSetScores)" />
+                            <input asp-for="Input.SetsToWin" type="hidden" value="2" />
                         </div>
 
                         <div>
@@ -154,8 +150,7 @@
                            data-copy-checked-from="Input_UsesSetScores" />
                     <input type="hidden"
                            name="Input.SetsToWin"
-                           value="@Model.Input.SetsToWin"
-                           data-copy-value-from="Input_SetsToWin" />
+                           value="2" />
                     <input type="hidden"
                            name="Input.ScheduledAt"
                            value="@(Model.Input.ScheduledAt?.ToString("dd/MM/yyyy HH:mm"))"
@@ -178,7 +173,6 @@
                 @foreach (var item in Model.Setup.Disciplines)
                 {
                     var canChangePlayingSystem = !item.IsLocked && !item.IsScheduleLocked;
-                    var canChangeSetSettings = !item.IsLocked && !item.HasResults;
                     <article class="discipline-card">
                         <div class="discipline-card-heading">
                             <div>
@@ -309,6 +303,8 @@
                                     <input type="hidden" name="disciplineId" value="@item.Id" />
                                     <input type="hidden" name="input.DisciplineId" value="@item.DisciplineId" />
                                     <input type="hidden" name="input.Description" value="@item.Description" />
+                                    <input type="hidden" name="input.UsesSetScores" value="@item.UsesSetScores.ToString().ToLowerInvariant()" />
+                                    <input type="hidden" name="input.SetsToWin" value="@item.SetsToWin" />
 
                                     <div>
                                         <label>Pořadí</label>
@@ -350,28 +346,6 @@
                                         @if (!canChangePlayingSystem)
                                         {
                                             <input type="hidden" name="input.PlayingSystem" value="@item.PlayingSystem" />
-                                        }
-                                    </div>
-
-                                    <div>
-                                        <label class="checkbox-label">
-                                            <input name="input.UsesSetScores" type="checkbox" value="true" checked="@item.UsesSetScores" disabled="@(!canChangeSetSettings)" data-uses-set-scores data-set-settings-locked="@((!canChangeSetSettings).ToString().ToLowerInvariant())" />
-                                            Sety
-                                        </label>
-                                        <input type="hidden" name="input.UsesSetScores" value="@(canChangeSetSettings ? "false" : item.UsesSetScores.ToString().ToLowerInvariant())" />
-                                    </div>
-
-                                    <div data-sets-to-win-container hidden="@(!item.UsesSetScores)">
-                                        <label>Vítězné sety</label>
-                                        <input name="input.SetsToWin"
-                                               value="@item.SetsToWin"
-                                               type="number"
-                                               min="1"
-                                               max="10"
-                                               disabled="@(!item.UsesSetScores || !canChangeSetSettings)" />
-                                        @if (!canChangeSetSettings)
-                                        {
-                                            <input type="hidden" name="input.SetsToWin" value="@item.SetsToWin" />
                                         }
                                     </div>
 
@@ -529,26 +503,6 @@
                     const source = document.getElementById(hiddenInput.dataset.copyCheckedFrom);
                     hiddenInput.value = source?.checked ? "true" : "false";
                 });
-            });
-
-            document.querySelectorAll("form").forEach(form => {
-                const checkbox = form.querySelector("[data-uses-set-scores]");
-                const container = form.querySelector("[data-sets-to-win-container]");
-                const input = container?.querySelector("input");
-                if (!checkbox || !container || !input) {
-                    return;
-                }
-
-                const updateSetsToWin = () => {
-                    container.hidden = !checkbox.checked;
-                    input.disabled = checkbox.dataset.setSettingsLocked === "true" || !checkbox.checked || checkbox.disabled;
-                    input.required = checkbox.checked;
-                    if (checkbox.checked && !input.value) {
-                        input.value = "2";
-                    }
-                };
-                checkbox.addEventListener("change", updateSetsToWin);
-                updateSetsToWin();
             });
 
             document.querySelectorAll("[data-open-modal]").forEach(button => {

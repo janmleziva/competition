@@ -167,10 +167,41 @@ BEGIN
         PointsForWin INT NOT NULL,
         PointsForDraw INT NOT NULL,
         PointsForLoss INT NOT NULL,
+        SetRule NVARCHAR(30) NULL,
+        SetCount INT NULL,
         CONSTRAINT PK_DisciplinePhases PRIMARY KEY (Id),
         CONSTRAINT CK_DisciplinePhases_Order CHECK ([Order] > 0),
-        CONSTRAINT CK_DisciplinePhases_Points CHECK (PointsForWin >= 0 AND PointsForDraw >= 0 AND PointsForLoss >= 0)
+        CONSTRAINT CK_DisciplinePhases_Points CHECK (PointsForWin >= 0 AND PointsForDraw >= 0 AND PointsForLoss >= 0),
+        CONSTRAINT CK_DisciplinePhases_SetRule CHECK ((SetRule IS NULL AND SetCount IS NULL) OR (SetRule IS NOT NULL AND SetCount > 0))
     );
+END;
+
+IF COL_LENGTH(N'dbo.DisciplinePhases', N'SetRule') IS NULL
+BEGIN
+    ALTER TABLE dbo.DisciplinePhases ADD SetRule NVARCHAR(30) NULL;
+END;
+
+IF COL_LENGTH(N'dbo.DisciplinePhases', N'SetCount') IS NULL
+BEGIN
+    ALTER TABLE dbo.DisciplinePhases ADD SetCount INT NULL;
+END;
+
+UPDATE phase
+SET phase.SetRule = N'SetsToWin',
+    phase.SetCount = discipline.SetsToWin
+FROM dbo.DisciplinePhases AS phase
+INNER JOIN dbo.CompetitionDisciplines AS discipline
+    ON discipline.Id = phase.CompetitionDisciplineId
+WHERE phase.SetRule IS NULL
+  AND phase.SetCount IS NULL
+  AND discipline.UsesSetScores = 1
+  AND discipline.SetsToWin IS NOT NULL;
+
+IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_DisciplinePhases_SetRule')
+BEGIN
+    ALTER TABLE dbo.DisciplinePhases
+        ADD CONSTRAINT CK_DisciplinePhases_SetRule
+        CHECK ((SetRule IS NULL AND SetCount IS NULL) OR (SetRule IS NOT NULL AND SetCount > 0));
 END;
 
 IF OBJECT_ID(N'dbo.DisciplineTeams', N'U') IS NULL

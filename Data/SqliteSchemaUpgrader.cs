@@ -8,6 +8,7 @@ public static class SqliteSchemaUpgrader
     public static void ApplyCompetitionUpgrades(CompetitionDbContext database)
     {
         RemoveObsoleteResultsLockColumn(database);
+        AddPhaseSetRules(database);
 
         database.Database.ExecuteSqlRaw(
             """
@@ -45,6 +46,73 @@ public static class SqliteSchemaUpgrader
             CREATE INDEX IF NOT EXISTS "IX_DisciplineBonusAwards_DisciplineTeamId"
                 ON "DisciplineBonusAwards" ("DisciplineTeamId");
             """);
+    }
+
+    private static void AddPhaseSetRules(CompetitionDbContext database)
+    {
+        if (!TableExists(database, "DisciplinePhases"))
+        {
+            return;
+        }
+
+        if (!ColumnExists(database, "DisciplinePhases", "SetRule"))
+        {
+            database.Database.ExecuteSqlRaw(
+                "ALTER TABLE \"DisciplinePhases\" ADD COLUMN \"SetRule\" TEXT NULL;");
+        }
+
+        if (!ColumnExists(database, "DisciplinePhases", "SetCount"))
+        {
+            database.Database.ExecuteSqlRaw(
+                "ALTER TABLE \"DisciplinePhases\" ADD COLUMN \"SetCount\" INTEGER NULL;");
+        }
+
+        database.Database.ExecuteSqlRaw(
+            """
+            UPDATE "DisciplinePhases"
+            SET "SetRule" = 'SetsToWin',
+                "SetCount" = (
+                    SELECT "SetsToWin"
+                    FROM "CompetitionDisciplines"
+                    WHERE "CompetitionDisciplines"."Id" = "DisciplinePhases"."CompetitionDisciplineId")
+            WHERE "SetRule" IS NULL
+              AND "SetCount" IS NULL
+              AND EXISTS (
+                    SELECT 1
+                    FROM "CompetitionDisciplines"
+                    WHERE "CompetitionDisciplines"."Id" = "DisciplinePhases"."CompetitionDisciplineId"
+                      AND "CompetitionDisciplines"."UsesSetScores" = 1
+                      AND "CompetitionDisciplines"."SetsToWin" IS NOT NULL);
+            """);
+    }
+
+    private static bool TableExists(CompetitionDbContext database, string tableName)
+    {
+        var connection = database.Database.GetDbConnection();
+        var shouldClose = connection.State == ConnectionState.Closed;
+        if (shouldClose)
+        {
+            connection.Open();
+        }
+
+        try
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText =
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = $tableName;";
+            var parameter = command.CreateParameter();
+            parameter.ParameterName = "$tableName";
+            parameter.Value = tableName;
+            command.Parameters.Add(parameter);
+            return Convert.ToInt64(command.ExecuteScalar()) > 0;
+        }
+        finally
+        {
+            if (shouldClose)
+            {
+                connection.Close();
+            }
+        }
     }
 
     private static void RemoveObsoleteResultsLockColumn(CompetitionDbContext database)

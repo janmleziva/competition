@@ -1,5 +1,10 @@
 @model Competition.Services.FinalStandingTable
 
+@{
+    var editionId = Context.Request.RouteValues["id"];
+    var disciplineId = Context.Request.RouteValues["disciplineId"];
+}
+
 <section class="standings-section final-standings-section" aria-labelledby="final-standings-title">
     <div class="phase-card-heading">
         <div>
@@ -37,7 +42,14 @@
                 {
                     <tr>
                         <td class="standing-position">@row.Position.</td>
-                        <th scope="row" class="standings-identity-column">@row.TeamName <span class="standing-seed">(@row.Seed)</span></th>
+                        <th scope="row" class="standings-identity-column">
+                            <a class="team-results-link"
+                               asp-page="/Editions/DisciplineTeamResults"
+                               asp-route-id="@editionId"
+                               asp-route-disciplineId="@disciplineId"
+                               asp-route-teamId="@row.TeamId">@row.TeamName</a>
+                            <span class="standing-seed">(@row.Seed)</span>
+                        </th>
                         <td class="standing-decided-by">@row.DecidedBy</td>
                         <td class="standing-score">@row.ScoreFor:@row.ScoreAgainst</td>
                         <td>@(row.ScoreDifference > 0 ? $"+{row.ScoreDifference}" : row.ScoreDifference)</td>

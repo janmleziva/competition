@@ -16,6 +16,12 @@ public enum PhaseType
     FinalStanding
 }
 
+public enum SetRuleType
+{
+    SetsToWin,
+    FixedSets
+}
+
 public enum MatchStatus
 {
     Scheduled,

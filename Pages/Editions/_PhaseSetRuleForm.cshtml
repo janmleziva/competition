@@ -1,0 +1,42 @@
+@model Competition.Pages.Editions.PhaseSetRuleFormViewModel
+@using Competition.Domain
+
+<section id="phase-set-rule-@Model.Phase.Id" class="phase-set-rule" aria-label="Pravidlo setů pro fázi @Model.Phase.Name">
+    @if (Model.CanEdit)
+    {
+        <form method="post" asp-page-handler="UpdatePhaseSetRule" class="phase-set-rule-form" data-phase-auto-submit>
+            <input type="hidden" name="PhaseSetRuleInput.PhaseId" value="@Model.Phase.Id" />
+            <div>
+                <label for="phase-@Model.Phase.Id-set-rule">Pravidlo setů</label>
+                <select id="phase-@Model.Phase.Id-set-rule" name="PhaseSetRuleInput.SetRule" data-phase-auto-submit-control>
+                    @foreach (var rule in Enum.GetValues<SetRuleType>())
+                    {
+                        <option value="@rule" selected="@(rule == Model.Phase.SetRule)">
+                            @DisciplinePhasesModel.GetSetRuleLabel(rule)
+                        </option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label for="phase-@Model.Phase.Id-set-count">Počet</label>
+                <input id="phase-@Model.Phase.Id-set-count"
+                       name="PhaseSetRuleInput.SetCount"
+                       value="@Model.Phase.SetCount"
+                       type="number"
+                       min="1"
+                       max="10"
+                       required
+                       data-phase-auto-submit-control />
+            </div>
+            <small>Změny se ukládají automaticky.</small>
+        </form>
+    }
+    else
+    {
+        <span class="set-rule-badge">
+            @(Model.Phase.SetRule == SetRuleType.FixedSets
+                ? $"{Model.Phase.SetCount} hrané sety"
+                : $"{Model.Phase.SetCount} vítězné sety")
+        </span>
+    }
+</section>

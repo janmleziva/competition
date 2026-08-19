@@ -297,6 +297,13 @@ namespace Competition.Data.Migrations
                     b.Property<int>("PointsForWin")
                         .HasColumnType("int");
 
+                    b.Property<int?>("SetCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SetRule")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -312,6 +319,8 @@ namespace Competition.Data.Migrations
                             t.HasCheckConstraint("CK_DisciplinePhases_Order", "\"Order\" > 0");
 
                             t.HasCheckConstraint("CK_DisciplinePhases_Points", "PointsForWin >= 0 AND PointsForDraw >= 0 AND PointsForLoss >= 0");
+
+                            t.HasCheckConstraint("CK_DisciplinePhases_SetRule", "(SetRule IS NULL AND SetCount IS NULL) OR (SetRule IS NOT NULL AND SetCount > 0)");
                         });
                 });
 

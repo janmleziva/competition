@@ -206,7 +206,7 @@ public sealed class DisciplineDetailModel(
                 TeamSize = item.TeamSize,
                 PlayingSystem = item.PlayingSystem,
                 UsesSetScores = item.UsesSetScores,
-                SetsToWin = item.SetsToWin,
+                SetsToWin = item.SetsToWin ?? 2,
                 Description = item.Description,
                 ScheduledAt = item.ScheduledAt
             };

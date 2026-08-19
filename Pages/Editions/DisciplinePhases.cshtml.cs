@@ -9,8 +9,8 @@ namespace Competition.Pages.Editions;
 
 public sealed record PhaseMatchListViewModel(
     IReadOnlyList<PhaseSetupMatch> Matches,
-    bool UsesSetScores,
-    int? SetsToWin,
+    SetRuleType? SetRule,
+    int? SetCount,
     bool CanEdit,
     bool ShowMatchName,
     string? StatusMessage = null,
@@ -23,9 +23,17 @@ public sealed record PhaseMatchListViewModel(
     bool ShowTeamSeed = false,
     bool ShowResultsControls = true,
     MatchSetScoresInput? AttemptedSetScores = null,
-    bool ValidationIsSetScores = false);
+    bool ValidationIsSetScores = false)
+{
+    public bool UsesSetScores => SetRule is not null;
+    public int MaximumSets => SetRule == SetRuleType.SetsToWin
+        ? Math.Max(1, SetCount.GetValueOrDefault(1) * 2 - 1)
+        : Math.Max(1, SetCount.GetValueOrDefault(1));
+}
 
 public sealed record PhaseFilterItem(string Key, string Label);
+public sealed record PhaseSetRuleFormViewModel(PhaseSetupPhase Phase, bool CanEdit);
+public sealed record PhasePointsFormViewModel(PhaseSetupPhase Phase, bool CanEdit);
 
 public class DisciplinePhasesModel(
     IPhaseSetupService phases,
@@ -60,6 +68,12 @@ public class DisciplinePhasesModel(
 
     [BindProperty]
     public MatchSetScoresInput SetScoresInput { get; set; } = new();
+
+    [BindProperty]
+    public PhaseSetRuleInput PhaseSetRuleInput { get; set; } = new();
+
+    [BindProperty]
+    public PhasePointsInput PhasePointsInput { get; set; } = new();
 
     [BindProperty]
     public PlayingSystemType SelectedPlayingSystem { get; set; }
@@ -106,6 +120,18 @@ public class DisciplinePhasesModel(
     public async Task<IActionResult> OnPostCreatePhaseAsync(long id, long disciplineId, CancellationToken ct) =>
         await ExecuteAsync(id, disciplineId, ct,
             () => phases.CreatePhaseAsync(id, disciplineId, NewPhase, ct), "Fáze byla vytvořena.");
+
+    public async Task<IActionResult> OnPostUpdatePhaseSetRuleAsync(long id, long disciplineId, CancellationToken ct) =>
+        await ExecuteAsync(id, disciplineId, ct,
+            () => phases.UpdatePhaseSetRuleAsync(id, disciplineId, PhaseSetRuleInput, ct),
+            "Pravidlo setů pro fázi bylo uloženo.",
+            $"phase-set-rule-{PhaseSetRuleInput.PhaseId}");
+
+    public async Task<IActionResult> OnPostUpdatePhasePointsAsync(long id, long disciplineId, CancellationToken ct) =>
+        await ExecuteAsync(id, disciplineId, ct,
+            () => phases.UpdatePhasePointsAsync(id, disciplineId, PhasePointsInput, ct),
+            "Bodování skupinové fáze bylo uloženo.",
+            $"phase-points-{PhasePointsInput.PhaseId}");
 
     public async Task<IActionResult> OnPostCreateGroupAsync(long id, long disciplineId, long phaseId, CancellationToken ct) =>
         await ExecuteAsync(id, disciplineId, ct,
@@ -294,6 +320,13 @@ public class DisciplinePhasesModel(
         _ => type.ToString()
     };
 
+    public static string GetSetRuleLabel(SetRuleType rule) => rule switch
+    {
+        SetRuleType.SetsToWin => "Počet vítězných setů",
+        SetRuleType.FixedSets => "Pevný počet hraných setů",
+        _ => rule.ToString()
+    };
+
     private async Task<IActionResult> ExecuteAsync<T>(long editionId, long disciplineId, CancellationToken ct, Func<Task<T>> action, string message, string? fragment = null, string? validationSection = null, string? targetPage = null)
     {
         if (User.Identity?.IsAuthenticated != true)
@@ -360,6 +393,11 @@ public class DisciplinePhasesModel(
         if (NewPhase.Order <= 0)
         {
             NewPhase.Order = setup.Phases.Count == 0 ? 1 : setup.Phases.Max(x => x.Order) + 1;
+        }
+        if (setup.UsesSetScores && NewPhase.SetRule is null)
+        {
+            NewPhase.SetRule = SetRuleType.SetsToWin;
+            NewPhase.SetCount = setup.SetsToWin;
         }
         return true;
     }

@@ -177,8 +177,14 @@
                     <div>
                         <h2>Každý s každým</h2>
                     </div>
-                    <span class="points-badge">Body @phase.PointsForWin / @phase.PointsForDraw / @phase.PointsForLoss</span>
                 </div>
+
+                <partial name="_PhasePointsForm" model="new PhasePointsFormViewModel(phase, !isResultsPage && isAdmin && !phase.HasResults)" />
+
+                @if (Model.Setup.UsesSetScores)
+                {
+                    <partial name="_PhaseSetRuleForm" model="new PhaseSetRuleFormViewModel(phase, !isResultsPage && isAdmin && !phase.HasResults)" />
+                }
 
                 @if (isResultsPage && Model.GroupStandings.TryGetValue(group.Id, out var roundRobinStandings))
                 {
@@ -199,7 +205,7 @@
                     <section class="fixture-section">
                         <h3>Rozpis zápasů</h3>
                         <partial name="_PhaseMatchList"
-                                 model="new PhaseMatchListViewModel(group.Matches, Model.Setup.UsesSetScores, Model.Setup.SetsToWin, Model.CanEditResults(isAdmin), false, Model.MatchStatusMessage, Model.MatchStatusMatchId, ValidationMessage: Model.MatchValidationMessage, ValidationMatchId: Model.MatchValidationMatchId, ShowTeamSeed: isResultsPage && Model.Setup.TeamSize > 1, ShowResultsControls: isResultsPage, AttemptedSetScores: Model.SetScoresInput, ValidationIsSetScores: Model.MatchValidationIsSetScores)" />
+                                 model="new PhaseMatchListViewModel(group.Matches, phase.SetRule, phase.SetCount, Model.CanEditResults(isAdmin), false, Model.MatchStatusMessage, Model.MatchStatusMatchId, ValidationMessage: Model.MatchValidationMessage, ValidationMatchId: Model.MatchValidationMatchId, ShowTeamSeed: isResultsPage && Model.Setup.TeamSize > 1, ShowResultsControls: isResultsPage, AttemptedSetScores: Model.SetScoresInput, ValidationIsSetScores: Model.MatchValidationIsSetScores)" />
                     </section>
                 }
             </article>
@@ -217,8 +223,14 @@
                             <span class="seed-badge">@phase.Order</span>
                             <div><span class="phase-eyebrow">Skupinová fáze</span><h2>@phase.Name</h2></div>
                         </div>
-                        <span class="points-badge">Body @phase.PointsForWin / @phase.PointsForDraw / @phase.PointsForLoss</span>
                     </div>
+
+                    <partial name="_PhasePointsForm" model="new PhasePointsFormViewModel(phase, !isResultsPage && isAdmin && !phase.HasResults)" />
+
+                    @if (Model.Setup.UsesSetScores)
+                    {
+                        <partial name="_PhaseSetRuleForm" model="new PhaseSetRuleFormViewModel(phase, !isResultsPage && isAdmin && !phase.HasResults)" />
+                    }
 
                     @if (!isResultsPage && group.Matches.Count == 0 && isAdmin)
                     {
@@ -271,7 +283,7 @@
                         <section class="fixture-section">
                             <h3>Rozpis</h3>
                             <partial name="_PhaseMatchList"
-                                     model="new PhaseMatchListViewModel(group.Matches, Model.Setup.UsesSetScores, Model.Setup.SetsToWin, Model.CanEditResults(isAdmin), false, Model.MatchStatusMessage, Model.MatchStatusMatchId, ValidationMessage: Model.MatchValidationMessage, ValidationMatchId: Model.MatchValidationMatchId, ShowTeamSeed: isResultsPage && Model.Setup.TeamSize > 1, ShowResultsControls: isResultsPage, AttemptedSetScores: Model.SetScoresInput, ValidationIsSetScores: Model.MatchValidationIsSetScores)" />
+                                     model="new PhaseMatchListViewModel(group.Matches, phase.SetRule, phase.SetCount, Model.CanEditResults(isAdmin), false, Model.MatchStatusMessage, Model.MatchStatusMatchId, ValidationMessage: Model.MatchValidationMessage, ValidationMatchId: Model.MatchValidationMatchId, ShowTeamSeed: isResultsPage && Model.Setup.TeamSize > 1, ShowResultsControls: isResultsPage, AttemptedSetScores: Model.SetScoresInput, ValidationIsSetScores: Model.MatchValidationIsSetScores)" />
                         </section>
                     }
                 </article>
@@ -282,6 +294,10 @@
                 <div class="phase-card-heading">
                     <div class="phase-title-with-order"><span class="seed-badge">@finalPhase.Order</span><div><span class="phase-eyebrow">Finálová fáze</span><h2>@finalPhase.Name</h2></div></div>
                 </div>
+                @if (Model.Setup.UsesSetScores)
+                {
+                    <partial name="_PhaseSetRuleForm" model="new PhaseSetRuleFormViewModel(finalPhase, !isResultsPage && isAdmin && !finalPhase.HasResults)" />
+                }
                 @if (finalPhase.Matches.Count == 0)
                 {
                     <p class="meta-inline">Finále a zápas o 3. místo se vytvoří společně se skupinovými zápasy.</p>
@@ -289,7 +305,7 @@
                 else
                 {
                     <partial name="_PhaseMatchList"
-                             model="new PhaseMatchListViewModel(finalPhase.Matches, Model.Setup.UsesSetScores, Model.Setup.SetsToWin, Model.CanEditResults(isAdmin), true, Model.MatchStatusMessage, Model.MatchStatusMatchId, ValidationMessage: Model.MatchValidationMessage, ValidationMatchId: Model.MatchValidationMatchId, ShowTeamSeed: isResultsPage && Model.Setup.TeamSize > 1, ShowResultsControls: isResultsPage, AttemptedSetScores: Model.SetScoresInput, ValidationIsSetScores: Model.MatchValidationIsSetScores)" />
+                             model="new PhaseMatchListViewModel(finalPhase.Matches, finalPhase.SetRule, finalPhase.SetCount, Model.CanEditResults(isAdmin), true, Model.MatchStatusMessage, Model.MatchStatusMatchId, ValidationMessage: Model.MatchValidationMessage, ValidationMatchId: Model.MatchValidationMatchId, ShowTeamSeed: isResultsPage && Model.Setup.TeamSize > 1, ShowResultsControls: isResultsPage, AttemptedSetScores: Model.SetScoresInput, ValidationIsSetScores: Model.MatchValidationIsSetScores)" />
                 }
             </article>
 
@@ -309,6 +325,11 @@
                 <div class="phase-card-heading">
                     <div><span class="phase-eyebrow">Vyřazovací fáze</span><h2>@phase.Name</h2></div>
                 </div>
+
+                @if (Model.Setup.UsesSetScores)
+                {
+                    <partial name="_PhaseSetRuleForm" model="new PhaseSetRuleFormViewModel(phase, !isResultsPage && isAdmin && !phase.HasResults)" />
+                }
 
                 @if (!isResultsPage && !Model.HasMatches && isAdmin)
                 {
@@ -387,7 +408,7 @@
                         @if (stage.Matches.Count > 0)
                         {
                             <partial name="_PhaseMatchList"
-                                     model="new PhaseMatchListViewModel(stage.Matches, Model.Setup.UsesSetScores, Model.Setup.SetsToWin, Model.CanEditResults(isAdmin), true, Model.MatchStatusMessage, Model.MatchStatusMatchId, isAdmin && !Model.Setup.IsScheduleLocked, Model.Setup.Teams.Where(x => stage.TeamIds.Contains(x.Id)).ToList(), sourceOptions, Model.MatchValidationMessage, Model.MatchValidationMatchId, isResultsPage && Model.Setup.TeamSize > 1, ShowResultsControls: isResultsPage, AttemptedSetScores: Model.SetScoresInput, ValidationIsSetScores: Model.MatchValidationIsSetScores)" />
+                                     model="new PhaseMatchListViewModel(stage.Matches, phase.SetRule, phase.SetCount, Model.CanEditResults(isAdmin), true, Model.MatchStatusMessage, Model.MatchStatusMatchId, isAdmin && !Model.Setup.IsScheduleLocked, Model.Setup.Teams.Where(x => stage.TeamIds.Contains(x.Id)).ToList(), sourceOptions, Model.MatchValidationMessage, Model.MatchValidationMatchId, isResultsPage && Model.Setup.TeamSize > 1, ShowResultsControls: isResultsPage, AttemptedSetScores: Model.SetScoresInput, ValidationIsSetScores: Model.MatchValidationIsSetScores)" />
                         }
                     </section>
                     previousStageCapacity = stage.Capacity.GetValueOrDefault();
@@ -453,6 +474,22 @@
                         <div><label asp-for="NewPhase.PointsForWin">Výhra</label><input asp-for="NewPhase.PointsForWin" type="number" min="0" /></div>
                         <div><label asp-for="NewPhase.PointsForDraw">Remíza</label><input asp-for="NewPhase.PointsForDraw" type="number" min="0" /></div>
                         <div><label asp-for="NewPhase.PointsForLoss">Prohra</label><input asp-for="NewPhase.PointsForLoss" type="number" min="0" /></div>
+                        @if (Model.Setup.UsesSetScores)
+                        {
+                            <div>
+                                <label asp-for="NewPhase.SetRule">Pravidlo setů</label>
+                                <select asp-for="NewPhase.SetRule">
+                                    @foreach (var rule in Enum.GetValues<SetRuleType>())
+                                    {
+                                        <option value="@rule">@DisciplinePhasesModel.GetSetRuleLabel(rule)</option>
+                                    }
+                                </select>
+                            </div>
+                            <div>
+                                <label asp-for="NewPhase.SetCount">Počet setů</label>
+                                <input asp-for="NewPhase.SetCount" type="number" min="1" max="10" required />
+                            </div>
+                        }
                         <button class="button button-small" type="submit">Přidat fázi</button>
                     </form>
                 </section>
@@ -483,7 +520,14 @@
                             }
                         </div>
                     </div>
-                    <p class="meta-inline">Body @phase.PointsForWin / @phase.PointsForDraw / @phase.PointsForLoss</p>
+                    @if (phase.Type == PhaseType.Group)
+                    {
+                        <partial name="_PhasePointsForm" model="new PhasePointsFormViewModel(phase, !isResultsPage && isAdmin && !phase.HasResults)" />
+                    }
+                    @if (Model.Setup.UsesSetScores)
+                    {
+                        <partial name="_PhaseSetRuleForm" model="new PhaseSetRuleFormViewModel(phase, !isResultsPage && isAdmin && !phase.HasResults)" />
+                    }
                     @if (phase.Type == PhaseType.Group)
                     {
                         @foreach (var group in phase.Groups)
@@ -706,6 +750,19 @@
 }
 
 <script>
+        document.querySelectorAll("[data-phase-auto-submit]").forEach(form => {
+            form.querySelectorAll("[data-phase-auto-submit-control]").forEach(control => {
+                control.addEventListener("change", () => {
+                    if (form.dataset.submitting === "true" || !form.reportValidity()) {
+                        return;
+                    }
+                    form.dataset.submitting = "true";
+                    form.classList.add("is-saving");
+                    form.requestSubmit();
+                });
+            });
+        });
+
         document.querySelectorAll("[data-phase-assignment-option]").forEach(option => {
             const checkbox = option.querySelector('input[type="checkbox"]');
             const status = option.querySelector("[data-assignment-status]");

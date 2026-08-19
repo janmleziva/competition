@@ -1,4 +1,10 @@
 @model Competition.Pages.Editions.PhaseMatchListViewModel
+@using Competition.Domain
+
+@{
+    var editionId = Context.Request.RouteValues["id"];
+    var disciplineId = Context.Request.RouteValues["disciplineId"];
+}
 
 @if (!string.IsNullOrWhiteSpace(Model.StatusMessage) &&
      Model.StatusMatchId is not null && Model.Matches.Any(x => x.Id == Model.StatusMatchId))
@@ -12,6 +18,13 @@
         var homeName = match.HomeTeamName ?? match.HomeSource ?? "neurčeno";
         var awayName = match.AwayTeamName ?? match.AwaySource ?? "neurčeno";
         var canEditMatch = Model.CanEdit && match.HomeTeamId is not null && match.AwayTeamId is not null;
+        var homeSubscore = match.SetScores.Sum(x => x.HomeScore);
+        var awaySubscore = match.SetScores.Sum(x => x.AwayScore);
+        var aggregateWinnerName = Model.SetRule == SetRuleType.FixedSets &&
+            match.HomeScore is not null && match.HomeScore == match.AwayScore &&
+            homeSubscore != awaySubscore
+                ? homeSubscore > awaySubscore ? homeName : awayName
+                : null;
         var canEditHomeTeam = Model.CanEditTeams;
         var canEditAwayTeam = Model.CanEditTeams;
         var selectedHomeValue = match.HomeSourceMatchId is not null
@@ -77,7 +90,18 @@
                         }
                         else
                         {
-                            <span class="match-team-name">@homeName</span>
+                            @if (Model.ShowResultsControls && match.HomeTeamId is not null && match.HomeTeamName is not null)
+                            {
+                                <a class="match-team-name team-results-link"
+                                   asp-page="/Editions/DisciplineTeamResults"
+                                   asp-route-id="@editionId"
+                                   asp-route-disciplineId="@disciplineId"
+                                   asp-route-teamId="@match.HomeTeamId">@homeName</a>
+                            }
+                            else
+                            {
+                                <span class="match-team-name">@homeName</span>
+                            }
                             @if (Model.ShowTeamSeed && match.HomeTeamSeed is not null)
                             {
                                 <small class="match-team-seed">(@match.HomeTeamSeed)</small>
@@ -131,7 +155,18 @@
                         }
                         else
                         {
-                            <span class="match-team-name">@awayName</span>
+                            @if (Model.ShowResultsControls && match.AwayTeamId is not null && match.AwayTeamName is not null)
+                            {
+                                <a class="match-team-name team-results-link"
+                                   asp-page="/Editions/DisciplineTeamResults"
+                                   asp-route-id="@editionId"
+                                   asp-route-disciplineId="@disciplineId"
+                                   asp-route-teamId="@match.AwayTeamId">@awayName</a>
+                            }
+                            else
+                            {
+                                <span class="match-team-name">@awayName</span>
+                            }
                             @if (Model.ShowTeamSeed && match.AwayTeamSeed is not null)
                             {
                                 <small class="match-team-seed">(@match.AwayTeamSeed)</small>
@@ -161,7 +196,7 @@
                        value="@match.HomeScore"
                        type="number"
                        min="0"
-                       max="@(Model.UsesSetScores ? Model.SetsToWin : null)"
+                       max="@(Model.UsesSetScores ? Model.SetCount : null)"
                        inputmode="numeric"
                        aria-label="Skóre @homeName"
                        disabled="@(!canEditMatch)" />
@@ -171,7 +206,7 @@
                        value="@match.AwayScore"
                        type="number"
                        min="0"
-                       max="@(Model.UsesSetScores ? Model.SetsToWin : null)"
+                       max="@(Model.UsesSetScores ? Model.SetCount : null)"
                        inputmode="numeric"
                        aria-label="Skóre @awayName"
                        disabled="@(!canEditMatch)" />
@@ -189,6 +224,12 @@
                         <span class="subscore-summary">
                             @string.Join(" · ", match.SetScores.Select(x => $"{x.HomeScore}:{x.AwayScore}"))
                         </span>
+                        @if (aggregateWinnerName is not null)
+                        {
+                            <span class="aggregate-winner">
+                                Vítěz podle součtu bodů: @aggregateWinnerName (@homeSubscore:@awaySubscore)
+                            </span>
+                        }
                     }
                     @if (canEditMatch)
                     {
@@ -196,7 +237,7 @@
                                 class="button button-ghost button-small"
                                 type="button"
                                 data-open-set-modal="set-score-modal-@match.Id">
-                            @(match.SetScores.Count == 0 ? "Přidat sety" : "Upravit sety")
+                            @(match.SetScores.Count == 0 ? "Výsledky setů" : "Upravit sety")
                         </button>
                     }
                 </div>
@@ -233,7 +274,7 @@
         var awayName = match.AwayTeamName ?? match.AwaySource ?? "neurčeno";
         var homeScore = match.HomeScore;
         var awayScore = match.AwayScore;
-        var maximumSets = Math.Max(1, Model.SetsToWin.GetValueOrDefault(1) * 2 - 1);
+        var maximumSets = Model.MaximumSets;
         var hasValidationError = Model.ValidationIsSetScores &&
             Model.ValidationMatchId == match.Id &&
             !string.IsNullOrWhiteSpace(Model.ValidationMessage);
@@ -243,6 +284,11 @@
         <div id="set-score-modal-@match.Id" class="modal-backdrop" role="presentation" hidden="@(!hasValidationError)">
             <section class="modal set-score-modal" role="dialog" aria-modal="true" aria-labelledby="set-score-title-@match.Id">
                 <h2 id="set-score-title-@match.Id">Výsledky setů</h2>
+                <p class="meta-inline">
+                    @(Model.SetRule == SetRuleType.FixedSets
+                        ? $"Hraje se přesně {Model.SetCount} setů."
+                        : $"Hraje se na {Model.SetCount} vítězné sety.")
+                </p>
                 <p class="set-score-matchup">
                     <strong>@homeName</strong> – <strong>@awayName</strong>
                     @if (homeScore is not null && awayScore is not null)

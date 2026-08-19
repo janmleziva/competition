@@ -2,29 +2,48 @@
 
 ## Summary
 
-This change set fixes bonus-rule persistence, improves the discipline workflow on responsive layouts, and makes set-score entry safer and more convenient.
+This branch adds phase-specific set rules to edition disciplines and completes the related setup, scoring, standings, and team-result workflows.
 
-## Changes
+Disciplines can be marked as set-based when assigned to an edition. Each phase can then use either a fixed number of played sets or a number of sets required to win. Group phases also support configurable points for a win, draw, and loss. Match outcomes for fixed-set draws are resolved by the aggregate set subscore when it differs.
 
-- Synchronize bonus-point rules in place so SQLite does not hit the unique index when an existing rule is saved again.
-- Add SQLite regression coverage for updating an existing bonus rule.
-- Keep navigation buttons beside page titles on narrow screens.
-- Repair knockout matchup layout across desktop, tablet, and mobile widths.
-- Hide result and set-score controls on the schedule setup page.
-- Rename knockout-stage pills from `X přímo` to `X nasazení`.
-- Close the random-team confirmation modal after successful reassignment.
-- Keep the set-score modal open on validation errors, display the error inside it, and preserve submitted values.
-- Derive and save a missing main match score from decisive set results.
-- Reject sets played after the configured winning-set threshold has already been reached.
-- Propagate automatically derived knockout winners to dependent matches.
-- Replace the deployment script's unavailable `Get-FileHash` dependency with a compatible .NET SHA-256 implementation.
+## User-facing changes
+
+- Add a `Hraje se na sety` option when assigning a discipline to an edition; new set-based disciplines default to two sets.
+- Configure the set rule independently for every phase:
+  - fixed number of played sets;
+  - number of sets required to win.
+- Save phase set-rule and group-point changes automatically when their values change.
+- Configure group-stage points for a win, draw, and loss.
+- Display Czech labels and responsive controls for phase settings.
+- Enter and edit exactly the applicable number of set results for the selected phase rule.
+- Resolve a tied fixed-set match using the aggregate points scored across its sets.
+- Use the resolved outcome consistently in group standings, statistics, scoring, and knockout progression.
+- Link team names on discipline results and standings to a new team-results page.
+- Show every match for the selected team in that edition discipline, with scores oriented to the team and opposing teams linked to their own result pages.
+
+## Data and compatibility
+
+- Add `SetRule`, `SetCount`, `PointsForWin`, `PointsForDraw`, and `PointsForLoss` phase fields.
+- Include EF Core migration `20260819075703_AddPhaseSetRules`.
+- Update the SQLite schema upgrader and initial SQL schema for existing local and deployed databases.
+- Preserve the existing discipline-level set defaults as the initial values for newly created phases.
+
+## Important implementation details
+
+- `MatchOutcomeResolver` is the common source for win, draw, and loss resolution.
+- Fixed-set matches may have an equal set score; aggregate set points break that tie when unequal.
+- Winning-set matches stop accepting additional sets once either side reaches the target.
+- Automatically resolved knockout winners continue to propagate into dependent matches.
+- Team histories include completed, in-progress, and scheduled matches scoped to the requested edition and discipline.
 
 ## Validation
 
-- `dotnet test Competition.sln -c Release --no-restore`
-- 142 tests passed.
+- `dotnet test Competition.Tests/Competition.Tests.csproj -c Release --no-restore`
+- 151 tests passed.
 - `git diff --check`
 
 ## Deployment status
 
-The initial bonus-rule fix and deployment-script compatibility change were deployed successfully to `/subdoms/pohoda-cup`. The later UI and scoring changes in this PR have not been deployed yet.
+The changes have not been deployed. Apply the EF migration, or allow the SQLite schema upgrader to update the local `App_Data/competition.db`, after pulling the branch.
+
+The untracked `deployment/database-backups/` directory is intentionally excluded from this branch.

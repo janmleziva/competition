@@ -351,6 +351,7 @@ public sealed class DisciplineAdministrationService(CompetitionDbContext dbConte
         var item = await dbContext.CompetitionDisciplines
             .Include(x => x.ParticipantAssignments)
             .Include(x => x.Teams)
+            .Include(x => x.Phases)
             .SingleOrDefaultAsync(x => x.Id == competitionDisciplineId && x.CompetitionEditionId == editionId, cancellationToken);
         if (item is null)
         {
@@ -381,6 +382,7 @@ public sealed class DisciplineAdministrationService(CompetitionDbContext dbConte
             (x.HomeScore != null || x.AwayScore != null || x.SetScores.Any() || x.Status != MatchStatus.Scheduled),
             cancellationToken);
         var playingSystemChanged = input.PlayingSystem != item.PlayingSystem;
+        var setScoreAvailabilityChanged = input.UsesSetScores != item.UsesSetScores;
 
         if (playingSystemChanged && item.IsScheduleLocked)
         {
@@ -420,6 +422,7 @@ public sealed class DisciplineAdministrationService(CompetitionDbContext dbConte
             item.PlayingSystem = input.PlayingSystem;
             item.UsesSetScores = input.UsesSetScores;
             item.SetsToWin = input.UsesSetScores ? input.SetsToWin : null;
+            ApplySetScoreAvailabilityToPhases(item, setScoreAvailabilityChanged);
             item.Description = NormalizeDescription(input.Description);
             item.ScheduledAt = input.ScheduledAt;
             if (playingSystemChanged)
@@ -435,6 +438,7 @@ public sealed class DisciplineAdministrationService(CompetitionDbContext dbConte
         item.PlayingSystem = input.PlayingSystem;
         item.UsesSetScores = input.UsesSetScores;
         item.SetsToWin = input.UsesSetScores ? input.SetsToWin : null;
+        ApplySetScoreAvailabilityToPhases(item, setScoreAvailabilityChanged);
         item.Description = NormalizeDescription(input.Description);
         item.ScheduledAt = input.ScheduledAt;
         if (playingSystemChanged)
@@ -443,6 +447,22 @@ public sealed class DisciplineAdministrationService(CompetitionDbContext dbConte
         }
         await dbContext.SaveChangesAsync(cancellationToken);
         return true;
+    }
+
+    private static void ApplySetScoreAvailabilityToPhases(
+        CompetitionDiscipline discipline,
+        bool availabilityChanged)
+    {
+        if (!availabilityChanged)
+        {
+            return;
+        }
+
+        foreach (var phase in discipline.Phases)
+        {
+            phase.SetRule = discipline.UsesSetScores ? SetRuleType.SetsToWin : null;
+            phase.SetCount = discipline.UsesSetScores ? discipline.SetsToWin : null;
+        }
     }
 
     private async Task ClearPhaseSetupAsync(long competitionDisciplineId, CancellationToken cancellationToken)
