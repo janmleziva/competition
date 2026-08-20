@@ -424,56 +424,68 @@ public sealed class PhaseSetupService : IPhaseSetupService
         return true;
     }
 
-    public async Task<int> RandomlyAssignGroupTeamsAsync(long editionId, long competitionDisciplineId, long phaseId, long groupId, int teamCount, CancellationToken cancellationToken = default)
+    public async Task<int> RandomlyAssignAllGroupTeamsAsync(long editionId, long competitionDisciplineId, CancellationToken cancellationToken = default)
     {
-        if (teamCount < 1)
+        var discipline = await dbContext.CompetitionDisciplines
+            .Include(x => x.Teams)
+            .Include(x => x.Phases).ThenInclude(x => x.Groups).ThenInclude(x => x.Teams)
+            .Include(x => x.Phases).ThenInclude(x => x.Matches)
+            .SingleOrDefaultAsync(x => x.Id == competitionDisciplineId && x.CompetitionEditionId == editionId, cancellationToken);
+        if (discipline is null)
         {
-            throw new ValidationException("Počet týmů musí být kladný.");
+            throw new ValidationException("Disciplína nebyla nalezena.");
         }
-        var group = await GetGroupAsync(editionId, competitionDisciplineId, phaseId, groupId, cancellationToken);
-        if (await dbContext.Matches.AnyAsync(x => x.DisciplinePhaseId == phaseId, cancellationToken))
+        EnsureOpen(discipline);
+        if (discipline.PlayingSystem != PlayingSystemType.GroupsThenClassificationMatches)
+        {
+            throw new ValidationException("Náhodné přiřazení do všech skupin je dostupné jen pro skupinový herní systém.");
+        }
+
+        var groupPhases = discipline.Phases
+            .Where(x => x.Type == PhaseType.Group)
+            .OrderBy(x => x.Order)
+            .ToList();
+        var groups = groupPhases.SelectMany(x => x.Groups.OrderBy(group => group.Order)).ToList();
+        if (groups.Count == 0)
+        {
+            throw new ValidationException("Nejsou vytvořené žádné skupiny.");
+        }
+        if (groupPhases.Any(x => x.Matches.Count != 0))
         {
             throw new ValidationException("Přiřazení nelze změnit po vytvoření zápasů.");
         }
 
-        var currentIds = await dbContext.PhaseGroupTeams
-            .Where(x => x.DisciplinePhaseId == phaseId && x.PhaseGroupId == groupId)
-            .OrderBy(x => x.Seed).Select(x => x.DisciplineTeamId).ToListAsync(cancellationToken);
-        var directTeamCapacity = group.Capacity;
-        if (group.DisciplinePhase.Type == PhaseType.Knockout && group.Capacity is not null)
+        var assignedTeamIds = groups.SelectMany(x => x.Teams).Select(x => x.DisciplineTeamId).ToHashSet();
+        var allTeamsAssigned = discipline.Teams.Count > 0 && discipline.Teams.All(x => assignedTeamIds.Contains(x.Id));
+        if (allTeamsAssigned)
         {
-            var previousWinnerCount = await GetKnockoutPreviousWinnerCountAsync(phaseId, group.Order, cancellationToken);
-            directTeamCapacity = Math.Max(0, group.Capacity.Value - previousWinnerCount);
-        }
-        if (directTeamCapacity is not null && currentIds.Count + teamCount > directTeamCapacity)
-        {
-            throw new ValidationException($"Do etapy lze přímo přiřadit nejvýše {directTeamCapacity} týmů.");
+            dbContext.PhaseGroupTeams.RemoveRange(groups.SelectMany(x => x.Teams));
+            assignedTeamIds.Clear();
         }
 
-        var assignedIds = await dbContext.PhaseGroupTeams
-            .Where(x => x.PhaseGroup.DisciplinePhase.CompetitionDisciplineId == competitionDisciplineId)
-            .Select(x => x.DisciplineTeamId).ToListAsync(cancellationToken);
-        var availableIds = await dbContext.DisciplineTeams
-            .Where(x => x.CompetitionDisciplineId == competitionDisciplineId && !assignedIds.Contains(x.Id))
-            .Select(x => x.Id).ToListAsync(cancellationToken);
-        if (availableIds.Count < teamCount)
+        var shuffledTeamIds = discipline.Teams
+            .Where(x => !assignedTeamIds.Contains(x.Id))
+            .Select(x => x.Id)
+            .OrderBy(_ => Random.Shared.Next())
+            .ToList();
+        var groupCounts = groups.Select(x => allTeamsAssigned ? 0 : x.Teams.Count).ToArray();
+        var groupSeeds = groups.Select(x => allTeamsAssigned || x.Teams.Count == 0 ? 0 : x.Teams.Max(team => team.Seed)).ToArray();
+        foreach (var teamId in shuffledTeamIds)
         {
-            throw new ValidationException("Pro náhodné přiřazení není k dispozici dost týmů.");
-        }
-
-        var selected = availableIds.OrderBy(_ => Random.Shared.Next()).Take(teamCount).ToList();
-        for (var index = 0; index < selected.Count; index++)
-        {
+            var smallestGroupSize = groupCounts.Min();
+            var groupIndex = Array.FindIndex(groupCounts, count => count == smallestGroupSize);
             dbContext.PhaseGroupTeams.Add(new PhaseGroupTeam
             {
-                DisciplinePhaseId = phaseId,
-                PhaseGroupId = groupId,
-                DisciplineTeamId = selected[index],
-                Seed = currentIds.Count + index + 1
+                DisciplinePhaseId = groups[groupIndex].DisciplinePhaseId,
+                PhaseGroupId = groups[groupIndex].Id,
+                DisciplineTeamId = teamId,
+                Seed = ++groupSeeds[groupIndex]
             });
+            groupCounts[groupIndex]++;
         }
+
         await dbContext.SaveChangesAsync(cancellationToken);
-        return selected.Count;
+        return allTeamsAssigned ? discipline.Teams.Count : shuffledTeamIds.Count;
     }
 
     private async Task<int> GetKnockoutPreviousWinnerCountAsync(long phaseId, int stageOrder, CancellationToken cancellationToken)
@@ -1212,7 +1224,7 @@ public sealed class PhaseSetupService : IPhaseSetupService
             match.HomeScore = null;
             match.AwayScore = null;
         }
-        ValidateMainScore(match, match.HomeScore, match.AwayScore);
+        ValidateMainScore(match, match.HomeScore, match.AwayScore, setResults);
         ValidateSetResultConsistency(match, setResults);
 
         var previousSets = match.SetScores.OrderBy(x => x.SetNumber)
@@ -1234,7 +1246,7 @@ public sealed class PhaseSetupService : IPhaseSetupService
             : suppliedSets.Count == 0 ? MatchStatus.Scheduled : MatchStatus.InProgress;
         match.UpdatedAtUtc = DateTime.UtcNow;
         LockScheduleAfterResult(match);
-        await UpdateKnockoutAdvancementAsync(match, cancellationToken);
+        await UpdateKnockoutAdvancementAsync(match, cancellationToken, ResolveOutcome(match, setResults));
         await SaveMatchEditAsync(cancellationToken);
         await ReconcileGroupStandingMatchesAsync(editionId, competitionDisciplineId, cancellationToken);
         logger.LogInformation(
@@ -1286,10 +1298,6 @@ public sealed class PhaseSetupService : IPhaseSetupService
         {
             throw new ValidationException("Vyberte pravidlo setů a zadejte počet od 1 do 10.");
         }
-        if (setRule == SetRuleType.FixedSets && phaseType != PhaseType.Group && setCount % 2 == 0)
-        {
-            throw new ValidationException("Ve vyřazovací nebo finálové fázi musí pevný počet setů zaručit vítěze, proto musí být lichý.");
-        }
     }
 
     private static void LockScheduleAfterResult(Match match)
@@ -1300,7 +1308,7 @@ public sealed class PhaseSetupService : IPhaseSetupService
         }
     }
 
-    private static void ValidateMainScore(Match match, int? homeScore, int? awayScore)
+    private static void ValidateMainScore(Match match, int? homeScore, int? awayScore, IReadOnlyList<SetResult>? sets = null)
     {
         var phase = match.DisciplinePhase;
         if (phase.SetRule is null || homeScore is null || awayScore is null)
@@ -1314,7 +1322,7 @@ public sealed class PhaseSetupService : IPhaseSetupService
             ? (homeScore == setCount && awayScore >= 0 && awayScore < setCount) ||
               (awayScore == setCount && homeScore >= 0 && homeScore < setCount)
             : homeScore + awayScore == setCount &&
-              (phase.Type == PhaseType.Group || homeScore != awayScore);
+              (phase.Type == PhaseType.Group || homeScore != awayScore || HasDecisiveSubscore(match, sets));
         if (!isValid)
         {
             var message = phase.SetRule == SetRuleType.SetsToWin
@@ -1324,6 +1332,31 @@ public sealed class PhaseSetupService : IPhaseSetupService
                     : $"Součet vyhraných setů musí být {setCount} a zápas musí mít vítěze.";
             throw new ValidationException(message);
         }
+    }
+
+    private static bool HasDecisiveSubscore(Match match, IReadOnlyList<SetResult>? sets) =>
+        (sets?.Sum(x => x.HomeScore) ?? match.SetScores.Sum(x => x.HomeScore)) !=
+        (sets?.Sum(x => x.AwayScore) ?? match.SetScores.Sum(x => x.AwayScore));
+
+    private static MatchOutcome ResolveOutcome(Match match, IReadOnlyList<SetResult>? sets = null)
+    {
+        if (match.HomeScore is null || match.AwayScore is null)
+        {
+            return MatchOutcome.Draw;
+        }
+        if (match.HomeScore != match.AwayScore)
+        {
+            return match.HomeScore > match.AwayScore ? MatchOutcome.HomeWin : MatchOutcome.AwayWin;
+        }
+
+        var homeSubscore = sets?.Sum(x => x.HomeScore) ?? match.SetScores.Sum(x => x.HomeScore);
+        var awaySubscore = sets?.Sum(x => x.AwayScore) ?? match.SetScores.Sum(x => x.AwayScore);
+        return homeSubscore.CompareTo(awaySubscore) switch
+        {
+            > 0 => MatchOutcome.HomeWin,
+            < 0 => MatchOutcome.AwayWin,
+            _ => MatchOutcome.Draw
+        };
     }
 
     private static void ValidateSetResultConsistency(Match match, IReadOnlyList<SetResult> sets)
@@ -1359,21 +1392,25 @@ public sealed class PhaseSetupService : IPhaseSetupService
         }
     }
 
-    private async Task UpdateKnockoutAdvancementAsync(Match sourceMatch, CancellationToken cancellationToken)
+    private async Task UpdateKnockoutAdvancementAsync(
+        Match sourceMatch,
+        CancellationToken cancellationToken,
+        MatchOutcome? resolvedOutcome = null)
     {
         if (sourceMatch.DisciplinePhase.Type != PhaseType.Knockout)
         {
             return;
         }
 
-        if (sourceMatch.HomeScore is not null && sourceMatch.HomeScore == sourceMatch.AwayScore)
+        var outcome = resolvedOutcome ?? MatchOutcomeResolver.Resolve(sourceMatch);
+        if (sourceMatch.HomeScore is not null && outcome == MatchOutcome.Draw)
         {
             throw new ValidationException("Vyřazovací zápas musí mít vítěze.");
         }
 
         var winnerTeamId = sourceMatch.HomeScore is null
             ? null
-            : sourceMatch.HomeScore > sourceMatch.AwayScore ? sourceMatch.HomeTeamId : sourceMatch.AwayTeamId;
+            : outcome == MatchOutcome.HomeWin ? sourceMatch.HomeTeamId : sourceMatch.AwayTeamId;
         var dependentMatches = await dbContext.Matches
             .Include(x => x.SetScores)
             .Where(x => x.HomeSourceMatchId == sourceMatch.Id || x.AwaySourceMatchId == sourceMatch.Id)
@@ -1533,6 +1570,7 @@ public sealed class PhaseSetupService : IPhaseSetupService
         }
 
         var matches = await dbContext.Matches
+            .Include(x => x.SetScores)
             .Where(x => x.DisciplinePhase.CompetitionDisciplineId == competitionDisciplineId)
             .OrderBy(x => x.Order)
             .ToListAsync(cancellationToken);
@@ -1554,15 +1592,18 @@ public sealed class PhaseSetupService : IPhaseSetupService
         {
             var sourceMatchId = home ? targetMatch.HomeSourceMatchId : targetMatch.AwaySourceMatchId;
             if (sourceMatchId is null || !matchesById.TryGetValue(sourceMatchId.Value, out var sourceMatch) ||
-                sourceMatch.HomeScore is null || sourceMatch.AwayScore is null ||
-                sourceMatch.HomeScore == sourceMatch.AwayScore)
+                sourceMatch.HomeScore is null || sourceMatch.AwayScore is null)
             {
                 return false;
             }
 
-            var winnerTeamId = sourceMatch.HomeScore > sourceMatch.AwayScore
-                ? sourceMatch.HomeTeamId
-                : sourceMatch.AwayTeamId;
+            var outcome = MatchOutcomeResolver.Resolve(sourceMatch);
+            var winnerTeamId = outcome switch
+            {
+                MatchOutcome.HomeWin => sourceMatch.HomeTeamId,
+                MatchOutcome.AwayWin => sourceMatch.AwayTeamId,
+                _ => null
+            };
             if (winnerTeamId is null)
             {
                 return false;

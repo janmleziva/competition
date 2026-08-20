@@ -84,12 +84,6 @@ public sealed class PhaseGroupInput
     public int? Capacity { get; set; }
 }
 
-public sealed class RandomGroupAssignmentInput
-{
-    [Range(1, int.MaxValue, ErrorMessage = "Počet týmů musí být kladný.")]
-    public int TeamCount { get; set; } = 1;
-}
-
 public sealed class MatchSlotInput
 {
     [Required(ErrorMessage = "Zadejte název zápasu.")]

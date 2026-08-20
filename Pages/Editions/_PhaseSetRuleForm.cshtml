@@ -1,7 +1,7 @@
 @model Competition.Pages.Editions.PhaseSetRuleFormViewModel
 @using Competition.Domain
 
-<section id="phase-set-rule-@Model.Phase.Id" class="phase-set-rule" aria-label="Pravidlo setů pro fázi @Model.Phase.Name">
+<section id="phase-set-rule-@Model.Phase.Id" class="phase-set-rule @(!Model.CanEdit ? "phase-summary-item" : null)" aria-label="Pravidlo setů pro fázi @Model.Phase.Name">
     @if (Model.CanEdit)
     {
         <form method="post" asp-page-handler="UpdatePhaseSetRule" class="phase-set-rule-form" data-phase-auto-submit>

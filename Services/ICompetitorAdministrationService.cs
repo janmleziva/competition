@@ -39,7 +39,8 @@ public sealed record CompetitionEntrySummary(
     string FirstName,
     string LastName,
     DateOnly? DateOfBirth,
-    int Seed);
+    int Seed,
+    bool CanRemove);
 
 public sealed record SeedUpdateResult(bool WasSwapped, string? SwappedCompetitorName);
 

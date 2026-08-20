@@ -377,6 +377,14 @@
                             </p>
                         }
 
+                        @if (User.Identity?.IsAuthenticated == true && !item.IsClosed && item.AwardPointSystemId is null)
+                        {
+                            <div class="point-system-missing-notice" role="status">
+                                <strong>Není vybraný bodovací systém.</strong>
+                                <span>Po dokončení zápasů nepůjde přidělit body, dokud jej nenastavíte.</span>
+                            </div>
+                        }
+
                         @if (item.IsClosed && item.FinalStandings is { Count: > 0 })
                         {
                             <p class="discipline-final-inline">

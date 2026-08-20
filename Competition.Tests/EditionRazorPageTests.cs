@@ -1,6 +1,7 @@
 using Competition.Models;
 using Competition.Pages.Editions;
 using Competition.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
@@ -8,6 +9,13 @@ namespace Competition.Tests;
 
 public sealed class EditionRazorPageTests
 {
+    [Fact]
+    public void DisciplineParticipantsPage_RequiresAuthorization()
+    {
+        Assert.NotNull(Attribute.GetCustomAttribute(
+            typeof(DisciplineParticipantsModel), typeof(AuthorizeAttribute)));
+    }
+
     [Fact]
     public async Task CreatePost_WithValidationErrors_DoesNotCallService()
     {

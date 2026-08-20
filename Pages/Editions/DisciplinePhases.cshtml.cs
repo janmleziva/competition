@@ -58,9 +58,6 @@ public class DisciplinePhasesModel(
     public MatchSlotInput NewMatch { get; set; } = new();
 
     [BindProperty]
-    public RandomGroupAssignmentInput RandomAssignment { get; set; } = new();
-
-    [BindProperty]
     public MatchResultInput ResultInput { get; set; } = new();
 
     [BindProperty]
@@ -161,9 +158,9 @@ public class DisciplinePhasesModel(
             () => phases.DeletePhaseAsync(id, disciplineId, phaseId, ct),
             "Fáze byla smazána.");
 
-    public async Task<IActionResult> OnPostRandomAssignAsync(long id, long disciplineId, long phaseId, long groupId, CancellationToken ct) =>
+    public async Task<IActionResult> OnPostRandomAssignAsync(long id, long disciplineId, CancellationToken ct) =>
         await ExecuteAsync(id, disciplineId, ct,
-            () => phases.RandomlyAssignGroupTeamsAsync(id, disciplineId, phaseId, groupId, RandomAssignment.TeamCount, ct),
+            () => phases.RandomlyAssignAllGroupTeamsAsync(id, disciplineId, ct),
             "Týmy byly náhodně přiřazeny.");
 
     public async Task<IActionResult> OnPostGenerateRoundRobinAsync(long id, long disciplineId, long phaseId, long groupId, CancellationToken ct) =>

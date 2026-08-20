@@ -86,7 +86,15 @@
                 {
                     <article class="edition-row registered-competitor-row">
                         <div>
-                            <div class="edition-title"><span class="seed-badge">@entry.Seed</span> @entry.LastName @entry.FirstName</div>
+                            <div class="edition-title">
+                                <span class="seed-badge">@entry.Seed</span>
+                                <a class="statistics-person-link"
+                                   asp-page="/Statistics/EditionCompetitor"
+                                   asp-route-id="@Model.Registration.EditionId"
+                                   asp-route-competitorId="@entry.CompetitorId">
+                                    @entry.LastName @entry.FirstName
+                                </a>
+                            </div>
                             <span class="meta-inline">Narozen/a: @Model.FormatDate(entry.DateOfBirth)</span>
                         </div>
                         @if (User.Identity?.IsAuthenticated == true)
@@ -100,7 +108,12 @@
                                 </form>
                                 <form method="post" asp-page-handler="Remove">
                                     <input type="hidden" name="entryId" value="@entry.Id" />
-                                    <button class="button button-danger button-small" type="submit">Odhlásit</button>
+                                    <button class="button button-danger button-small"
+                                            type="submit"
+                                            disabled="@(!entry.CanRemove)"
+                                            title="@(!entry.CanRemove ? "Soutěžícího nelze odhlásit, protože už je zařazen do týmu." : null)">
+                                        Odhlásit
+                                    </button>
                                 </form>
                             </div>
                         }

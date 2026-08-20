@@ -82,6 +82,46 @@ public sealed class PhaseSetupServiceTests
     }
 
     [Fact]
+    public async Task RandomAssignment_PreservesExistingAssignmentsAndFillsRemainingGroupsEvenly()
+    {
+        await using var db = CreateDbContext();
+        var (editionId, disciplineId, teamIds) = await SeedDisciplineAsync(db, 7, PlayingSystemType.GroupsThenClassificationMatches);
+        var service = new PhaseSetupService(db);
+        var setup = await service.GetSetupAsync(editionId, disciplineId);
+        var groups = setup!.Phases.Where(x => x.Type == PhaseType.Group).OrderBy(x => x.Order).Select(x => x.Groups.Single()).ToList();
+
+        await service.AssignGroupTeamsAsync(editionId, disciplineId, setup.Phases[0].Id, groups[0].Id, teamIds.Take(2).ToList());
+
+        Assert.Equal(5, await service.RandomlyAssignAllGroupTeamsAsync(editionId, disciplineId));
+
+        var assignments = await db.PhaseGroupTeams.AsNoTracking().ToListAsync();
+        Assert.Equal(teamIds.Order(), assignments.Select(x => x.DisciplineTeamId).Order());
+        Assert.Equal(new[] { 3, 4 }, assignments.GroupBy(x => x.PhaseGroupId).Select(x => x.Count()).Order());
+        Assert.All(teamIds.Take(2), teamId => Assert.Contains(assignments, x => x.PhaseGroupId == groups[0].Id && x.DisciplineTeamId == teamId));
+        Assert.All(assignments.GroupBy(x => x.PhaseGroupId), group =>
+            Assert.Equal(Enumerable.Range(1, group.Count()), group.OrderBy(x => x.Seed).Select(x => x.Seed)));
+    }
+
+    [Fact]
+    public async Task RandomAssignment_RecreatesGroupsWhenEveryTeamIsAlreadyAssigned()
+    {
+        await using var db = CreateDbContext();
+        var (editionId, disciplineId, teamIds) = await SeedDisciplineAsync(db, 7, PlayingSystemType.GroupsThenClassificationMatches);
+        var service = new PhaseSetupService(db);
+        var setup = await service.GetSetupAsync(editionId, disciplineId);
+        var groupPhases = setup!.Phases.Where(x => x.Type == PhaseType.Group).OrderBy(x => x.Order).ToList();
+
+        await service.AssignGroupTeamsAsync(editionId, disciplineId, groupPhases[0].Id, groupPhases[0].Groups.Single().Id, teamIds.Take(6).ToList());
+        await service.AssignGroupTeamsAsync(editionId, disciplineId, groupPhases[1].Id, groupPhases[1].Groups.Single().Id, teamIds.Skip(6).ToList());
+
+        Assert.Equal(7, await service.RandomlyAssignAllGroupTeamsAsync(editionId, disciplineId));
+
+        var assignments = await db.PhaseGroupTeams.AsNoTracking().ToListAsync();
+        Assert.Equal(teamIds.Order(), assignments.Select(x => x.DisciplineTeamId).Order());
+        Assert.Equal(new[] { 3, 4 }, assignments.GroupBy(x => x.PhaseGroupId).Select(x => x.Count()).Order());
+    }
+
+    [Fact]
     public async Task TwoGroupClassification_FillsFinalStandingTeamsAfterBothGroupsAreComplete()
     {
         await using var db = CreateDbContext();
@@ -784,7 +824,7 @@ public sealed class PhaseSetupServiceTests
     }
 
     [Fact]
-    public async Task FixedEvenSetCount_IsRejectedForAWinRequiredPhase()
+    public async Task FixedEvenSetCount_IsAllowedForAWinRequiredPhase()
     {
         await using var db = CreateDbContext();
         var (editionId, disciplineId, _) = await SeedDisciplineAsync(db, 2, PlayingSystemType.Knockout);
@@ -795,15 +835,57 @@ public sealed class PhaseSetupServiceTests
         var service = new PhaseSetupService(db);
         var phase = Assert.Single((await service.GetSetupAsync(editionId, disciplineId))!.Phases);
 
-        var error = await Assert.ThrowsAsync<ValidationException>(() =>
-            service.UpdatePhaseSetRuleAsync(editionId, disciplineId, new PhaseSetRuleInput
-            {
-                PhaseId = phase.Id,
-                SetRule = SetRuleType.FixedSets,
-                SetCount = 2
-            }));
+        Assert.True(await service.UpdatePhaseSetRuleAsync(editionId, disciplineId, new PhaseSetRuleInput
+        {
+            PhaseId = phase.Id,
+            SetRule = SetRuleType.FixedSets,
+            SetCount = 2
+        }));
 
-        Assert.Contains("lichý", error.Message);
+        phase = Assert.Single((await service.GetSetupAsync(editionId, disciplineId))!.Phases);
+        Assert.Equal((SetRuleType.FixedSets, 2), (phase.SetRule, phase.SetCount));
+    }
+
+    [Fact]
+    public async Task FixedEvenSetCount_AdvancesKnockoutWinnerByAggregateSubscore()
+    {
+        await using var db = CreateDbContext();
+        var (editionId, disciplineId, teamIds) = await SeedDisciplineAsync(db, 4, PlayingSystemType.Knockout);
+        var discipline = await db.CompetitionDisciplines.SingleAsync();
+        discipline.UsesSetScores = true;
+        discipline.SetsToWin = 2;
+        await db.SaveChangesAsync();
+        var service = new PhaseSetupService(db);
+        var phase = Assert.Single((await service.GetSetupAsync(editionId, disciplineId))!.Phases);
+        await service.UpdatePhaseSetRuleAsync(editionId, disciplineId, new PhaseSetRuleInput
+        {
+            PhaseId = phase.Id,
+            SetRule = SetRuleType.FixedSets,
+            SetCount = 2
+        });
+        var semifinalId = await service.CreateGroupAsync(editionId, disciplineId, phase.Id,
+            new PhaseGroupInput { Name = "Semifinále", Order = 1, Capacity = 4 });
+        await service.CreateGroupAsync(editionId, disciplineId, phase.Id,
+            new PhaseGroupInput { Name = "Finále", Order = 2, Capacity = 2 });
+        await service.AssignGroupTeamsAsync(editionId, disciplineId, phase.Id, semifinalId, teamIds);
+        await service.GeneratePresetMatchesAsync(editionId, disciplineId);
+        await service.SetScheduleLockAsync(editionId, disciplineId, true);
+
+        var semifinal = await db.Matches.AsNoTracking().OrderBy(x => x.Order).FirstAsync();
+        Assert.True(await service.UpdateMatchSetScoresAsync(editionId, disciplineId, new MatchSetScoresInput
+        {
+            MatchId = semifinal.Id,
+            Version = semifinal.Version,
+            Sets =
+            [
+                new MatchSetScoreInput { SetNumber = 1, HomeScore = 11, AwayScore = 9 },
+                new MatchSetScoreInput { SetNumber = 2, HomeScore = 2, AwayScore = 11 }
+            ]
+        }, false));
+
+        var final = await db.Matches.AsNoTracking().SingleAsync(x => x.HomeSourceMatchId == semifinal.Id || x.AwaySourceMatchId == semifinal.Id);
+        var advancingTeamId = final.HomeSourceMatchId == semifinal.Id ? final.HomeTeamId : final.AwayTeamId;
+        Assert.Equal(semifinal.AwayTeamId, advancingTeamId);
     }
 
     [Fact]

@@ -218,7 +218,7 @@
 
             @if (Model.UsesSetScores)
             {
-                <div class="subscore-control">
+                <div class="subscore-control @(aggregateWinnerName is not null ? "has-aggregate-winner" : null)">
                     @if (match.SetScores.Count > 0)
                     {
                         <span class="subscore-summary">
@@ -227,7 +227,7 @@
                         @if (aggregateWinnerName is not null)
                         {
                             <span class="aggregate-winner">
-                                Vítěz podle součtu bodů: @aggregateWinnerName (@homeSubscore:@awaySubscore)
+                                Vítěz: @aggregateWinnerName
                             </span>
                         }
                     }

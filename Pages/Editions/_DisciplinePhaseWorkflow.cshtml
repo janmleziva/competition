@@ -94,8 +94,29 @@
             </div>
         </div>
 
+        @if (isResultsPage && isAuthenticated && !Model.Setup.IsClosed && Model.Scoring.AwardPointSystemId is null)
+        {
+            <div class="point-system-missing-notice" role="status">
+                <strong>Pro disciplínu není vybraný bodovací systém.</strong>
+                <span>Body zatím nelze přidělit.</span>
+                <a asp-page="/Editions/DisciplineDetail"
+                   asp-route-id="@Model.Setup.EditionId"
+                   asp-route-disciplineId="@Model.Setup.DisciplineId">Vybrat bodovací systém v nastavení disciplíny</a>
+            </div>
+        }
+
         <section class="playing-system-banner @(Model.Setup.IsScheduleLocked ? "is-locked" : null)" aria-label="Vybraný herní systém">
-            <span class="playing-system-label">Herní systém</span>
+            <div class="playing-system-banner-heading">
+                <span class="playing-system-label">Herní systém</span>
+                @if (Model.Setup.IsScheduleLocked && !Model.Setup.IsClosed)
+                {
+                    <span class="schedule-lock-badge">Rozpis uzamčen</span>
+                }
+                @if (Model.Setup.IsClosed)
+                {
+                    <span class="schedule-lock-badge discipline-closed-badge">Disciplína uzavřena</span>
+                }
+            </div>
             <div class="playing-system-value">
                 @if (!isResultsPage && isAdmin && !Model.HasMatches && !Model.Setup.IsScheduleLocked)
                 {
@@ -112,14 +133,6 @@
                 else
                 {
                     <strong>@DisciplinePhasesModel.GetPlayingSystemLabel(Model.Setup.PlayingSystem)</strong>
-                }
-                @if (Model.Setup.IsScheduleLocked && !Model.Setup.IsClosed)
-                {
-                    <span class="schedule-lock-badge">Rozpis uzamčen</span>
-                }
-                @if (Model.Setup.IsClosed)
-                {
-                    <span class="schedule-lock-badge discipline-closed-badge">Disciplína uzavřena</span>
                 }
             </div>
         </section>
@@ -234,6 +247,11 @@
 
                     @if (!isResultsPage && group.Matches.Count == 0 && isAdmin)
                     {
+                        <div class="random-assignment-form random-assignment-all-form">
+                            <button class="button button-ghost button-small" type="button" data-open-modal="random-assignment-modal" disabled="@(Model.Setup.Teams.Count == 0)">
+                                Náhodně přiřadit týmy
+                            </button>
+                        </div>
                         <form id="group-@group.Id" method="post" asp-page-handler="AssignGroupTeams" class="group-assignment-form" data-auto-assignment-form>
                             <input type="hidden" name="phaseId" value="@phase.Id" />
                             <input type="hidden" name="groupId" value="@group.Id" />
@@ -260,17 +278,6 @@
                             </div>
                         </form>
 
-                        var unassignedCount = Model.Setup.Teams.Count - Model.Setup.AssignedTeamIds.Count;
-                        @if (unassignedCount > 0)
-                        {
-                            <form method="post" asp-page-handler="RandomAssign" class="random-assignment-form">
-                                <input type="hidden" name="phaseId" value="@phase.Id" />
-                                <input type="hidden" name="groupId" value="@group.Id" />
-                                <label for="random-count-@group.Id">Náhodně přidat týmů</label>
-                                <input id="random-count-@group.Id" name="RandomAssignment.TeamCount" type="number" min="1" max="@unassignedCount" value="1" />
-                                <button class="button button-ghost button-small" type="submit">Náhodně přiřadit</button>
-                            </form>
-                        }
                     }
 
                     @if (isResultsPage && Model.GroupStandings.TryGetValue(group.Id, out var groupStandings))
@@ -601,6 +608,33 @@
         }
     </section>
 </main>
+
+@if (!isResultsPage && isAdmin && Model.Setup.PlayingSystem == PlayingSystemType.GroupsThenClassificationMatches && !Model.HasMatches)
+{
+    <div id="random-assignment-modal" class="modal-backdrop" role="presentation" hidden>
+        <section class="modal" role="dialog" aria-modal="true" aria-labelledby="random-assignment-title">
+            <h2 id="random-assignment-title">Náhodně přiřadit týmy?</h2>
+            <div class="schedule-lock-notice" role="note">
+                @if (Model.Setup.AreAllTeamsAssigned)
+                {
+                    <strong>Skupiny jsou plně obsazené.</strong>
+                    <p>Současné přiřazení se zruší a všechny týmy budou znovu náhodně a rovnoměrně rozděleny do skupin.</p>
+                }
+                else
+                {
+                    <strong>Dosavadní přiřazení zůstane zachované.</strong>
+                    <p>Do skupin budou náhodně a rovnoměrně doplněny pouze dosud nepřiřazené týmy.</p>
+                }
+            </div>
+            <div class="modal-actions">
+                <form method="post" asp-page-handler="RandomAssign" data-close-modal-after-post="true">
+                    <button class="button" type="submit">Pokračovat</button>
+                </form>
+                <button class="button button-ghost" type="button" data-close-modal>Zrušit</button>
+            </div>
+        </section>
+    </div>
+}
 
 @if (!isResultsPage && isAdmin && Model.HasMatches)
 {
