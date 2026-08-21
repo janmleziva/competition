@@ -61,11 +61,11 @@
                         @if (User.Identity?.IsAuthenticated == true)
                         {
                             <div class="row-actions">
-                                <a class="button button-ghost button-small" asp-page="/Editions/Edit" asp-route-id="@edition.Id">Upravit</a>
+                                <a class="button button-ghost button-small" asp-page="/Editions/Edit" asp-route-id="@edition.Id"><svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-edit" /></svg>Upravit</a>
                                 @if (!edition.IsActive)
                                 {
                                     <form method="post" asp-page-handler="SetActive" asp-route-id="@edition.Id">
-                                        <button class="button button-small" type="submit">Nastavit jako aktivní</button>
+                                        <button class="button button-small" type="submit"><svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-trophy" /></svg>Nastavit jako aktivní</button>
                                     </form>
                                 }
                             </div>

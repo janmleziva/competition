@@ -195,6 +195,44 @@ public sealed class GroupStandingsServiceTests
     }
 
     [Fact]
+    public async Task FinalStandings_AggregateScoresFromGroupAndPlacementMatches()
+    {
+        await using var db = CreateDbContext();
+        var setup = await SeedGroupAsync(db, ["Alpha", "Beta"]);
+        var discipline = await db.CompetitionDisciplines.SingleAsync(x => x.Id == setup.DisciplineId);
+        discipline.PlayingSystem = PlayingSystemType.GroupsThenClassificationMatches;
+        await AddMatchAsync(db, setup, 0, 1, MatchStatus.Completed, 2, 0);
+        var finalPhase = new DisciplinePhase
+        {
+            CompetitionDisciplineId = setup.DisciplineId,
+            Name = "O umístění",
+            Type = PhaseType.FinalStanding,
+            Order = 2
+        };
+        db.DisciplinePhases.Add(finalPhase);
+        await db.SaveChangesAsync();
+        db.Matches.Add(new Match
+        {
+            DisciplinePhaseId = finalPhase.Id,
+            HomeTeamId = setup.TeamIds[1],
+            AwayTeamId = setup.TeamIds[0],
+            Name = "Finále",
+            Order = 1,
+            Status = MatchStatus.Completed,
+            HomeScore = 1,
+            AwayScore = 3
+        });
+        await db.SaveChangesAsync();
+
+        var final = Assert.IsType<FinalStandingTable>(await new GroupStandingsService(db)
+            .GetFinalStandingsAsync(setup.EditionId, setup.DisciplineId));
+
+        Assert.Equal("Alpha", final.Rows[0].TeamName);
+        Assert.Equal((5, 1), (final.Rows[0].ScoreFor, final.Rows[0].ScoreAgainst));
+        Assert.Equal((1, 5), (final.Rows[1].ScoreFor, final.Rows[1].ScoreAgainst));
+    }
+
+    [Fact]
     public async Task KnockoutCompletedStage_RanksEliminatedTeamsBeforeLaterStageIsPlayed()
     {
         await using var db = CreateDbContext();

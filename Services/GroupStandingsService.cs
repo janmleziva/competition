@@ -95,6 +95,7 @@ public sealed class GroupStandingsService(CompetitionDbContext dbContext) : IGro
             PlayingSystemType.Custom => CalculateCustomFinalStandings(discipline),
             _ => []
         };
+        rows = ApplyAllMatchAggregates(rows, discipline);
 
         if (discipline.FinalStandings.Count != 0)
         {
@@ -136,6 +137,36 @@ public sealed class GroupStandingsService(CompetitionDbContext dbContext) : IGro
                     : row.TeamName
             }).ToList()
         };
+    }
+
+    private static IReadOnlyList<FinalStandingRow> ApplyAllMatchAggregates(
+        IReadOnlyList<FinalStandingRow> rows,
+        CompetitionDiscipline discipline)
+    {
+        if (rows.Count == 0)
+        {
+            return rows;
+        }
+
+        var teamIds = discipline.Teams.Select(team => team.Id).ToHashSet();
+        var completedMatches = discipline.Phases
+            .SelectMany(phase => phase.Matches)
+            .Where(match => IsCompletedMatch(match) &&
+                teamIds.Contains(match.HomeTeamId!.Value) &&
+                teamIds.Contains(match.AwayTeamId!.Value))
+            .ToList();
+        var aggregates = BuildMatchAggregates(teamIds, completedMatches);
+        return rows.Select(row =>
+        {
+            var aggregate = aggregates[row.TeamId];
+            return row with
+            {
+                ScoreFor = aggregate.ScoreFor,
+                ScoreAgainst = aggregate.ScoreAgainst,
+                SubscoreFor = aggregate.SubscoreFor,
+                SubscoreAgainst = aggregate.SubscoreAgainst
+            };
+        }).ToList();
     }
 
     private static IReadOnlyList<FinalStandingRow> CalculateRoundRobinFinalStandings(CompetitionDiscipline discipline)

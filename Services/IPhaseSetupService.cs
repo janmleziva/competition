@@ -14,7 +14,7 @@ public interface IPhaseSetupService
     Task<bool> AssignGroupTeamsAsync(long editionId, long competitionDisciplineId, long phaseId, long groupId, IReadOnlyCollection<long> teamIds, CancellationToken cancellationToken = default);
     Task<bool> DeleteGroupAsync(long editionId, long competitionDisciplineId, long phaseId, long groupId, CancellationToken cancellationToken = default);
     Task<bool> DeletePhaseAsync(long editionId, long competitionDisciplineId, long phaseId, CancellationToken cancellationToken = default);
-    Task<int> RandomlyAssignGroupTeamsAsync(long editionId, long competitionDisciplineId, long phaseId, long groupId, int teamCount, CancellationToken cancellationToken = default);
+    Task<int> RandomlyAssignAllGroupTeamsAsync(long editionId, long competitionDisciplineId, CancellationToken cancellationToken = default);
     Task<int> GenerateRoundRobinAsync(long editionId, long competitionDisciplineId, long phaseId, long groupId, CancellationToken cancellationToken = default);
     Task<int> GeneratePresetMatchesAsync(long editionId, long competitionDisciplineId, CancellationToken cancellationToken = default);
     Task<int> GenerateKnockoutMatchesAsync(long editionId, long competitionDisciplineId, bool randomizeTeams, CancellationToken cancellationToken = default);

@@ -85,10 +85,10 @@
                                     {
                                         <a class="button button-ghost button-small"
                                            asp-page="/PointSystems/Index"
-                                           asp-route-editId="@system.Id">Upravit</a>
+                                           asp-route-editId="@system.Id"><svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-edit" /></svg>Upravit</a>
                                         <button class="button button-danger button-small"
                                                 type="button"
-                                                data-open-modal="delete-point-system-modal-@system.Id">Smazat</button>
+                                                data-open-modal="delete-point-system-modal-@system.Id"><svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-trash" /></svg>Smazat</button>
                                     }
                                 </div>
                             }

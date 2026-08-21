@@ -132,6 +132,9 @@ public sealed class CompetitorAdministrationServiceTests
         });
         await dbContext.SaveChangesAsync();
 
+        var registration = await service.GetEditionRegistrationAsync(editionId);
+        Assert.False(Assert.Single(registration!.Entries).CanRemove);
+
         var error = await Assert.ThrowsAsync<ValidationException>(
             () => service.RemoveAsync(editionId, entry.Id));
 
@@ -147,6 +150,9 @@ public sealed class CompetitorAdministrationServiceTests
         var service = new CompetitorAdministrationService(dbContext);
         await service.RegisterAsync(editionId, firstCompetitorId, 1);
         var entryId = await dbContext.CompetitionEntries.Select(x => x.Id).SingleAsync();
+
+        var registration = await service.GetEditionRegistrationAsync(editionId);
+        Assert.True(Assert.Single(registration!.Entries).CanRemove);
 
         Assert.True(await service.RemoveAsync(editionId, entryId));
 

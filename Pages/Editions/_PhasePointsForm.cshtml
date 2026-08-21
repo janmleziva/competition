@@ -1,6 +1,6 @@
 @model Competition.Pages.Editions.PhasePointsFormViewModel
 
-<section id="phase-points-@Model.Phase.Id" class="phase-points" aria-label="Bodování fáze @Model.Phase.Name">
+<section id="phase-points-@Model.Phase.Id" class="phase-points @(!Model.CanEdit ? "phase-summary-item" : null)" aria-label="Bodování fáze @Model.Phase.Name">
     @if (Model.CanEdit)
     {
         <form method="post" asp-page-handler="UpdatePhasePoints" class="phase-points-form" data-phase-auto-submit>

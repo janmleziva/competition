@@ -23,6 +23,7 @@
                            asp-page="@(Model.Setup.Discipline.IsScheduleLocked ? "/Editions/DisciplineResults" : "/Editions/DisciplinePhases")"
                            asp-route-id="@Model.Setup.EditionId"
                            asp-route-disciplineId="@Model.Setup.Discipline.Id">
+                            <svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-calendar" /></svg>
                             @(Model.Setup.Discipline.IsScheduleLocked ? "Rozpis a výsledky" : "Rozpis")
                         </a>
                     }
@@ -32,14 +33,16 @@
                                 type="button"
                                 disabled
                                 title="Nejprve přiřaďte účastníky a vytvořte všechny týmy.">
+                            <svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-calendar" /></svg>
                             @(Model.Setup.Discipline.IsScheduleLocked ? "Rozpis a výsledky" : "Rozpis")
                         </button>
                     }
                 }
 
-                <a class="button button-ghost"
+                <a class="button button-ghost button-back"
                    asp-page="/Editions/Disciplines"
                    asp-route-id="@Model.Setup.EditionId">
+                    <svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-arrow-left" /></svg>
                     Zpět
                 </a>
             </div>
@@ -47,7 +50,7 @@
 
         @if (isManagementLocked)
         {
-            <div class="schedule-lock-notice" role="status">
+            <div class="schedule-lock-notice participant-schedule-lock-notice" role="status">
                 @if (Model.Setup.Discipline.HasMatches)
                 {
                     <strong>Rozpis už obsahuje zápasy.</strong>
@@ -80,7 +83,7 @@
             {
                 <div class="row-actions participant-toolbar">
                     <form method="post" asp-page-handler="AssignAll">
-                        <button class="button" type="submit">Přiřadit všechny</button>
+                        <button class="button" type="submit"><svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-users" /></svg>Přiřadit všechny</button>
                     </form>
                 </div>
 
@@ -127,12 +130,13 @@
                         @if (Model.Setup.Teams.Count == 0)
                         {
                             <form method="post" asp-page-handler="RandomizeTeams">
-                                <button class="button" type="submit">Náhodně vytvořit týmy</button>
+                                <button class="button" type="submit"><svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-shuffle" /></svg>Náhodně vytvořit týmy</button>
                             </form>
                         }
                         else
                         {
                             <button class="button" type="button" data-open-random-modal>
+                                <svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-shuffle" /></svg>
                                 Náhodně vytvořit týmy
                             </button>
                         }
@@ -156,7 +160,7 @@
                                     </div>
                                     <form method="post" asp-page-handler="DeleteTeam">
                                         <input type="hidden" name="teamId" value="@team.TeamId" />
-                                        <button class="button button-danger button-small" type="submit">Smazat tým</button>
+                                        <button class="button button-danger button-small" type="submit"><svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-trash" /></svg>Smazat tým</button>
                                     </form>
                                 </article>
                             }
@@ -222,8 +226,9 @@
                                         <button class="button button-ghost"
                                                 type="submit"
                                                 asp-page-handler="AddMember"
-                                                asp-fragment="new-team"
-                                                data-add-team-member>
+                                            asp-fragment="new-team"
+                                            data-add-team-member>
+                                            <svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-plus" /></svg>
                                             Přidej člena
                                         </button>
                                     }
@@ -232,6 +237,7 @@
                                             type="submit"
                                             data-create-team
                                             hidden="@(!Model.IsNewTeamComplete)">
+                                        <svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-plus" /></svg>
                                         Vytvořit tým
                                     </button>
                                 </div>
@@ -250,6 +256,7 @@
                    asp-page="/Editions/DisciplinePhases"
                    asp-route-id="@Model.Setup.EditionId"
                    asp-route-disciplineId="@Model.Setup.Discipline.Id">
+                    <svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-calendar" /></svg>
                     Vytvořit rozpis
                 </a>
             </div>

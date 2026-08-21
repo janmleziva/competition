@@ -13,11 +13,12 @@
                     @Model.Results.EditionName · @Model.Results.DisciplineName · všechny zápasy týmu
                 </p>
             </div>
-            <a class="button button-ghost"
+            <a class="button button-ghost button-back"
                asp-page="/Editions/DisciplineResults"
                asp-route-id="@Model.Results.EditionId"
                asp-route-disciplineId="@Model.Results.CompetitionDisciplineId">
-                Zpět na výsledky
+                <svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-arrow-left" /></svg>
+                Zpět
             </a>
         </div>
 

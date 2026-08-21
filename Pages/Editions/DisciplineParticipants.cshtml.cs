@@ -1,10 +1,12 @@
 using System.ComponentModel.DataAnnotations;
 using Competition.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace Competition.Pages.Editions;
 
+[Authorize]
 public sealed class DisciplineParticipantsModel(IDisciplineAdministrationService disciplines) : PageModel
 {
     public DisciplineParticipantSetup Setup { get; private set; } = null!;

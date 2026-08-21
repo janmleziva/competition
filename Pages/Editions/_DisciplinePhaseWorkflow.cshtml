@@ -16,20 +16,34 @@
                     <h1>@Model.Setup.DisciplineName</h1>
                     <p class="lead">@(isResultsPage ? "Rozpis a výsledky" : "Tvorba rozpisu") · @Model.Setup.EditionName</p>
                 </div>
-                <a class="button button-ghost" asp-page="/Editions/Disciplines" asp-route-id="@Model.Setup.EditionId">Zpět</a>
+                <a class="button button-ghost button-back" asp-page="/Editions/Disciplines" asp-route-id="@Model.Setup.EditionId">
+                    <svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-arrow-left" /></svg>
+                    Zpět
+                </a>
             </div>
-            <div class="action-group phase-heading-actions">
+            @if (isResultsPage)
+            {
+                <button class="phase-actions-toggle"
+                        type="button"
+                        data-phase-actions-toggle
+                        aria-expanded="false"
+                        aria-controls="phase-heading-actions">
+                    <span>Akce</span>
+                    <span class="phase-actions-toggle-icon" aria-hidden="true"></span>
+                </button>
+            }
+            <div id="phase-heading-actions" class="action-group phase-heading-actions">
                 @if (isResultsPage && isAuthenticated && Model.Setup.IsClosed)
                 {
                     <form method="post" asp-page-handler="Reopen">
-                        <button class="button" type="submit">Znovu otevřít disciplínu</button>
+                        <button class="button" type="submit"><svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-unlock" /></svg>Znovu otevřít disciplínu</button>
                     </form>
                 }
                 @if (isResultsPage && isAuthenticated && !Model.Setup.IsClosed)
                 {
                     @if (Model.Scoring.FinalStandings.Count > 0)
                     {
-                        <button class="button" type="button" data-open-modal="close-discipline-modal">Uzavřít</button>
+                        <button class="button" type="button" data-open-modal="close-discipline-modal"><svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-lock" /></svg>Uzavřít</button>
                     }
                     else
                     {
@@ -37,14 +51,15 @@
                                 type="button"
                                 data-open-modal="finalize-discipline-modal"
                                 disabled="@(!Model.Scoring.CanFinalize)"
-                                title="@Model.Scoring.FinalizeBlockReason">
+                            title="@Model.Scoring.FinalizeBlockReason">
+                            <svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-trophy" /></svg>
                             Přidělit body a uzavřít
                         </button>
                     }
                 }
                 @if (!isResultsPage && isAdmin && Model.HasMatches)
                 {
-                    <button class="button" type="button" data-open-modal="lock-schedule-modal">Uzamknout rozpis</button>
+                    <button class="button" type="button" data-open-modal="lock-schedule-modal"><svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-lock" /></svg>Uzamknout rozpis</button>
                 }
                 @if (isResultsPage && isAdmin && Model.HasMatches)
                 {
@@ -52,7 +67,8 @@
                         <button class="button button-ghost"
                                 type="submit"
                                 disabled="@Model.Setup.HasMatchResults"
-                                title="@(Model.Setup.HasMatchResults ? "Rozpis s uloženými výsledky už nelze odemknout." : null)">
+                            title="@(Model.Setup.HasMatchResults ? "Rozpis s uloženými výsledky už nelze odemknout." : null)">
+                            <svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-unlock" /></svg>
                             Odemknout rozpis
                         </button>
                     </form>
@@ -64,6 +80,7 @@
                             data-open-modal="random-results-modal"
                             disabled="@(Model.Scoring.FinalStandings.Count > 0 || (Model.Setup.PlayingSystem == PlayingSystemType.Knockout && !Model.Setup.IsScheduleLocked))"
                             title="@(Model.Scoring.FinalStandings.Count > 0 ? "Nejprve odeberte přidělené body." : Model.Setup.PlayingSystem == PlayingSystemType.Knockout && !Model.Setup.IsScheduleLocked ? "Nejprve uzamkněte rozpis." : null)">
+                        <svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-shuffle" /></svg>
                         Náhodně vygenerovat výsledky
                     </button>
                     @if (Model.Scoring.FinalStandings.Count > 0)
@@ -71,6 +88,7 @@
                         <button class="button button-danger"
                                 type="button"
                                 data-open-modal="remove-awarded-points-modal">
+                            <svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-trash" /></svg>
                             Odebrat přidělené body
                         </button>
                     }
@@ -78,6 +96,7 @@
                             id="delete-results-button"
                             type="button"
                             data-open-modal="delete-results-modal">
+                        <svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-trash" /></svg>
                         Smazat výsledky
                     </button>
                 }
@@ -88,14 +107,36 @@
                             data-open-modal="reset-schedule-modal"
                             disabled="@(!Model.Setup.CanResetSchedule)"
                             title="@(!Model.Setup.CanResetSchedule ? "Rozpis obsahuje výsledky a nelze jej smazat." : null)">
+                        <svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-trash" /></svg>
                         Smazat rozpis
                     </button>
                 }
             </div>
         </div>
 
+        @if (isResultsPage && isAuthenticated && !Model.Setup.IsClosed && Model.Scoring.AwardPointSystemId is null)
+        {
+            <div class="point-system-missing-notice" role="status">
+                <strong>Pro disciplínu není vybraný bodovací systém.</strong>
+                <span>Body zatím nelze přidělit.</span>
+                <a asp-page="/Editions/DisciplineDetail"
+                   asp-route-id="@Model.Setup.EditionId"
+                   asp-route-disciplineId="@Model.Setup.DisciplineId">Vybrat bodovací systém v nastavení disciplíny</a>
+            </div>
+        }
+
         <section class="playing-system-banner @(Model.Setup.IsScheduleLocked ? "is-locked" : null)" aria-label="Vybraný herní systém">
-            <span class="playing-system-label">Herní systém</span>
+            <div class="playing-system-banner-heading">
+                <span class="playing-system-label">Herní systém</span>
+                @if (Model.Setup.IsScheduleLocked && !Model.Setup.IsClosed)
+                {
+                    <span class="schedule-lock-badge">Rozpis uzamčen</span>
+                }
+                @if (Model.Setup.IsClosed)
+                {
+                    <span class="schedule-lock-badge discipline-closed-badge">Disciplína uzavřena</span>
+                }
+            </div>
             <div class="playing-system-value">
                 @if (!isResultsPage && isAdmin && !Model.HasMatches && !Model.Setup.IsScheduleLocked)
                 {
@@ -106,20 +147,12 @@
                                 <option value="@system">@DisciplinePhasesModel.GetPlayingSystemLabel(system)</option>
                             }
                         </select>
-                        <button class="button button-small" type="submit">Změnit</button>
+                        <button class="button button-small" type="submit"><svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-settings" /></svg>Změnit</button>
                     </form>
                 }
                 else
                 {
                     <strong>@DisciplinePhasesModel.GetPlayingSystemLabel(Model.Setup.PlayingSystem)</strong>
-                }
-                @if (Model.Setup.IsScheduleLocked && !Model.Setup.IsClosed)
-                {
-                    <span class="schedule-lock-badge">Rozpis uzamčen</span>
-                }
-                @if (Model.Setup.IsClosed)
-                {
-                    <span class="schedule-lock-badge discipline-closed-badge">Disciplína uzavřena</span>
                 }
             </div>
         </section>
@@ -195,6 +228,7 @@
                 {
                     <form method="post" asp-page-handler="GeneratePresetMatches" class="phase-primary-action">
                         <button class="button" type="submit" disabled="@(Model.Setup.Teams.Count < 2)">
+                            <svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-calendar" /></svg>
                             Vygenerovat zápasy podle Bergerových tabulek
                         </button>
                     </form>
@@ -234,6 +268,12 @@
 
                     @if (!isResultsPage && group.Matches.Count == 0 && isAdmin)
                     {
+                        <div class="random-assignment-form random-assignment-all-form">
+                            <button class="button button-ghost button-small" type="button" data-open-modal="random-assignment-modal" disabled="@(Model.Setup.Teams.Count == 0)">
+                                <svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-shuffle" /></svg>
+                                Náhodně přiřadit týmy
+                            </button>
+                        </div>
                         <form id="group-@group.Id" method="post" asp-page-handler="AssignGroupTeams" class="group-assignment-form" data-auto-assignment-form>
                             <input type="hidden" name="phaseId" value="@phase.Id" />
                             <input type="hidden" name="groupId" value="@group.Id" />
@@ -260,17 +300,6 @@
                             </div>
                         </form>
 
-                        var unassignedCount = Model.Setup.Teams.Count - Model.Setup.AssignedTeamIds.Count;
-                        @if (unassignedCount > 0)
-                        {
-                            <form method="post" asp-page-handler="RandomAssign" class="random-assignment-form">
-                                <input type="hidden" name="phaseId" value="@phase.Id" />
-                                <input type="hidden" name="groupId" value="@group.Id" />
-                                <label for="random-count-@group.Id">Náhodně přidat týmů</label>
-                                <input id="random-count-@group.Id" name="RandomAssignment.TeamCount" type="number" min="1" max="@unassignedCount" value="1" />
-                                <button class="button button-ghost button-small" type="submit">Náhodně přiřadit</button>
-                            </form>
-                        }
                     }
 
                     @if (isResultsPage && Model.GroupStandings.TryGetValue(group.Id, out var groupStandings))
@@ -313,6 +342,7 @@
             {
                 <form method="post" asp-page-handler="GeneratePresetMatches" class="phase-primary-action phase-page-action">
                     <button class="button" type="submit" disabled="@(!Model.Setup.AreAllTeamsAssigned)" title="@(Model.Setup.AreAllTeamsAssigned ? null : "Nejprve rozdělte všechny týmy do skupin.")">
+                        <svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-calendar" /></svg>
                         Vygenerovat skupinové a finálové zápasy
                     </button>
                 </form>
@@ -372,7 +402,7 @@
                                     <form method="post" asp-page-handler="DeleteGroup">
                                         <input type="hidden" name="phaseId" value="@phase.Id" />
                                         <input type="hidden" name="groupId" value="@stage.Id" />
-                                        <button class="button button-danger button-small" type="submit">Smazat</button>
+                                        <button class="button button-danger button-small" type="submit"><svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-trash" /></svg>Smazat</button>
                                     </form>
                                 }
                             </div>
@@ -442,11 +472,11 @@
                             }
                             <form method="post" asp-page-handler="GenerateKnockoutMatches">
                                 <input type="hidden" name="randomizeTeams" value="true" />
-                                <button class="button" type="submit">Vygenerovat pavouk náhodně</button>
+                                <button class="button" type="submit"><svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-shuffle" /></svg>Vygenerovat pavouk náhodně</button>
                             </form>
                             <form method="post" asp-page-handler="GenerateKnockoutMatches">
                                 <input type="hidden" name="randomizeTeams" value="false" />
-                                <button class="button button-ghost" type="submit">Sestavit zápasy ručně</button>
+                                <button class="button button-ghost" type="submit"><svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-calendar" /></svg>Sestavit zápasy ručně</button>
                             </form>
                         </div>
                     }
@@ -515,7 +545,7 @@
                             {
                                 <form method="post" asp-page-handler="DeletePhase">
                                     <input type="hidden" name="phaseId" value="@phase.Id" />
-                                    <button class="button button-danger button-small" type="submit">Smazat</button>
+                                    <button class="button button-danger button-small" type="submit"><svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-trash" /></svg>Smazat</button>
                                 </form>
                             }
                         </div>
@@ -601,6 +631,33 @@
         }
     </section>
 </main>
+
+@if (!isResultsPage && isAdmin && Model.Setup.PlayingSystem == PlayingSystemType.GroupsThenClassificationMatches && !Model.HasMatches)
+{
+    <div id="random-assignment-modal" class="modal-backdrop" role="presentation" hidden>
+        <section class="modal" role="dialog" aria-modal="true" aria-labelledby="random-assignment-title">
+            <h2 id="random-assignment-title">Náhodně přiřadit týmy?</h2>
+            <div class="schedule-lock-notice" role="note">
+                @if (Model.Setup.AreAllTeamsAssigned)
+                {
+                    <strong>Skupiny jsou plně obsazené.</strong>
+                    <p>Současné přiřazení se zruší a všechny týmy budou znovu náhodně a rovnoměrně rozděleny do skupin.</p>
+                }
+                else
+                {
+                    <strong>Dosavadní přiřazení zůstane zachované.</strong>
+                    <p>Do skupin budou náhodně a rovnoměrně doplněny pouze dosud nepřiřazené týmy.</p>
+                }
+            </div>
+            <div class="modal-actions">
+                <form method="post" asp-page-handler="RandomAssign" data-close-modal-after-post="true">
+                    <button class="button" type="submit">Pokračovat</button>
+                </form>
+                <button class="button button-ghost" type="button" data-close-modal>Zrušit</button>
+            </div>
+        </section>
+    </div>
+}
 
 @if (!isResultsPage && isAdmin && Model.HasMatches)
 {
@@ -831,6 +888,13 @@
             const focusedControl = document.getElementById(decodeURIComponent(window.location.hash.substring(1)));
             focusedControl?.focus({ preventScroll: true });
         }
+
+        document.querySelectorAll("[data-phase-actions-toggle]").forEach(button => {
+            button.addEventListener("click", () => {
+                const isExpanded = button.getAttribute("aria-expanded") === "true";
+                button.setAttribute("aria-expanded", (!isExpanded).toString());
+            });
+        });
 
         document.querySelectorAll("[data-open-modal], [data-open-set-modal]").forEach(button => {
             button.addEventListener("click", () => {

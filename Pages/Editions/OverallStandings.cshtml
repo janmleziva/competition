@@ -12,8 +12,8 @@
                 <p class="lead">@Model.Standing.EditionName</p>
             </div>
             <div class="row-actions">
-                <a class="button button-ghost" asp-page="/Statistics/Edition" asp-route-id="@Model.Standing.EditionId">Statistiky ročníku</a>
-                <a class="button button-ghost" asp-page="/Editions/Details" asp-route-id="@Model.Standing.EditionId">Zpět</a>
+                <a class="button button-ghost" asp-page="/Statistics/Edition" asp-route-id="@Model.Standing.EditionId"><svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-chart" /></svg>Statistiky ročníku</a>
+                <a class="button button-ghost button-back" asp-page="/Editions/Details" asp-route-id="@Model.Standing.EditionId"><svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-arrow-left" /></svg>Zpět</a>
             </div>
         </div>
 
@@ -28,14 +28,14 @@
                     name="includeBonusPoints"
                     value="true"
                     aria-pressed="@Model.IncludeBonusPoints.ToString().ToLowerInvariant()">
-                Včetně bonusových bodů
+                Včetně bonusů
             </button>
             <button class="phase-switch-button @(!Model.IncludeBonusPoints ? "is-active" : null)"
                     type="submit"
                     name="includeBonusPoints"
                     value="false"
                     aria-pressed="@((!Model.IncludeBonusPoints).ToString().ToLowerInvariant())">
-                Bez bonusových bodů
+                Bez bonusů
             </button>
         </form>
 

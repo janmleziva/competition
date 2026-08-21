@@ -121,7 +121,8 @@ public sealed class CompetitorAdministrationService(CompetitionDbContext dbConte
                 x.Competitor.FirstName,
                 x.Competitor.LastName,
                 x.Competitor.DateOfBirth,
-                x.Seed))
+                x.Seed,
+                !x.TeamMemberships.Any()))
             .ToListAsync(cancellationToken);
 
         var registeredIds = entries.Select(x => x.CompetitorId).ToArray();

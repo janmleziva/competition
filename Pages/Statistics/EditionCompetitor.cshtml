@@ -11,7 +11,7 @@
                 <h1>@Model.Results.FirstName @Model.Results.LastName</h1>
                 <p class="lead">@Model.Results.EditionName · všechny odehrané zápasy</p>
             </div>
-            <a class="button button-ghost" asp-page="/Statistics/Edition" asp-route-id="@Model.Results.EditionId">Zpět na statistiky</a>
+            <a class="button button-ghost button-back" aria-label="Zpět na statistiky" asp-page="/Statistics/Edition" asp-route-id="@Model.Results.EditionId"><svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-arrow-left" /></svg>Zpět</a>
         </div>
 
         @if (Model.Results.Disciplines.Count == 0)
