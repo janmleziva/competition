@@ -16,8 +16,8 @@
             </div>
 
             <div class="action-group">
-                <a class="button" asp-page="/Editions/OverallStandings" asp-route-id="@Model.Setup.EditionId">Celkové pořadí</a>
-                <a class="button button-ghost" asp-page="/Editions/Details" asp-route-id="@Model.Setup.EditionId">Zpět</a>
+                <a class="button" asp-page="/Editions/OverallStandings" asp-route-id="@Model.Setup.EditionId"><svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-trophy" /></svg>Celkové pořadí</a>
+                <a class="button button-ghost button-back" asp-page="/Editions/Details" asp-route-id="@Model.Setup.EditionId"><svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-arrow-left" /></svg>Zpět</a>
             </div>
         </div>
 
@@ -32,8 +32,11 @@
                 <div asp-validation-summary="ModelOnly" class="error validation-panel"></div>
             </div>
 
-            <section class="registration-form discipline-attach-section" aria-labelledby="attach-discipline-heading">
-                <h2 id="attach-discipline-heading">Přidat disciplínu</h2>
+            <details class="registration-form discipline-admin-collapsible discipline-attach-section">
+                <summary id="attach-discipline-heading">
+                    <span>Přidat disciplínu</span>
+                    <span class="discipline-admin-collapsible-icon" aria-hidden="true"></span>
+                </summary>
 
                 @if (Model.Setup.AvailableDisciplines.Count == 0)
                 {
@@ -113,12 +116,15 @@
                         <button class="button button-small" type="submit">Přiřadit</button>
                     </form>
                 }
-            </section>
+            </details>
 
             <div class="choice-divider discipline-create-divider" aria-hidden="true"><span>nebo</span></div>
 
-            <section class="registration-form discipline-create-section" aria-labelledby="create-discipline-heading">
-                <h2 id="create-discipline-heading">Vytvořte novou</h2>
+            <details class="registration-form discipline-admin-collapsible discipline-create-section">
+                <summary id="create-discipline-heading">
+                    <span>Vytvořit novou disciplínu</span>
+                    <span class="discipline-admin-collapsible-icon" aria-hidden="true"></span>
+                </summary>
 
                 <form id="create-discipline-form"
                       method="post"
@@ -160,7 +166,7 @@
                         <button class="button" type="submit">Vytvořit a připravit k přiřazení</button>
                     </div>
                 </form>
-            </section>
+            </details>
         }
 
         @if (Model.Setup.Disciplines.Count == 0)
@@ -174,6 +180,24 @@
                 {
                     var canChangePlayingSystem = !item.IsLocked && !item.IsScheduleLocked;
                     <article class="discipline-card">
+                        <button class="discipline-card-toggle"
+                                type="button"
+                                data-discipline-card-toggle
+                                aria-expanded="false"
+                                aria-controls="discipline-card-content-@item.Id">
+                            <span class="seed-badge">@item.Order</span>
+                            <span class="discipline-card-toggle-title">@item.Name</span>
+                            @if (item.IsLocked && !item.IsClosed)
+                            {
+                                <span class="configuration-lock-badge">Uzamčeno</span>
+                            }
+                            @if (item.IsClosed)
+                            {
+                                <span class="configuration-lock-badge discipline-closed-badge">Uzavřeno</span>
+                            }
+                            <span class="discipline-card-toggle-icon" aria-hidden="true"></span>
+                        </button>
+                        <div id="discipline-card-content-@item.Id" class="discipline-card-content">
                         <div class="discipline-card-heading">
                             <div>
                                 <div class="edition-title">
@@ -206,13 +230,23 @@
                                 }
                             </div>
 
+                            <button class="discipline-actions-toggle"
+                                    type="button"
+                                    data-discipline-actions-toggle
+                                    aria-expanded="false"
+                                    aria-controls="discipline-actions-@item.Id">
+                                <span>Akce</span>
+                                <span class="discipline-actions-toggle-icon" aria-hidden="true"></span>
+                            </button>
+
                             @if (User.Identity?.IsAuthenticated == true)
                             {
-                                <div class="discipline-assignment-actions">
+                                <div id="discipline-actions-@item.Id" class="discipline-assignment-actions">
                                     <a class="button button-ghost button-small"
                                        asp-page="/Editions/DisciplineDetail"
                                        asp-route-id="@Model.Setup.EditionId"
                                        asp-route-disciplineId="@item.Id">
+                                        <svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-settings" /></svg>
                                         Nastavení
                                     </a>
 
@@ -220,6 +254,7 @@
                                        asp-page="/Editions/DisciplineParticipants"
                                        asp-route-id="@Model.Setup.EditionId"
                                        asp-route-disciplineId="@item.Id">
+                                        <svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-users" /></svg>
                                         Účastníci a týmy
                                     </a>
 
@@ -229,6 +264,7 @@
                                            asp-page="@(item.IsScheduleLocked ? "/Editions/DisciplineResults" : "/Editions/DisciplinePhases")"
                                            asp-route-id="@Model.Setup.EditionId"
                                            asp-route-disciplineId="@item.Id">
+                                            <svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-calendar" /></svg>
                                             @(item.IsScheduleLocked ? "Rozpis a výsledky" : "Rozpis")
                                         </a>
                                     }
@@ -238,6 +274,7 @@
                                                 type="button"
                                                 disabled
                                                 title="Nejprve přiřaďte účastníky a vytvořte všechny týmy.">
+                                            <svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-calendar" /></svg>
                                             @(item.IsScheduleLocked ? "Rozpis a výsledky" : "Rozpis")
                                         </button>
                                     }
@@ -247,6 +284,7 @@
                                             data-open-modal="remove-discipline-modal-@item.Id"
                                             disabled="@(!item.CanRemove)"
                                             title="@item.RemoveBlockReason">
+                                        <svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-trash" /></svg>
                                         Odebrat
                                     </button>
                                     @if (!item.IsClosed)
@@ -254,12 +292,16 @@
                                         <form method="post" asp-page-handler="@(item.IsLocked ? "UnlockDiscipline" : "LockDiscipline")">
                                             <input type="hidden" name="disciplineId" value="@item.Id" />
                                             <button class="button button-small" type="submit">
+                                                <svg class="button-action-icon" aria-hidden="true"><use href="@(item.IsLocked ? "#action-icon-unlock" : "#action-icon-lock")" /></svg>
                                                 @(item.IsLocked ? "Odemknout" : "Uzamknout")
                                             </button>
                                         </form>
                                         @if (item.FinalStandings is { Count: > 0 })
                                         {
-                                            <button class="button button-small" type="button" data-open-modal="close-discipline-modal-@item.Id">Uzavřít</button>
+                                            <button class="button button-small" type="button" data-open-modal="close-discipline-modal-@item.Id">
+                                                <svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-lock" /></svg>
+                                                Uzavřít
+                                            </button>
                                         }
                                         else
                                         {
@@ -268,6 +310,7 @@
                                                     data-open-modal="finalize-discipline-modal-@item.Id"
                                                     disabled="@(!item.CanFinalize)"
                                                     title="@(item.AwardPointSystemId is null ? "Nejprve vyberte bodovací systém na detailu disciplíny." : !item.AreAllMatchesCompleted ? "Nejprve odehrajte všechny zápasy." : null)">
+                                                <svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-trophy" /></svg>
                                                 Přidělit body a uzavřít
                                             </button>
                                         }
@@ -276,11 +319,12 @@
                             }
                             else
                             {
-                                <div class="discipline-assignment-actions">
+                                <div id="discipline-actions-@item.Id" class="discipline-assignment-actions">
                                     <a class="button button-ghost button-small"
                                        asp-page="/Editions/DisciplineDetail"
                                        asp-route-id="@Model.Setup.EditionId"
                                        asp-route-disciplineId="@item.Id">
+                                        <svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-settings" /></svg>
                                         Detail
                                     </a>
                                     @if (item.IsPhaseSetupAvailable)
@@ -289,6 +333,7 @@
                                            asp-page="@(item.IsScheduleLocked ? "/Editions/DisciplineResults" : "/Editions/DisciplinePhases")"
                                            asp-route-id="@Model.Setup.EditionId"
                                            asp-route-disciplineId="@item.Id">
+                                            <svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-calendar" /></svg>
                                             @(item.IsScheduleLocked ? "Rozpis a výsledky" : "Rozpis")
                                         </a>
                                     }
@@ -489,6 +534,7 @@
                                 </section>
                             </div>
                         }
+                        </div>
                     </article>
                 }
             </div>
@@ -517,6 +563,7 @@
                 button.addEventListener("click", () => {
                     const modal = document.getElementById(button.dataset.openModal);
                     if (modal) {
+                        document.body.appendChild(modal);
                         modal.hidden = false;
                         modal.querySelector("button")?.focus();
                     }
@@ -528,6 +575,20 @@
             document.querySelectorAll(".modal-backdrop").forEach(backdrop => {
                 backdrop.addEventListener("click", event => {
                     if (event.target === backdrop) backdrop.hidden = true;
+                });
+            });
+
+            document.querySelectorAll("[data-discipline-card-toggle]").forEach(button => {
+                button.addEventListener("click", () => {
+                    const isExpanded = button.getAttribute("aria-expanded") === "true";
+                    button.setAttribute("aria-expanded", (!isExpanded).toString());
+                });
+            });
+
+            document.querySelectorAll("[data-discipline-actions-toggle]").forEach(button => {
+                button.addEventListener("click", () => {
+                    const isExpanded = button.getAttribute("aria-expanded") === "true";
+                    button.setAttribute("aria-expanded", (!isExpanded).toString());
                 });
             });
         })();

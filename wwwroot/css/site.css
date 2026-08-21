@@ -102,6 +102,7 @@ h1 { font-size: clamp(1.9rem, 4.5vw, 3.2rem); }
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    gap: 10px;
     margin-top: 22px;
     padding: 12px 20px;
     color: #fff;
@@ -156,7 +157,8 @@ h1 { font-size: clamp(1.9rem, 4.5vw, 3.2rem); }
 .details-grid dt { color: var(--muted); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
 .details-grid dd { margin: 7px 0 0; font-size: 1.1rem; font-weight: 700; }
 .details-wide { grid-column: 1 / -1; }
-.edition-actions { display: grid; gap: 18px; margin-top: 8px; }
+.edition-actions { display: grid; gap: 18px; margin-top: 16px; }
+.edition-actions-toggle { display: none; }
 .action-group { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
 .action-group form { display: contents; }
 .action-group .button { margin-top: 0; }
@@ -380,6 +382,7 @@ h1 { font-size: clamp(1.9rem, 4.5vw, 3.2rem); }
 .destructive-warning p { margin: 6px 0 0; color: #7f1d1d; }
 .phase-heading-actions { width: 100%; justify-content: flex-end; }
 .phase-heading-actions:empty { display: none; }
+.phase-actions-toggle { display: none; }
 
 @media (min-width: 701px) {
     .phase-page-heading {
@@ -506,6 +509,7 @@ h1 { font-size: clamp(1.9rem, 4.5vw, 3.2rem); }
 .discipline-settings-grid label { display: block; margin-bottom: 6px; font-weight: 650; }
 .discipline-list { display: grid; gap: 16px; margin-top: 24px; }
 .discipline-card { padding: 20px; background: #fff; border: 1px solid #dbe3ef; border-radius: calc(var(--radius) * .65); }
+.discipline-card-toggle { display: none; }
 .discipline-card-heading { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 14px 20px; }
 .compact-grid { grid-template-columns: .55fr .7fr 1.1fr 1.2fr auto; }
 .discipline-actions, .participant-toolbar { margin-top: 16px; }
@@ -552,7 +556,23 @@ h1 { font-size: clamp(1.9rem, 4.5vw, 3.2rem); }
 .disciplines-page > .discipline-form-feedback { order: 2; }
 .disciplines-page > .discipline-attach-section { order: 3; margin-top: 18px; }
 .disciplines-page > .discipline-create-divider { order: 4; }
-.disciplines-page > .discipline-create-section { order: 5; }
+.disciplines-page > .discipline-create-section { order: 5; margin-top: 0; }
+.discipline-admin-collapsible > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    color: var(--text);
+    font-size: 1.3rem;
+    font-weight: 850;
+    cursor: pointer;
+    list-style: none;
+}
+.discipline-admin-collapsible > summary::-webkit-details-marker { display: none; }
+.discipline-admin-collapsible-icon { width: 11px; height: 11px; flex: 0 0 auto; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); transition: transform .18s ease; }
+.discipline-admin-collapsible[open] > summary { margin-bottom: 16px; }
+.discipline-admin-collapsible[open] > summary .discipline-admin-collapsible-icon { transform: rotate(225deg); }
+.discipline-admin-collapsible[open] .discipline-settings-grid { margin-top: 0; }
 .participant-management-lock { min-width: 0; margin: 0; padding: 0; border: 0; }
 .participant-management-lock[disabled] { opacity: .72; }
 .participant-create-schedule-action { display: flex; justify-content: flex-start; margin-top: 22px; }
@@ -573,6 +593,9 @@ h1 { font-size: clamp(1.9rem, 4.5vw, 3.2rem); }
 .discipline-update-form input:disabled { color: var(--muted); background: #f1f5f9; cursor: not-allowed; opacity: 1; }
 .discipline-update-form .button, .discipline-assignment-actions .button { margin-top: 0; white-space: nowrap; }
 .discipline-assignment-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; flex: 0 0 auto; }
+.page-icon-symbols { position: absolute; width: 0; height: 0; overflow: hidden; }
+.button-action-icon { width: 16px; height: 16px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.discipline-actions-toggle { display: none; }
 .blocked-action-reason { display: block; margin-top: 6px; color: #991b1b; font-size: .76rem; }
 .discipline-assignment-actions form { display: contents; }
 .discipline-scoring-section { margin-top: 4px; }
@@ -709,6 +732,8 @@ h1 { font-size: clamp(1.9rem, 4.5vw, 3.2rem); }
     .auth-actions .button { width: 100%; }
     .panel { padding: 24px; }
     .page-heading, .edition-row { align-items: flex-start; flex-direction: column; }
+    .page-heading:has(.button-back) { position: relative; width: 100%; padding-right: 96px; }
+    .page-heading .button-back { position: absolute; top: 0; right: 0; width: auto; margin: 0; }
     .competitor-stats-heading, .competitor-registration-heading { flex-direction: row; flex-wrap: wrap; }
     .form-grid, .details-grid { grid-template-columns: 1fr; }
     .search-actions, .inline-form, .registration-actions { align-items: stretch; flex-direction: column; }
@@ -725,6 +750,43 @@ h1 { font-size: clamp(1.9rem, 4.5vw, 3.2rem); }
     .participant-schedule-lock-notice { margin-top: 14px; }
     .phase-team-list .assignment-status { margin-left: 32px; }
     .team-row { flex-direction: column; }
+
+    .edition-actions-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        width: 100%;
+        min-height: 42px;
+        margin-top: 18px;
+        padding: 9px 12px;
+        color: var(--accent);
+        background: transparent;
+        border: 1px solid var(--accent);
+        border-radius: 10px;
+        font: inherit;
+        font-weight: 800;
+        cursor: pointer;
+    }
+    .edition-actions-toggle-icon { width: 9px; height: 9px; flex: 0 0 auto; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); transition: transform .18s ease; }
+    .edition-actions-toggle[aria-expanded="true"] .edition-actions-toggle-icon { transform: rotate(225deg); }
+    .edition-actions-toggle + .edition-actions { display: none; gap: 3px; margin-top: 4px; }
+    .edition-actions-toggle[aria-expanded="true"] + .edition-actions { display: grid; }
+    .edition-actions .action-group { align-items: stretch; flex-direction: column; gap: 3px; }
+    .edition-actions .action-group-navigation { padding-top: 0; border-top: 0; }
+    .edition-actions .button {
+        justify-content: flex-start;
+        width: 100%;
+        min-height: 40px;
+        padding: 8px 5px;
+        color: var(--text);
+        background: transparent;
+        border: 0;
+        border-radius: 8px;
+        box-shadow: none;
+    }
+    .edition-actions .button:hover { color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+    .details-grid { margin-top: 18px; }
 }
 
 @media (max-width: 410px) {
@@ -746,9 +808,117 @@ h1 { font-size: clamp(1.9rem, 4.5vw, 3.2rem); }
 }
 
 @media (max-width: 700px) {
+    .discipline-list { gap: 10px; }
+    .discipline-admin-collapsible > summary { font-size: 1.12rem; }
+    .discipline-card { padding: 0; overflow: hidden; }
+    .discipline-card-toggle {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        min-height: 62px;
+        padding: 12px 14px;
+        color: var(--text);
+        background: transparent;
+        border: 0;
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+    }
+    .discipline-card-toggle-title { min-width: 0; flex: 1; overflow-wrap: anywhere; font-size: 1.12rem; font-weight: 850; }
+    .discipline-card-toggle .configuration-lock-badge { flex: 0 0 auto; }
+    .discipline-card-toggle-icon { width: 10px; height: 10px; flex: 0 0 auto; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); transition: transform .18s ease; }
+    .discipline-card-toggle[aria-expanded="true"] .discipline-card-toggle-icon { transform: rotate(225deg); }
+    .discipline-card-content { display: none; padding: 4px 14px 16px; border-top: 1px solid #dbe3ef; }
+    .discipline-card-toggle[aria-expanded="true"] + .discipline-card-content { display: block; }
+    .discipline-card-content .discipline-card-heading > div > .edition-title { display: none; }
+
+    .discipline-actions-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        width: 100%;
+        min-height: 42px;
+        padding: 9px 12px;
+        color: var(--accent);
+        background: transparent;
+        border: 1px solid var(--accent);
+        border-radius: 10px;
+        font: inherit;
+        font-weight: 800;
+        cursor: pointer;
+    }
+    .discipline-actions-toggle-icon { width: 9px; height: 9px; flex: 0 0 auto; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); transition: transform .18s ease; }
+    .discipline-actions-toggle[aria-expanded="true"] .discipline-actions-toggle-icon { transform: rotate(225deg); }
+    .discipline-assignment-actions {
+        display: none;
+        align-items: stretch;
+        flex-direction: column;
+        gap: 3px;
+        width: 100%;
+        margin-top: 4px;
+    }
+    .discipline-actions-toggle[aria-expanded="true"] + .discipline-assignment-actions { display: flex; }
+    .discipline-assignment-actions .button {
+        justify-content: flex-start;
+        width: 100%;
+        min-height: 40px;
+        padding: 8px 5px;
+        color: var(--text);
+        background: transparent;
+        border: 0;
+        border-radius: 8px;
+        box-shadow: none;
+    }
+    .discipline-assignment-actions .button:hover { color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+    .discipline-assignment-actions .button-danger { color: #dc2626; }
+    .discipline-assignment-actions .button:disabled { color: var(--muted); background: transparent; opacity: .55; }
+
+    .results-workflow .phase-actions-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        width: 100%;
+        min-height: 42px;
+        padding: 9px 12px;
+        color: var(--accent);
+        background: transparent;
+        border: 1px solid var(--accent);
+        border-radius: 10px;
+        font: inherit;
+        font-weight: 800;
+        cursor: pointer;
+    }
+    .results-workflow .phase-actions-toggle:has(+ .phase-heading-actions:empty) { display: none; }
+    .phase-actions-toggle-icon { width: 9px; height: 9px; flex: 0 0 auto; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); transition: transform .18s ease; }
+    .phase-actions-toggle[aria-expanded="true"] .phase-actions-toggle-icon { transform: rotate(225deg); }
+    .results-workflow .phase-actions-toggle + .phase-heading-actions {
+        display: none;
+        align-items: stretch;
+        flex-direction: column;
+        gap: 3px;
+        width: 100%;
+        margin-top: 4px;
+    }
+    .results-workflow .phase-actions-toggle[aria-expanded="true"] + .phase-heading-actions { display: flex; }
+    .results-workflow .phase-heading-actions .button {
+        justify-content: flex-start;
+        width: 100%;
+        min-height: 40px;
+        padding: 8px 5px;
+        color: var(--text);
+        background: transparent;
+        border: 0;
+        border-radius: 8px;
+        box-shadow: none;
+    }
+    .results-workflow .phase-heading-actions .button:hover { color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+    .results-workflow .phase-heading-actions .button-danger { color: #dc2626; }
+    .results-workflow .phase-heading-actions .button:disabled { color: var(--muted); background: transparent; opacity: .55; }
+
     .discipline-settings-grid, .discipline-update-form { grid-template-columns: 1fr; }
-    .discipline-assignment-actions { align-items: stretch; flex-direction: column; }
-    .discipline-assignment-actions .button { width: 100%; }
     .discipline-detail-form { grid-template-columns: 1fr; }
     .discipline-description-field, .discipline-detail-actions { grid-column: auto; }
     .point-rule-row { grid-template-columns: 1fr 1fr; }

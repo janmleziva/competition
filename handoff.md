@@ -24,6 +24,11 @@ This change set completes the final UI, validation, phase setup, scoring, and st
 - Show the corresponding notice in the discipline overview in the same summary area as other discipline outcomes.
 - Aggregate final-standing scores and subscores from all completed matches, including placement and knockout/final matches, rather than group matches only.
 - Wrap long scheduled matchup names instead of truncating meaningful group/stage information.
+- Collapse discipline cards and discipline-administration forms into compact disclosures on mobile.
+- Replace large mobile action-button stacks with accessible `Akce` submenus on discipline, results, and edition-detail views.
+- Use one shared, dependency-free SVG icon set for recurring actions such as back, standings, statistics, schedules, edit, delete, lock, and create.
+- Keep mobile Back actions on the title row and align them to the right.
+- Re-parent discipline-card confirmation modals when opened so they remain centered against the viewport.
 
 ## Important implementation details
 
@@ -31,6 +36,7 @@ This change set completes the final UI, validation, phase setup, scoring, and st
 - `GroupStandingsService.ApplyAllMatchAggregates` augments final standings with every completed match while preserving the decided placement order.
 - Competitor removal availability is exposed before submission through `ICompetitorAdministrationService` and enforced in the UI as well as the service layer.
 - Responsive changes are concentrated in `wwwroot/css/site.css`; the desktop phase heading uses an explicit full-width grid track so its two action rows can align to the right edge.
+- Shared action symbols live in `Pages/Shared/_ActionIcons.cshtml` and are loaded once by the application layout.
 
 ## Validation
 

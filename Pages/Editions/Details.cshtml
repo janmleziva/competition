@@ -19,24 +19,26 @@
             <div class="status-message" role="status">@Model.StatusMessage</div>
         }
 
-        <dl class="details-grid">
-            <div class="details-wide"><dt>Město</dt><dd>@Model.Edition.City</dd></div>
-            <div><dt>Začátek</dt><dd>@Model.FormatDate(Model.Edition.StartDate)</dd></div>
-            <div><dt>Konec</dt><dd>@Model.FormatDate(Model.Edition.EndDate)</dd></div>
-        </dl>
-
-        <div class="edition-actions">
+        <button class="edition-actions-toggle"
+                type="button"
+                data-edition-actions-toggle
+                aria-expanded="false"
+                aria-controls="edition-actions">
+            <span>Akce</span>
+            <span class="edition-actions-toggle-icon" aria-hidden="true"></span>
+        </button>
+        <div id="edition-actions" class="edition-actions">
             <div class="action-group" aria-label="Tento ročník">
-                <a class="button" asp-page="/Editions/Competitors" asp-route-id="@Model.Edition.Id">Soutěžící</a>
-                <a class="button" asp-page="/Editions/Disciplines" asp-route-id="@Model.Edition.Id">Disciplíny</a>
-                <a class="button" asp-page="/Editions/OverallStandings" asp-route-id="@Model.Edition.Id">Celkové pořadí</a>
+                <a class="button" asp-page="/Editions/Competitors" asp-route-id="@Model.Edition.Id"><svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-users" /></svg>Soutěžící</a>
+                <a class="button" asp-page="/Editions/Disciplines" asp-route-id="@Model.Edition.Id"><svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-grid" /></svg>Disciplíny</a>
+                <a class="button" asp-page="/Editions/OverallStandings" asp-route-id="@Model.Edition.Id"><svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-trophy" /></svg>Celkové pořadí</a>
                 @if (User.Identity?.IsAuthenticated == true)
                 {
-                <a class="button" asp-page="/Editions/Edit" asp-route-id="@Model.Edition.Id">Upravit</a>
+                <a class="button" asp-page="/Editions/Edit" asp-route-id="@Model.Edition.Id"><svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-edit" /></svg>Upravit</a>
                     @if (!Model.Edition.IsActive)
                     {
                         <form method="post" asp-page-handler="SetActive">
-                            <button class="button" type="submit">Nastavit jako aktivní</button>
+                            <button class="button" type="submit"><svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-trophy" /></svg>Nastavit jako aktivní</button>
                         </form>
                     }
                 }
@@ -44,10 +46,25 @@
             <div class="action-group action-group-navigation" aria-label="Navigace mezi ročníky">
                 @if (User.Identity?.IsAuthenticated == true)
                 {
-                    <a class="button button-ghost" asp-page="/Editions/Create">Nový ročník</a>
+                    <a class="button button-ghost" asp-page="/Editions/Create"><svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-plus" /></svg>Nový ročník</a>
                 }
-                <a class="button button-ghost" asp-page="/Editions/Index">Všechny ročníky</a>
+                <a class="button button-ghost" asp-page="/Editions/Index"><svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-calendar" /></svg>Všechny ročníky</a>
             </div>
         </div>
+
+        <dl class="details-grid">
+            <div class="details-wide"><dt>Město</dt><dd>@Model.Edition.City</dd></div>
+            <div><dt>Začátek</dt><dd>@Model.FormatDate(Model.Edition.StartDate)</dd></div>
+            <div><dt>Konec</dt><dd>@Model.FormatDate(Model.Edition.EndDate)</dd></div>
+        </dl>
     </section>
 </main>
+
+<script>
+    document.querySelectorAll("[data-edition-actions-toggle]").forEach(button => {
+        button.addEventListener("click", () => {
+            const isExpanded = button.getAttribute("aria-expanded") === "true";
+            button.setAttribute("aria-expanded", (!isExpanded).toString());
+        });
+    });
+</script>

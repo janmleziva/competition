@@ -32,11 +32,12 @@
                 {
                     <form method="post" asp-page-handler="@(item.IsLocked ? "Unlock" : "Lock")">
                         <button class="button" type="submit">
+                            <svg class="button-action-icon" aria-hidden="true"><use href="@(item.IsLocked ? "#action-icon-unlock" : "#action-icon-lock")" /></svg>
                             @(item.IsLocked ? "Odemknout disciplínu" : "Uzamknout disciplínu")
                         </button>
                     </form>
                 }
-                <a class="button button-ghost" asp-page="/Editions/Disciplines" asp-route-id="@Model.Setup.EditionId">Zpět</a>
+                <a class="button button-ghost button-back" asp-page="/Editions/Disciplines" asp-route-id="@Model.Setup.EditionId"><svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-arrow-left" /></svg>Zpět</a>
             </div>
         </div>
 

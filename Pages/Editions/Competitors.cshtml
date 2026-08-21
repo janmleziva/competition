@@ -11,7 +11,7 @@
                 <h1>Soutěžící</h1>
                 <p class="lead">@Model.Registration.EditionName</p>
             </div>
-            <a class="button button-ghost" asp-page="/Editions/Details" asp-route-id="@Model.Registration.EditionId">Zpět</a>
+            <a class="button button-ghost button-back" asp-page="/Editions/Details" asp-route-id="@Model.Registration.EditionId"><svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-arrow-left" /></svg>Zpět</a>
         </div>
 
         @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
@@ -138,7 +138,7 @@
                     <input type="hidden" name="allowDuplicateName" value="true" />
                     <button class="button" type="submit">Přesto vytvořit a přihlásit</button>
                 </form>
-                <button class="button button-ghost" type="button" onclick="document.getElementById('duplicate-modal').remove(); document.getElementById('newCompetitor_FirstName').focus();">Zpět k formuláři</button>
+                <button class="button button-ghost" type="button" onclick="document.getElementById('duplicate-modal').remove(); document.getElementById('newCompetitor_FirstName').focus();"><svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-arrow-left" /></svg>Zpět k formuláři</button>
             </div>
         </section>
     </div>

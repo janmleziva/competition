@@ -49,20 +49,20 @@
                             <span class="meta-inline">Narozen/a: @Model.FormatDate(competitor.DateOfBirth) · Ročníky: @competitor.EditionCount</span>
                         </div>
                         <div class="row-actions">
-                            <a class="button button-ghost button-small" asp-page="/Competitors/Stats" asp-route-id="@competitor.Id">Statistiky</a>
+                            <a class="button button-ghost button-small" asp-page="/Competitors/Stats" asp-route-id="@competitor.Id"><svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-chart" /></svg>Statistiky</a>
                             @if (User.Identity?.IsAuthenticated == true)
                             {
-                                <a class="button button-ghost button-small" asp-page="/Competitors/Edit" asp-route-id="@competitor.Id">Upravit</a>
+                                <a class="button button-ghost button-small" asp-page="/Competitors/Edit" asp-route-id="@competitor.Id"><svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-edit" /></svg>Upravit</a>
                                 @if (competitor.EditionCount == 0)
                                 {
                                     <form method="post" asp-page-handler="Delete" asp-route-id="@competitor.Id">
-                                        <button class="button button-danger button-small" type="submit">Smazat</button>
+                                        <button class="button button-danger button-small" type="submit"><svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-trash" /></svg>Smazat</button>
                                     </form>
                                 }
                                 else
                                 {
                                     <span class="disabled-tooltip" title="zaregistrovaný soutěžící nemůže být smazán">
-                                        <button class="button button-danger button-small" type="button" disabled title="zaregistrovaný soutěžící nemůže být smazán">Smazat</button>
+                                        <button class="button button-danger button-small" type="button" disabled title="zaregistrovaný soutěžící nemůže být smazán"><svg class="button-action-icon" aria-hidden="true"><use href="#action-icon-trash" /></svg>Smazat</button>
                                     </span>
                                 }
                             }
